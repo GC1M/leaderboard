@@ -20,6 +20,12 @@ function Routes() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={gate === 'signed-in'}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="groups/index" />
+        <Stack.Screen name="groups/join" />
+        <Stack.Screen name="groups/new" />
+        <Stack.Screen name="join/[code]" />
+        <Stack.Screen name="steps/index" />
+        <Stack.Screen name="steps/permission" />
       </Stack.Protected>
       <Stack.Protected guard={gate === 'signed-out'}>
         <Stack.Screen name="sign-in" />

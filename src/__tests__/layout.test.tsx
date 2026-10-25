@@ -2,7 +2,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { act } from 'react';
 import { createRoot } from 'test-renderer';
 
-import RootLayout from './_layout';
+import RootLayout from '@/app/_layout';
 
 const mockAuth = jest.fn();
 jest.mock('@/lib/auth', () => ({

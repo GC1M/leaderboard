@@ -24,7 +24,7 @@ async function setup() {
   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = 'web';
   process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID = 'ios';
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const SignIn = require('./sign-in').default;
+  const SignIn = require('@/app/sign-in').default;
   const renderer = createRoot();
   await act(async () => {
     renderer.render(<SignIn />);
