@@ -36,6 +36,7 @@ const config: ExpoConfig = {
         backgroundColor: '#0D1424',
         image: './assets/images/splash-icon.png',
         imageWidth: 76,
+        dark: { backgroundColor: '#0B1020', image: './assets/images/splash-icon.png' },
       },
     ],
     'expo-secure-store',
