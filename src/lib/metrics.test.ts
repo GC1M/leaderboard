@@ -35,9 +35,17 @@ describe('upsertDailyMetrics', () => {
       { onConflict: 'user_id,date,metric' },
     );
   });
-  it.each([80001, -1, 1.5])('rejects %p before hitting the database', async (value) => {
+  it.each([80001, -1, 1.5, NaN])('rejects manual %p before hitting the database', async (value) => {
     await expect(upsertDailyMetrics([{ date: '2026-10-25', value, source: 'manual' }])).rejects.toThrow(/80,000|whole/);
     expect(mockUpsert).not.toHaveBeenCalled();
+  });
+  it.each([-1, 1.5, NaN])('rejects healthkit %p before hitting the database', async (value) => {
+    await expect(upsertDailyMetrics([{ date: '2026-10-25', value, source: 'healthkit' }])).rejects.toThrow(/whole/);
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
+  it('stores a healthkit total above the manual cap unchanged', async () => {
+    await upsertDailyMetrics([{ date: '2026-10-25', value: 100000, source: 'healthkit' }]);
+    expect(mockUpsert.mock.calls[0][0][0].value).toBe(100000);
   });
   it('maps a check violation to the friendly cap message', async () => {
     mockUpsert.mockResolvedValue({ error: { code: '23514' } });

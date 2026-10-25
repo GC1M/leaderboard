@@ -11,15 +11,15 @@ export const SYNC_DAYS = 7;
 export type SyncResult =
   | { status: 'unavailable' }
   | { status: 'needs-permission' }
-  | { status: 'synced'; written: number; at: Date };
+  | { status: 'synced'; written: number; skipped: { date: string; value: number }[]; at: Date };
 
 export async function syncSteps(): Promise<SyncResult> {
   if (!isHealthAvailable()) return { status: 'unavailable' };
   if (await needsStepsPermission()) return { status: 'needs-permission' };
   const [health, existing] = await Promise.all([readDailySteps(SYNC_DAYS), getMyRecentSteps(SYNC_DAYS)]);
-  const rows = planSync(health, existing);
+  const { rows, skipped } = planSync(health, existing);
   await upsertDailyMetrics(rows);
-  return { status: 'synced', written: rows.length, at: new Date() };
+  return { status: 'synced', written: rows.length, skipped, at: new Date() };
 }
 
 // Syncs when the app returns to the foreground and on demand via `sync()` (pull-to-refresh).
