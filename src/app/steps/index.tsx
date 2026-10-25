@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, RefreshControl, Text, View } from 'react-native';
 
 import { Button, ErrorText, Screen, styles } from '@/components/ui';import { ManualEntry } from '@/components/steps/ManualEntry';
 import { StepRow } from '@/components/steps/StepRow';
@@ -87,7 +87,8 @@ export default function Steps() {
         </View>
       )}
 
-      {health && <Button plain label="Connect a Watch or Tracker" onPress={() => router.push('/steps/sources')} />}
+      {/* The how-to applies to any iPhone, even before Health access works (Expo Go, not yet allowed). */}
+      {Platform.OS === 'ios' && <Button plain label="Connect a Watch or Tracker" onPress={() => router.push('/steps/sources')} />}
 
       <View style={{ marginTop: 16 }}>
         <ManualEntry dates={dates} rows={rows ?? []} onSaved={load} />
