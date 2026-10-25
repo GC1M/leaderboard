@@ -30,6 +30,16 @@ export async function verifyEmailCode(email: string, token: string) {
   if (error) throw error;
 }
 
+export async function sendPhoneCode(phone: string) {
+  const { error } = await supabase.auth.signInWithOtp({ phone });
+  if (error) throw error;
+}
+
+export async function verifyPhoneCode(phone: string, token: string) {
+  const { error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
+  if (error) throw error;
+}
+
 export const appleAvailable = () => AppleAuthentication.isAvailableAsync().catch(() => false);
 
 // Returns false if the user cancelled.

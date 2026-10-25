@@ -5,14 +5,18 @@ import {
   appleAvailable,
   googleAvailable,
   sendEmailCode,
+  sendPhoneCode,
   signInWithApple,
   signInWithGoogle,
   verifyEmailCode,
+  verifyPhoneCode,
 } from '@/lib/sign-in';
+import { normalizePhone } from '@/lib/phone';
 
 export default function SignIn() {
   const [apple, setApple] = useState(false);
-  const [email, setEmail] = useState('');
+  // One input: anything with an @ is an email, otherwise a phone number.
+  const [contact, setContact] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -20,6 +24,10 @@ export default function SignIn() {
   useEffect(() => {
     appleAvailable().then(setApple);
   }, []);
+
+  const isEmail = contact.includes('@');
+  const phone = isEmail ? null : normalizePhone(contact);
+  const target = isEmail ? contact.trim() : phone;
 
   // The session change from supabase flips the route guard, so nothing to navigate to on success.
   const run = async (fn: () => Promise<unknown>) => {
@@ -40,12 +48,12 @@ export default function SignIn() {
       {googleAvailable() && <Button title="Sign in with Google" disabled={busy} onPress={() => run(signInWithGoogle)} />}
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder="Email or phone number"
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
+        value={contact}
+        onChangeText={setContact}
         editable={!codeSent}
       />
       {codeSent ? (
@@ -61,16 +69,16 @@ export default function SignIn() {
           <Button
             title="Verify code"
             disabled={busy || code.length !== 6}
-            onPress={() => run(() => verifyEmailCode(email.trim(), code))}
+            onPress={() => run(() => (isEmail ? verifyEmailCode(target!, code) : verifyPhoneCode(target!, code)))}
           />
         </>
       ) : (
         <Button
-          title="Email me a code"
-          disabled={busy || !email.trim()}
+          title="Send me a code"
+          disabled={busy || !target}
           onPress={() =>
             run(async () => {
-              await sendEmailCode(email.trim());
+              await (isEmail ? sendEmailCode(target!) : sendPhoneCode(target!));
               setCodeSent(true);
             })
           }

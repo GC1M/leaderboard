@@ -24,6 +24,6 @@ test('sign-in screen renders without the Google module, keeps Apple and email', 
   });
   const json = JSON.stringify(renderer.container);
   expect(json).toContain('Sign in with Apple');
-  expect(json).toContain('Email me a code');
+  expect(json).toContain('Send me a code');
   expect(json).not.toContain('Sign in with Google');
 });

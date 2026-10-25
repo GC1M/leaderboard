@@ -1,6 +1,6 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 
-import { sendEmailCode, signInWithApple, verifyEmailCode } from './sign-in';
+import { sendEmailCode, sendPhoneCode, verifyPhoneCode, signInWithApple, verifyEmailCode } from './sign-in';
 import { supabase } from './supabase';
 
 jest.mock('./supabase', () => {
@@ -80,4 +80,16 @@ test('Apple: cancel returns false and never calls Supabase', async () => {
   apple.mockRejectedValue({ code: 'ERR_REQUEST_CANCELED' });
   expect(await signInWithApple()).toBe(false);
   expect(s.auth.signInWithIdToken).not.toHaveBeenCalled();
+});
+
+test('phone: sends an SMS OTP and verifies it with type sms', async () => {
+  await sendPhoneCode('+14152127777');
+  expect(s.auth.signInWithOtp).toHaveBeenCalledWith({ phone: '+14152127777' });
+  await verifyPhoneCode('+14152127777', '123456');
+  expect(s.auth.verifyOtp).toHaveBeenCalledWith({ phone: '+14152127777', token: '123456', type: 'sms' });
+});
+
+test('phone: errors are thrown', async () => {
+  s.auth.signInWithOtp.mockResolvedValueOnce({ error: new Error('sms failed') });
+  await expect(sendPhoneCode('+14152127777')).rejects.toThrow('sms failed');
 });
