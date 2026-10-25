@@ -32,3 +32,19 @@ test('other users are not highlighted; no-data rows say so', async () => {
   expect(out).toContain('No data');
   expect(out).toContain('"width":"0%"');
 });
+
+test('medal color for the podium and the source caption', async () => {
+  const out = await render(
+    <LeaderboardRowView
+      row={{ userId: 'c', name: 'Cy', value: 900, rank: 1 }}
+      rankLabel="1"
+      metric="steps"
+      isYou={false}
+      leader={900}
+      source={{ text: 'Manual', manual: true }}
+    />,
+  );
+  expect(out).toContain('#9A6B00'); // gold
+  expect(out).toContain('#8A5A00'); // manual color
+  expect(out).toContain('Rank 1, Cy, 900, Manual');
+});

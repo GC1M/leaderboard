@@ -143,6 +143,18 @@ export function Field({
   );
 }
 
+// Flat placeholder rows while a list loads. No shimmer.
+export function Skeleton({ label, rows = 3 }: { label: string; rows?: number }) {
+  const c = useTheme();
+  return (
+    <View accessible accessibilityLabel={label} accessibilityRole="progressbar" style={{ gap: 12 }}>
+      {Array.from({ length: rows }, (_, i) => (
+        <View key={i} style={[styles.skeleton, { backgroundColor: c.lane }]} />
+      ))}
+    </View>
+  );
+}
+
 export function ErrorText({ children }: { children?: string | null }) {
   const c = useTheme();
   if (!children) return null;
@@ -164,5 +176,6 @@ export const styles = StyleSheet.create({
   button: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   link: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   input: { minHeight: 48, borderRadius: 8 },
+  skeleton: { height: 64, borderRadius: 8, opacity: 0.6 },
   code: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: 4, fontVariant: ['tabular-nums'] },
 });
