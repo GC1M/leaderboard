@@ -7,7 +7,7 @@ import { Button, ErrorText, Field, Row, Screen, Section, Skeleton, styles } from
 import { useAuth } from '@/lib/auth';
 import {
   deleteGroup,
-  deleteMemberSteps,
+  deleteMemberManualSteps,
   inviteLink,
   leaveGroup,
   listMembers,
@@ -15,7 +15,6 @@ import {
   renameGroup,
   type Member,
 } from '@/lib/groups';
-import { localDateKey } from '@/lib/health/dates';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/theme';
 
@@ -91,9 +90,9 @@ export default function GroupInfo() {
   const memberOptions = (m: Member) =>
     Alert.alert(m.name, undefined, [
       {
-        text: "Delete Today's Steps",
+        text: "Delete Today's Manual Steps",
         style: 'destructive',
-        onPress: () => act(() => deleteMemberSteps(id, m.userId, localDateKey(new Date()))),
+        onPress: () => act(() => deleteMemberManualSteps(id, m.userId)),
       },
       {
         text: 'Remove from Group',
@@ -122,7 +121,9 @@ export default function GroupInfo() {
             setBusy(true);
             try {
               await (owner ? deleteGroup(id) : leaveGroup(id));
-              router.dismissTo('/groups');
+              // Group info sits on the root stack above the tabs: pop back to the tabs, then show Groups.
+              router.dismissAll();
+              router.navigate('/groups');
             } catch (e) {
               setBusy(false);
               setError(e instanceof Error ? e.message : 'Something went wrong. Try again.');
@@ -172,7 +173,7 @@ export default function GroupInfo() {
         />
       </Section>
 
-      <Section title={`${members.length} ${members.length === 1 ? 'member' : 'members'}`} footer={owner ? 'Tap a member to delete their steps for today or remove them.' : undefined}>
+      <Section title={`${members.length} ${members.length === 1 ? 'member' : 'members'}`} footer={owner ? 'Tap a member to remove them or delete steps they typed in today. Health steps can\'t be deleted.' : undefined}>
         {members.map((m, i) => {
           const manageable = owner && m.userId !== me;
           const tag = [m.userId === me && 'You', m.role === 'owner' && 'Owner'].filter(Boolean).join(', ');

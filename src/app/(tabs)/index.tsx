@@ -30,9 +30,10 @@ export default function Summary() {
     try {
       const [s, groups] = await Promise.all([getMyRecentSteps(7), listMyGroups()]);
       // ponytail: one leaderboard call per group; fine for a handful of groups, add a batched RPC if people join dozens.
-      const boards = await Promise.all(groups.map((g) => getLeaderboard(g.id, 'steps', 'day')));
+      // One group failing (e.g. you were just removed) shouldn't blank the whole summary.
+      const boards = await Promise.allSettled(groups.map((g) => getLeaderboard(g.id, 'steps', 'day')));
       setSteps(s);
-      setCards(groups.map((g, i) => ({ ...g, standing: myStanding(boards[i], me) })));
+      setCards(groups.map((g, i) => ({ ...g, standing: boards[i].status === 'fulfilled' ? myStanding(boards[i].value, me) : null })));
       setError(null);
     } catch {
       setError("Couldn't load your summary. Pull down to try again.");

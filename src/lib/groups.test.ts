@@ -1,7 +1,7 @@
 import {
   createGroup,
   deleteGroup,
-  deleteMemberSteps,
+  deleteMemberManualSteps,
   friendlyError,
   inviteLink,
   isValidCode,
@@ -130,8 +130,8 @@ test('owner RPCs send the right args and map errors', async () => {
   rpc.mockResolvedValue({ data: null, error: null });
   await removeMember('g', 'u');
   expect(rpc).toHaveBeenCalledWith('remove_member', { p_group_id: 'g', p_user_id: 'u' });
-  await deleteMemberSteps('g', 'u', '2026-10-25');
-  expect(rpc).toHaveBeenCalledWith('delete_member_metric', { p_group_id: 'g', p_user_id: 'u', p_date: '2026-10-25', p_metric: 'steps' });
-  rpc.mockResolvedValue({ data: null, error: { message: 'no entry for that day' } });
-  await expect(deleteMemberSteps('g', 'u', '2026-10-25')).rejects.toThrow(/no steps for that day/);
+  await deleteMemberManualSteps('g', 'u');
+  expect(rpc).toHaveBeenCalledWith('delete_member_manual_entry', { p_group_id: 'g', p_user_id: 'u', p_metric: 'steps' });
+  rpc.mockResolvedValue({ data: null, error: { message: 'no manual entry for today' } });
+  await expect(deleteMemberManualSteps('g', 'u')).rejects.toThrow(/no manual steps for today/);
 });
