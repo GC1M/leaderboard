@@ -244,6 +244,16 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Email sign-in sends a 6-digit code ({{ .Token }}) instead of only a magic link.
+# magic_link is used for existing users, confirmation for first-time signups.
+[auth.email.template.magic_link]
+subject = "Your Leaderboard sign-in code"
+content_path = "./supabase/templates/otp.html"
+
+[auth.email.template.confirmation]
+subject = "Your Leaderboard sign-in code"
+content_path = "./supabase/templates/otp.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
@@ -321,9 +331,18 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
+[auth.external.google]
+enabled = true
+# Comma-separated: web client ID first, then the iOS client ID, so native ID tokens verify.
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+# The native Google SDK does not send a nonce.
+skip_nonce_check = true
+
 [auth.external.apple]
-enabled = false
-client_id = ""
+enabled = true
+# Native sign-in sends an ID token whose audience is the app bundle ID (comma-separate extra IDs, e.g. a web Services ID).
+client_id = "env(SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID)"
 # DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
 secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
 # Overrides the default auth callback URL derived from auth.external_url.
