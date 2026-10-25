@@ -63,3 +63,25 @@ export async function joinGroup(input: string): Promise<string> {
   if (!isValidCode(code)) throw new Error('Invite codes are 8 characters, letters and numbers only.');
   return friendly(supabase.rpc('join_group', { code }));
 }
+
+// RLS turns a forbidden delete into "0 rows", not an error, so check that a row actually went.
+async function deleteOne(p: PromiseLike<{ data: unknown[] | null; error: unknown }>, notAllowed: string) {
+  const rows = await friendly(p);
+  if (!rows?.length) throw new Error(notAllowed);
+}
+
+/** Owner only. Memberships go with it (on delete cascade). */
+export function deleteGroup(id: string): Promise<void> {
+  return deleteOne(supabase.from('groups').delete().eq('id', id).select('id'), 'Only the group owner can delete it.');
+}
+
+/** Members only; the owner deletes the group instead. */
+export async function leaveGroup(id: string): Promise<void> {
+  const { data: auth } = await supabase.auth.getSession();
+  const uid = auth.session?.user.id;
+  if (!uid) throw new Error(friendlyError({ message: 'not authenticated' }));
+  return deleteOne(
+    supabase.from('group_members').delete().eq('group_id', id).eq('user_id', uid).select('user_id'),
+    "The owner can't leave. Delete the group instead.",
+  );
+}

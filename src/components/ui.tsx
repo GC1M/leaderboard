@@ -60,12 +60,13 @@ export function Screen({
   );
 }
 
-// `secondary` is an outline button, `plain` is a text link (still 44pt tall).
+// `secondary` is an outline button, `plain` is a text link (still 44pt tall), `danger` colors a plain link red.
 export function Button({
   label,
   onPress,
   secondary,
   plain,
+  danger,
   busy,
   disabled,
 }: {
@@ -73,12 +74,13 @@ export function Button({
   onPress: () => void;
   secondary?: boolean;
   plain?: boolean;
+  danger?: boolean;
   busy?: boolean;
   disabled?: boolean;
 }) {
   const c = useTheme();
   const off = disabled || busy;
-  const fg = plain ? c.accent : secondary ? c.ink : c.onAccent;
+  const fg = danger ? c.danger : plain ? c.accent : secondary ? c.ink : c.onAccent;
   return (
     <Pressable
       accessibilityRole="button"

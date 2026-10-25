@@ -17,6 +17,7 @@ import {
   type Metric,
   type Period,
 } from '@/lib/leaderboard';
+import { deleteGroup, leaveGroup } from '@/lib/groups';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/theme';
 
@@ -27,7 +28,7 @@ const PERIODS: { key: Period; label: string }[] = [
   { key: 'week', label: 'This week' },
 ];
 
-type Group = { name: string; invite_code: string };
+type Group = { name: string; invite_code: string; owner_id: string };
 
 export default function GroupDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,7 +48,7 @@ export default function GroupDetail() {
 
   const load = useCallback(
     () =>
-      Promise.all([supabase.from('groups').select('name, invite_code').eq('id', id).single(), getLeaderboard(id, METRIC, period)])
+      Promise.all([supabase.from('groups').select('name, invite_code, owner_id').eq('id', id).single(), getLeaderboard(id, METRIC, period)])
         .then(([g, r]) => {
           if (g.error) throw g.error;
           setGroup(g.data);
@@ -69,6 +70,34 @@ export default function GroupDetail() {
     await load();
     setRefreshing(false);
   };
+
+  const owner = !!group && group.owner_id === me;
+  const [leaving, setLeaving] = useState(false);
+  const confirmLeave = () =>
+    group &&
+    Alert.alert(
+      owner ? `Delete ${group.name}?` : `Leave ${group.name}?`,
+      owner
+        ? 'Everyone in it loses this leaderboard. Steps stay in each person\'s history. This can\'t be undone.'
+        : 'You can join again later with the invite code.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: owner ? 'Delete group' : 'Leave group',
+          style: 'destructive',
+          onPress: async () => {
+            setLeaving(true);
+            try {
+              await (owner ? deleteGroup(id) : leaveGroup(id));
+              router.replace('/groups');
+            } catch (e) {
+              setLeaving(false);
+              Alert.alert(owner ? "Couldn't delete the group" : "Couldn't leave the group", e instanceof Error ? e.message : undefined);
+            }
+          },
+        },
+      ],
+    );
 
   const showCode = () =>
     group &&
@@ -151,11 +180,18 @@ export default function GroupDetail() {
           ListHeaderComponent={error ? <ErrorText>{error}</ErrorText> : undefined}
           ListEmptyComponent={<Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>No members yet.</Text>}
           ListFooterComponent={
-            rows.length > 0 && ranked === 0 ? (
-              <Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>
-                No steps recorded {period === 'day' ? 'today' : 'this week'} yet.
-              </Text>
-            ) : undefined
+            <>
+              {rows.length > 0 && ranked === 0 && (
+                <Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>
+                  No steps recorded {period === 'day' ? 'today' : 'this week'} yet.
+                </Text>
+              )}
+              {group && (
+                <View style={styles.manage}>
+                  <Button plain danger busy={leaving} label={owner ? 'Delete group' : 'Leave group'} onPress={confirmLeave} />
+                </View>
+              )}
+            </>
           }
           renderItem={({ item, index }) => (
             <LeaderboardRowView
@@ -192,5 +228,6 @@ const styles = StyleSheet.create({
   tab: { minHeight: 44, minWidth: 96, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 999 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
   empty: { textAlign: 'center', padding: 24 },
+  manage: { marginTop: 32 },
   youBar: { paddingTop: 12, paddingHorizontal: 16, borderTopWidth: StyleSheet.hairlineWidth },
 });
