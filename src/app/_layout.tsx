@@ -21,6 +21,7 @@ function Routes() {
       <Stack.Protected guard={gate === 'signed-in'}>
         <Stack.Screen name="index" />
         <Stack.Screen name="groups/index" />
+        <Stack.Screen name="groups/[id]" />
         <Stack.Screen name="groups/join" />
         <Stack.Screen name="groups/new" />
         <Stack.Screen name="join/[code]" />
