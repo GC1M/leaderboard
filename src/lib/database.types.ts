@@ -143,8 +143,8 @@ isOneToOne: false
         isOneToOne: true
         isSetofReturn: false
       } },
-"delete_member_metric":
-{ Args: { "p_date": string,"p_group_id": string,"p_metric": string,"p_user_id": string }; Returns: undefined
+"delete_member_manual_entry":
+{ Args: { "p_group_id": string,"p_metric": string,"p_user_id": string }; Returns: undefined
                            },
 "delete_my_account":
 { Args: Record<PropertyKey, never>; Returns: undefined

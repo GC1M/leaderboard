@@ -1,13 +1,17 @@
-import { useColorScheme } from 'react-native';
+import { type ColorValue, Platform, PlatformColor, useColorScheme } from 'react-native';
 
-// Tokens from the PLAN.md design section ("Race board"). One accent, and it means "you".
+// Surfaces, text and separators follow Apple's semantic system colors on iOS, so they also adapt to
+// Increase Contrast. The hex values are Apple's defaults, used on Android and web.
+// Brand colors (accent, "you", medals, manual) are ours; contrast figures are in PLAN.md "Tokens".
+const system = (name: string, hex: string): ColorValue => (Platform.OS === 'ios' ? PlatformColor(name) : hex);
+
 const light = {
-  bg: '#F3F5F8',
-  surface: '#FFFFFF',
-  ink: '#0D1424',
+  bg: system('systemGroupedBackground', '#F2F2F7'),
+  surface: system('secondarySystemGroupedBackground', '#FFFFFF'),
+  ink: system('label', '#000000'),
+  line: system('separator', '#C6C6C8'),
   inkSoft: '#4A5568',
-  border: '#8A94A6',
-  line: '#DDE2EA',
+  border: '#7A8496',
   accent: '#2340D8',
   onAccent: '#FFFFFF',
   youTint: '#E3E9FF',
@@ -19,12 +23,12 @@ const light = {
 };
 
 const dark: typeof light = {
-  bg: '#0B1020',
-  surface: '#151C30',
-  ink: '#EEF1F7',
+  bg: system('systemGroupedBackground', '#000000'),
+  surface: system('secondarySystemGroupedBackground', '#1C1C1E'),
+  ink: system('label', '#FFFFFF'),
+  line: system('separator', '#38383A'),
   inkSoft: '#A3AEC2',
   border: '#6B7691',
-  line: '#26304A',
   accent: '#8FA3FF',
   onAccent: '#0B1020',
   youTint: '#1F2A52',

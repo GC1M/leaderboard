@@ -133,15 +133,15 @@ export default function SignIn() {
               if (t.length === 6 && !busy) verify(t);
             }}
           />
-          <Button label="Verify code" busy={busy} disabled={code.length !== 6} onPress={() => verify(code)} />
+          <Button label="Verify Code" busy={busy} disabled={code.length !== 6} onPress={() => verify(code)} />
           <View style={local.row}>
             <Button
               plain
-              label={cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+              label={cooldown > 0 ? `Resend Code in ${cooldown}s` : 'Resend Code'}
               disabled={busy || cooldown > 0}
               onPress={send}
             />
-            <Button plain label={mode === 'email' ? 'Change email' : 'Change phone'} onPress={changeContact} />
+            <Button plain label={mode === 'email' ? 'Change Email' : 'Change Phone'} onPress={changeContact} />
           </View>
         </>
       ) : (
@@ -161,10 +161,10 @@ export default function SignIn() {
             value={contact}
             onChangeText={setContact}
           />
-          <Button label="Send me a code" busy={busy} disabled={!valid} onPress={send} />
+          <Button label="Send Me a Code" busy={busy} disabled={!valid} onPress={send} />
           <Button
             plain
-            label={mode === 'email' ? 'Use phone number instead' : 'Use email instead'}
+            label={mode === 'email' ? 'Use Phone Number Instead' : 'Use Email Instead'}
             onPress={() => switchMode(mode === 'email' ? 'phone' : 'email')}
           />
         </>

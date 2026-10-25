@@ -33,9 +33,9 @@ export default function HealthPermission() {
         We read your step count from Apple Health so your friends see a score they can trust. We only upload daily totals, never your location or workouts.
       </Text>
       <ErrorText>{error}</ErrorText>
-      <Button label="Allow Health access" busy={busy} onPress={allow} />
-      <Button label="Enter steps manually" secondary disabled={busy} onPress={() => router.replace('/steps')} />
-      <Button plain label="Using a Garmin, Oura or other tracker?" onPress={() => router.push('/steps/sources')} />
+      <Button label="Allow Health Access" busy={busy} onPress={allow} />
+      <Button label="Enter Steps Manually" secondary disabled={busy} onPress={() => router.replace('/steps')} />
+      <Button plain label="Using a Garmin, Oura or Other Tracker?" onPress={() => router.push('/steps/sources')} />
     </Screen>
   );
 }

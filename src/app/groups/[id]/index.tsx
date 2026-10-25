@@ -24,7 +24,7 @@ import { useTheme } from '@/theme';
 const METRIC: Metric = 'steps';
 const PERIODS: { key: Period; label: string }[] = [
   { key: 'day', label: 'Today' },
-  { key: 'week', label: 'This week' },
+  { key: 'week', label: 'This Week' },
 ];
 
 type Group = { name: string };
@@ -89,7 +89,7 @@ export default function GroupDetail() {
     <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>
       <View style={styles.header}>
         <Button plain label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
-        <Button plain label="Group info" onPress={() => router.push(`/groups/${id}/info`)} />
+        <Button plain label="Group Info" onPress={() => router.push(`/groups/${id}/info`)} />
       </View>
       <View style={styles.head}>
         <Text accessibilityRole="header" numberOfLines={2} style={[ui.title, { color: c.ink }]}>
@@ -125,7 +125,7 @@ export default function GroupDetail() {
       {error && !rows ? (
         <View style={styles.center}>
           <ErrorText>{error}</ErrorText>
-          <Button label="Try again" onPress={load} />
+          <Button label="Try Again" onPress={load} />
         </View>
       ) : !rows ? (
         <View style={{ paddingHorizontal: 16 }}>

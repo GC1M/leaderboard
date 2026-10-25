@@ -1,4 +1,4 @@
-import { formatValue, hasNoData, periodRange, rankLabels, sourceLabel, type LeaderboardRow } from './leaderboard';
+import { formatValue, hasNoData, myStanding, periodRange, rankLabels, sourceLabel, type LeaderboardRow } from './leaderboard';
 
 jest.mock('./supabase', () => ({ supabase: {} }));
 
@@ -33,4 +33,11 @@ test('sourceLabel', () => {
   expect(sourceLabel('day', 0, false)).toEqual({ text: 'Health', manual: false });
   expect(sourceLabel('day', 1, false)).toEqual({ text: 'Manual', manual: true });
   expect(sourceLabel('week', 2, false)).toEqual({ text: '2 of 7 days manual', manual: true });
+});
+
+test('myStanding', () => {
+  const rows = [row('a', 9000, 1), row('b', 5000, 2), row('c', 5000, 2), row('d', 0, 4)];
+  expect(myStanding(rows, 'c')).toEqual({ rankLabel: 'T2', members: 4, value: 5000, leader: 9000 });
+  expect(myStanding(rows, 'd')).toEqual({ rankLabel: '-', members: 4, value: 0, leader: 9000 });
+  expect(myStanding(rows, 'zz')).toBeNull();
 });
