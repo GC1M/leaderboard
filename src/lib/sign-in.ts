@@ -1,6 +1,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Crypto from 'expo-crypto';
+import { Platform } from 'react-native';
 
 import { supabase } from './supabase';
 
@@ -9,7 +10,7 @@ const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 
 // The native Google module is not in Expo Go, and requiring it there throws. Load it lazily and treat any failure as unavailable.
 function loadGoogle(): typeof import('@react-native-google-signin/google-signin') | null {
-  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return null;
+  if (Platform.OS === 'web' || Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require('@react-native-google-signin/google-signin');
