@@ -2,13 +2,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Text } from 'react-native';
 
-import { Button, ErrorText, Screen, styles, useColors } from '@/components/groups/ui';
+import { Button, ErrorText, Screen, styles } from '@/components/ui';
+import { useTheme } from '@/theme';
 import { isValidCode, joinGroup, normalizeCode } from '@/lib/groups';
 
 // Deep link landing for leaderboard://join/<CODE>. Never auto-joins.
 // The group name isn't readable before joining (RLS), so we confirm with the code only.
 export default function JoinByLink() {
-  const c = useColors();
+  const c = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams<{ code: string }>();
   const code = normalizeCode(String(params.code ?? ''));

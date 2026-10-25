@@ -1,6 +1,8 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useEffect, useState } from 'react';
-import { Button, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput } from 'react-native';
+import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+
+import { Button, Field, Screen, styles } from '@/components/ui';
 
 import { normalizePhone } from '@/lib/phone';
 import {
@@ -13,10 +15,17 @@ import {
   verifyEmailCode,
   verifyPhoneCode,
 } from '@/lib/sign-in';
+import { useTheme } from '@/theme';
 
 const RESEND_SECONDS = 30;
 
+// Plain messages instead of raw provider errors. Rate limits get their own, since "try again" would be wrong advice.
+const friendly = (e: unknown, fallback: string) =>
+  (e as { status?: number })?.status === 429 ? 'Too many tries. Wait a minute, then request a new code.' : fallback;
+
 export default function SignIn() {
+  const c = useTheme();
+  const dark = useColorScheme() === 'dark';
   const [apple, setApple] = useState(false);
   const [mode, setMode] = useState<'email' | 'phone'>('email');
   const [contact, setContact] = useState('');
@@ -40,13 +49,13 @@ export default function SignIn() {
   const valid = mode === 'email' ? target!.includes('@') : !!target;
 
   // The session change from supabase flips the route guard, so nothing to navigate to on success.
-  const run = async (fn: () => Promise<unknown>) => {
+  const run = async (fn: () => Promise<unknown>, fallback: string) => {
     setBusy(true);
     setError(null);
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendly(e, fallback));
     } finally {
       setBusy(false);
     }
@@ -58,10 +67,13 @@ export default function SignIn() {
       setSentTo(target);
       setCode('');
       setCooldown(RESEND_SECONDS);
-    });
+    }, `Couldn't send a code. Check the ${mode === 'email' ? 'email' : 'phone number'} and try again.`);
 
   const verify = (token: string) =>
-    run(() => (mode === 'email' ? verifyEmailCode(sentTo!, token) : verifyPhoneCode(sentTo!, token)));
+    run(
+      () => (mode === 'email' ? verifyEmailCode(sentTo!, token) : verifyPhoneCode(sentTo!, token)),
+      'That code is wrong or expired. Request a new one.',
+    );
 
   const changeContact = () => {
     setSentTo(null);
@@ -76,74 +88,93 @@ export default function SignIn() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Leaderboard</Text>
-        {apple && (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-            cornerRadius={8}
-            style={styles.apple}
-            onPress={() => run(signInWithApple)}
-          />
-        )}
-        {googleAvailable() && <Button title="Sign in with Google" disabled={busy} onPress={() => run(signInWithGoogle)} />}
-        {sentTo ? (
-          <>
-            <Text>Code sent to {sentTo}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="6-digit code"
-              keyboardType="number-pad"
-              textContentType="oneTimeCode"
-              autoComplete="one-time-code"
-              maxLength={6}
-              value={code}
-              onChangeText={(t) => {
-                setCode(t);
-                if (t.length === 6 && !busy) verify(t);
-              }}
+    <Screen title="Leaderboard">
+      <Text style={[styles.body, { color: c.inkSoft }]}>Compete with your friends. Steps first.</Text>
+      {(apple || googleAvailable()) && (
+        <View style={local.providers}>
+          {apple && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={
+                dark ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+              }
+              cornerRadius={14}
+              style={local.apple}
+              onPress={() => run(signInWithApple, "Couldn't sign in with Apple. Try again.")}
             />
-            {error && <Text style={styles.error}>{error}</Text>}
-            <Button title="Verify code" disabled={busy || code.length !== 6} onPress={() => verify(code)} />
+          )}
+          {googleAvailable() && (
             <Button
-              title={cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+              label="Continue with Google"
+              secondary
+              disabled={busy}
+              onPress={() => run(signInWithGoogle, "Couldn't sign in with Google. Try again.")}
+            />
+          )}
+          <Text style={[styles.caption, { color: c.inkSoft, textAlign: 'center' }]}>or use a one-time code</Text>
+        </View>
+      )}
+      {sentTo ? (
+        <>
+          <Field
+            key="code"
+            label="6-digit code"
+            helper={`Enter the 6-digit code sent to ${sentTo}`}
+            error={error}
+            code
+            autoFocus
+            keyboardType="number-pad"
+            textContentType="oneTimeCode"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={code}
+            onChangeText={(t) => {
+              setCode(t);
+              if (t.length === 6 && !busy) verify(t);
+            }}
+          />
+          <Button label="Verify code" busy={busy} disabled={code.length !== 6} onPress={() => verify(code)} />
+          <View style={local.row}>
+            <Button
+              plain
+              label={cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
               disabled={busy || cooldown > 0}
               onPress={send}
             />
-            <Button title={mode === 'email' ? 'Change email' : 'Change phone'} onPress={changeContact} />
-          </>
-        ) : (
-          <>
-            <Button
-              title={mode === 'email' ? 'Use phone number instead' : 'Use email instead'}
-              onPress={() => switchMode(mode === 'email' ? 'phone' : 'email')}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder={mode === 'email' ? 'Email' : 'Phone number'}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType={mode === 'email' ? 'email-address' : 'phone-pad'}
-              textContentType={mode === 'email' ? 'emailAddress' : 'telephoneNumber'}
-              value={contact}
-              onChangeText={setContact}
-            />
-            {error && <Text style={styles.error}>{error}</Text>}
-            <Button title="Send me a code" disabled={busy || !valid} onPress={send} />
-          </>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <Button plain label={mode === 'email' ? 'Change email' : 'Change phone'} onPress={changeContact} />
+          </View>
+        </>
+      ) : (
+        <>
+          <Field
+            key={mode}
+            label={mode === 'email' ? 'Email' : 'Phone number'}
+            error={error}
+            placeholder={mode === 'email' ? 'you@example.com' : '+1 555 123 4567'}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType={mode === 'email' ? 'email-address' : 'phone-pad'}
+            textContentType={mode === 'email' ? 'emailAddress' : 'telephoneNumber'}
+            autoComplete={mode === 'email' ? 'email' : 'tel'}
+            returnKeyType="send"
+            onSubmitEditing={() => valid && !busy && send()}
+            value={contact}
+            onChangeText={setContact}
+          />
+          <Button label="Send me a code" busy={busy} disabled={!valid} onPress={send} />
+          <Button
+            plain
+            label={mode === 'email' ? 'Use phone number instead' : 'Use email instead'}
+            onPress={() => switchMode(mode === 'email' ? 'phone' : 'email')}
+          />
+        </>
+      )}
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  container: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
-  title: { fontSize: 28, fontWeight: '600' },
-  apple: { width: 240, height: 44 },
-  input: { alignSelf: 'stretch', borderWidth: 1, borderColor: '#999', borderRadius: 8, padding: 12, fontSize: 16 },
-  error: { color: '#c00' },
+const local = StyleSheet.create({
+  providers: { gap: 12, marginTop: 8 },
+  apple: { height: 48 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 16 },
 });

@@ -1,13 +1,14 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, Text, View } from 'react-native';
 
-import { Button, ErrorText, Screen, styles, useColors } from '@/components/groups/ui';
+import { Button, ErrorText, Screen, styles } from '@/components/ui';
+import { useTheme } from '@/theme';
 import { listMyGroups, type MyGroup } from '@/lib/groups';
 import { supabase } from '@/lib/supabase';
 
 export default function Groups() {
-  const c = useColors();
+  const c = useTheme();
   const router = useRouter();
   const [groups, setGroups] = useState<MyGroup[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +41,16 @@ export default function Groups() {
       <Button label="Create a group" onPress={() => router.push('/groups/new')} />
       <Button label="Join with a code" secondary onPress={() => router.push('/groups/join')} />
       <Button label="My steps" secondary onPress={() => router.push('/steps')} />
-      <Button label="Sign out" secondary onPress={() => supabase.auth.signOut()} />
+      <Button
+        label="Sign out"
+        plain
+        onPress={() =>
+          Alert.alert('Sign out?', 'Your groups and steps stay saved.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Sign out', style: 'destructive', onPress: () => supabase.auth.signOut() },
+          ])
+        }
+      />
     </View>
   );
 

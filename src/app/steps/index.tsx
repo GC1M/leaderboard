@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, Text, View } from 'react-native';
 
-import { ManualEntry } from '@/components/steps/ManualEntry';
+import { Button, ErrorText, Screen, styles } from '@/components/ui';import { ManualEntry } from '@/components/steps/ManualEntry';
 import { StepRow } from '@/components/steps/StepRow';
-import { useStepsTheme } from '@/components/steps/theme';
+import { useTheme } from '@/theme';
 import { isHealthAvailable } from '@/lib/health/healthkit';
 import { lastNDates, localDateKey } from '@/lib/health/dates';
 import type { StepRow as Row } from '@/lib/health/rules';
@@ -12,7 +12,7 @@ import { SYNC_DAYS, useStepSync } from '@/lib/health/sync';
 import { deleteManualSteps, getMyRecentSteps } from '@/lib/metrics';
 
 export default function Steps() {
-  const t = useStepsTheme();
+  const t = useTheme();
   const router = useRouter();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -61,49 +61,35 @@ export default function Steps() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={health ? <RefreshControl refreshing={syncing} onRefresh={refresh} /> : undefined}
-      >
-        <Text accessibilityRole="header" style={[styles.title, { color: t.ink }]}>My steps</Text>
-        <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: syncError ? t.danger : t.inkSoft }]}>{status}</Text>
-        {result?.status === 'needs-permission' && (
-          <Pressable onPress={() => router.push('/steps/permission')} accessibilityRole="button" style={styles.link}>
-            <Text style={{ color: t.accent, fontWeight: '600' }}>Set up Health access</Text>
-          </Pressable>
-        )}
+    <Screen
+      title="My steps"
+      back
+      refreshControl={health ? <RefreshControl refreshing={syncing} onRefresh={refresh} /> : undefined}
+    >
+      <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: syncError ? t.danger : t.inkSoft }]}>{status}</Text>
+      {result?.status === 'needs-permission' && (
+        <Button plain label="Set up Health access" onPress={() => router.push('/steps/permission')} />
+      )}
 
-        {rows === null && !loadError ? (
-          <ActivityIndicator style={styles.spinner} />
-        ) : loadError ? (
-          <View>
-            <Text style={[styles.caption, { color: t.danger }]}>{loadError}</Text>
-            <Pressable onPress={load} accessibilityRole="button" style={styles.link}>
-              <Text style={{ color: t.accent, fontWeight: '600' }}>Try again</Text>
-            </Pressable>
-          </View>
-        ) : (
-          [...dates].reverse().map((d) => {
+      {rows === null && !loadError ? (
+        <ActivityIndicator accessibilityLabel="Loading steps" color={t.accent} />
+      ) : loadError ? (
+        <View>
+          <ErrorText>{loadError}</ErrorText>
+          <Button plain label="Try again" onPress={load} />
+        </View>
+      ) : (
+        <View>
+          {[...dates].reverse().map((d) => {
             const row = rows?.find((r) => r.date === d);
             return <StepRow key={d} date={d} today={today} row={row} onUseHealth={health ? () => switchToHealth(d) : undefined} />;
-          })
-        )}
-
-        <View style={styles.entry}>
-          <ManualEntry dates={dates} rows={rows ?? []} onSaved={load} />
+          })}
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      )}
+
+      <View style={{ marginTop: 16 }}>
+        <ManualEntry dates={dates} rows={rows ?? []} onSaved={load} />
+      </View>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { padding: 16, paddingBottom: 48 },
-  title: { fontSize: 30, fontWeight: '800', marginBottom: 4 },
-  caption: { fontSize: 13, marginBottom: 12 },
-  link: { minHeight: 44, justifyContent: 'center' },
-  spinner: { marginVertical: 32 },
-  entry: { marginTop: 32 },
-});
