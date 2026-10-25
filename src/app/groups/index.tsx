@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, RefreshControl, Text, View } from 'react-
 
 import { Button, ErrorText, Screen, styles, useColors } from '@/components/groups/ui';
 import { listMyGroups, type MyGroup } from '@/lib/groups';
+import { supabase } from '@/lib/supabase';
 
 export default function Groups() {
   const c = useColors();
@@ -38,6 +39,8 @@ export default function Groups() {
     <View style={{ gap: 12 }}>
       <Button label="Create a group" onPress={() => router.push('/groups/new')} />
       <Button label="Join with a code" secondary onPress={() => router.push('/groups/join')} />
+      <Button label="My steps" secondary onPress={() => router.push('/steps')} />
+      <Button label="Sign out" secondary onPress={() => supabase.auth.signOut()} />
     </View>
   );
 
