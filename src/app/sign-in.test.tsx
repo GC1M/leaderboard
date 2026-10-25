@@ -43,6 +43,8 @@ async function setup() {
   return { text, type, press };
 }
 
+jest.setTimeout(30000); // first render cold-loads react-native, slow on CI
+
 beforeEach(() => {
   mockOtp.mockReset().mockResolvedValue({ error: null });
 });
