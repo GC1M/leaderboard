@@ -25,14 +25,14 @@ export type Database = {
           Tables: {
             "daily_metrics": {
                   Row: {
-                    "date": string,"metric": string,"source": string,"updated_at": string,"user_id": string,"value": number
+                    "date": string,"metric": string,"source": string,"updated_at": string,"user_id": string,"value": number,"window_end": string | null,"window_start": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "date": string,"metric": string,"source": string,"updated_at"?: string,"user_id": string,"value": number
+                    "date": string,"metric": string,"source": string,"updated_at"?: string,"user_id": string,"value": number,"window_end"?: string | null,"window_start"?: string | null
                   }
                   Update: {
-                    "date"?: string,"metric"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string,"value"?: number
+                    "date"?: string,"metric"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string,"value"?: number,"window_end"?: string | null,"window_start"?: string | null
                   }
                   Relationships: [
                     {
@@ -123,10 +123,44 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"weight_measurements": {
+                  Row: {
+                    "id": string,"kg": number,"measured_at": string,"source": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "id"?: string,"kg": number,"measured_at": string,"source": string,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "id"?: string,"kg"?: number,"measured_at"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "weight_measurements_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
-            [_ in never]: never
+            "latest_weight": {
+                  Row: {
+                    "kg": number,"measured_at": string,"source": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    {
+      foreignKeyName: "weight_measurements_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                }
           }
           Functions: {
             "create_group":

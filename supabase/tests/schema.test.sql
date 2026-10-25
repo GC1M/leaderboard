@@ -36,8 +36,8 @@ insert into daily_metrics (user_id, date, metric, value, source) values
   (auth.uid(), current_date, 'steps', 5000, 'manual'),
   (auth.uid(), current_date - 1, 'steps', 100, 'manual'),
   (auth.uid(), current_date - 7, 'steps', 1000, 'manual'),
-  (auth.uid(), current_date, 'weight_kg', 90, 'manual'),
   (auth.uid(), current_date, 'screen_min', 100, 'manual');
+insert into weight_measurements (user_id, measured_at, kg, source) values (auth.uid(), now(), 90, 'manual');
 insert into goals (user_id, metric, start_value, target_value, start_date)
   values (auth.uid(), 'weight_kg', 100, 80, current_date - 30);
 select throws_ok($$insert into daily_metrics values (auth.uid(), current_date - 5, 'steps', 80001, 'manual')$$, '23514', null, 'steps over 80000 rejected');
@@ -45,14 +45,14 @@ select lives_ok($$insert into daily_metrics values (auth.uid(), current_date - 5
 
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
 insert into daily_metrics (user_id, date, metric, value, source) values
-  (auth.uid(), current_date, 'steps', 7000, 'manual'),
-  (auth.uid(), current_date, 'weight_kg', 95, 'manual');
+  (auth.uid(), current_date, 'steps', 7000, 'manual');
+insert into weight_measurements (user_id, measured_at, kg, source) values (auth.uid(), now(), 95, 'manual');
 insert into goals (user_id, metric, start_value, target_value, start_date)
   values (auth.uid(), 'weight_kg', 100, 80, current_date - 30);
 
 -- RLS isolation / privacy
 select is((select count(*)::int from daily_metrics where user_id = '00000000-0000-0000-0000-00000000000a' and metric = 'steps'), 4, 'group-mate sees steps');
-select is((select count(*)::int from daily_metrics where user_id = '00000000-0000-0000-0000-00000000000a' and metric = 'weight_kg'), 0, 'group-mate cannot read raw weight');
+select is((select count(*)::int from weight_measurements where user_id = '00000000-0000-0000-0000-00000000000a'), 0, 'group-mate cannot read raw weight');
 select is((select count(*)::int from goals where user_id = '00000000-0000-0000-0000-00000000000a'), 0, 'group-mate cannot read weight goal');
 
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
