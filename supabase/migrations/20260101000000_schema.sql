@@ -13,9 +13,11 @@ language plpgsql volatile set search_path = '' as $$
 declare
   alphabet constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; -- no I, O, 0, 1
   code text := '';
+  bytes bytea := extensions.gen_random_bytes(8);
 begin
-  for i in 1..8 loop
-    code := code || substr(alphabet, 1 + floor(random() * length(alphabet))::int, 1);
+  for i in 0..7 loop
+    -- 256 is a multiple of 32, so byte % 32 is unbiased
+    code := code || substr(alphabet, 1 + get_byte(bytes, i) % 32, 1);
   end loop;
   return code;
 end $$;
@@ -133,7 +135,7 @@ create policy groups_delete on public.groups for delete to authenticated
 create policy group_members_select on public.group_members for select to authenticated
   using (public.is_group_member(group_id));
 create policy group_members_leave on public.group_members for delete to authenticated
-  using (user_id = (select auth.uid()));
+  using (user_id = (select auth.uid()) and role <> 'owner'); -- owner deletes the group instead
 
 -- others never see raw weight; weight progress is exposed via group_leaderboard()
 create policy daily_metrics_select on public.daily_metrics for select to authenticated
@@ -190,6 +192,7 @@ end $$;
 -- p_period: 'day' (caller's today) or 'week' (Monday through Sunday containing today).
 -- weight_kg returns % progress toward the active goal, never raw kg.
 -- screen_min ranks ascending (less is better); everything else descending.
+-- Members with no data (value 0) always rank last.
 create function public.group_leaderboard(p_group_id uuid, p_metric text, p_period text)
 returns table (user_id uuid, display_name text, value numeric, rank bigint)
 language plpgsql stable security definer set search_path = '' as $$
@@ -242,7 +245,7 @@ begin
     where m.group_id = p_group_id
   )
   select vals.uid, vals.name, coalesce(vals.v, 0)::numeric,
-    rank() over (order by coalesce(vals.v, 0) * (case when p_metric = 'screen_min' then -1 else 1 end) desc)
+    rank() over (order by (vals.v is null), coalesce(vals.v, 0) * (case when p_metric = 'screen_min' then -1 else 1 end) desc)
   from vals
   order by 4, 2;
 end $$;

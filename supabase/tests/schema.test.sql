@@ -1,5 +1,5 @@
 begin;
-select plan(19);
+select plan(23);
 
 -- fixtures (postgres role bypasses RLS; trigger creates profiles)
 insert into auth.users (id, email, raw_user_meta_data) values
@@ -9,6 +9,8 @@ insert into auth.users (id, email, raw_user_meta_data) values
 
 select is((select display_name from profiles where id = '00000000-0000-0000-0000-00000000000a'), 'Alice', 'profile uses metadata name');
 select is((select display_name from profiles where id = '00000000-0000-0000-0000-00000000000b'), 'bob', 'profile falls back to email prefix');
+
+select ok((select bool_and(public.gen_invite_code() ~ '^[A-HJ-NP-Z2-9]{8}$') from generate_series(1, 200)), 'gen_invite_code always yields 8 unambiguous chars');
 
 create function pg_temp.as_user(u text) returns void language sql as $$
   select set_config('request.jwt.claim.sub', u, true), set_config('role', 'authenticated', true);
@@ -34,7 +36,8 @@ insert into daily_metrics (user_id, date, metric, value, source) values
   (auth.uid(), current_date, 'steps', 5000, 'manual'),
   (auth.uid(), current_date - 1, 'steps', 100, 'manual'),
   (auth.uid(), current_date - 7, 'steps', 1000, 'manual'),
-  (auth.uid(), current_date, 'weight_kg', 90, 'manual');
+  (auth.uid(), current_date, 'weight_kg', 90, 'manual'),
+  (auth.uid(), current_date, 'screen_min', 100, 'manual');
 insert into goals (user_id, metric, start_value, target_value, start_date)
   values (auth.uid(), 'weight_kg', 100, 80, current_date - 30);
 select throws_ok($$insert into daily_metrics values (auth.uid(), current_date - 5, 'steps', 80001, 'manual')$$, '23514', null, 'steps over 80000 rejected');
@@ -73,6 +76,17 @@ select ok(
 select results_eq(
   $$select value from group_leaderboard((select id from g1), 'weight_kg', 'week') order by rank$$,
   $$values (50::numeric), (25)$$, 'weight is % progress, not kg');
+
+select results_eq(
+  $$select display_name, rank from group_leaderboard((select id from g1), 'screen_min', 'day') order by rank$$,
+  $$values ('Alice'::text, 1::bigint), ('bob', 2)$$, 'member with no screen_min data ranks last');
+
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+delete from group_members where user_id = auth.uid();
+select is((select count(*)::int from group_members where group_id = (select id from g1) and role = 'owner'), 1, 'owner cannot leave own group');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+delete from group_members where user_id = auth.uid();
+select is((select count(*)::int from group_members where group_id = (select id from g1)), 0, 'member can leave (no longer sees group)');
 
 select * from finish();
 rollback;
