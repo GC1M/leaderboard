@@ -143,6 +143,9 @@ isOneToOne: false
         isOneToOne: true
         isSetofReturn: false
       } },
+"delete_member_metric":
+{ Args: { "p_date": string,"p_group_id": string,"p_metric": string,"p_user_id": string }; Returns: undefined
+                           },
 "gen_invite_code":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
@@ -156,6 +159,9 @@ isOneToOne: false
                            },
 "join_group":
 { Args: { "code": string }; Returns: string
+                           },
+"remove_member":
+{ Args: { "p_group_id": string,"p_user_id": string }; Returns: undefined
                            },
 "shares_group_with":
 { Args: { "p_user_id": string }; Returns: boolean

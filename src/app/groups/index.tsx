@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Alert, Pressable, RefreshControl, Text, View } from 'react-native';
 
 import { Button, ErrorText, Screen, Skeleton, styles } from '@/components/ui';
@@ -23,12 +23,12 @@ export default function Groups() {
     }
   }, []);
 
-  useEffect(() => {
-    // Not load(): lint forbids a synchronous setState call in an effect body.
-    listMyGroups().then(setGroups, () =>
-      setError("Couldn't load your groups. Check your connection and try again."),
-    );
-  }, []);
+  // Reload on focus so a group deleted, left or renamed elsewhere is reflected on return.
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
 
   const refresh = async () => {
     setRefreshing(true);

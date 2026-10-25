@@ -1,12 +1,15 @@
 import {
   createGroup,
   deleteGroup,
+  deleteMemberSteps,
   friendlyError,
   inviteLink,
   isValidCode,
   joinGroup,
   leaveGroup,
   listMyGroups,
+  removeMember,
+  renameGroup,
   normalizeCode,
 } from './groups';
 import { supabase } from './supabase';
@@ -88,7 +91,7 @@ test('listMyGroups rejects when signed out', async () => {
 // Chain stub for from(...).delete().eq().eq().select() resolving to `result`.
 function deleteChain(result: { data: unknown[] | null; error: unknown }) {
   const chain: Record<string, jest.Mock> = {};
-  for (const k of ['delete', 'eq']) chain[k] = jest.fn(() => chain);
+  for (const k of ['delete', 'update', 'eq']) chain[k] = jest.fn(() => chain);
   chain.select = jest.fn().mockResolvedValue(result);
   from.mockReturnValue(chain);
   return chain;
@@ -112,4 +115,23 @@ test('leaveGroup removes only my membership; owner gets told to delete', async (
   expect(chain.eq).toHaveBeenCalledWith('user_id', 'me');
   deleteChain({ data: [], error: null });
   await expect(leaveGroup('g')).rejects.toThrow(/Delete the group instead/);
+});
+
+test('renameGroup trims, validates, and treats 0 rows as not allowed', async () => {
+  await expect(renameGroup('g', '   ')).rejects.toThrow(/1 to 60/);
+  const chain = deleteChain({ data: [{ id: 'g' }], error: null });
+  await renameGroup('g', '  Office  ');
+  expect(chain.update).toHaveBeenCalledWith({ name: 'Office' });
+  deleteChain({ data: [], error: null });
+  await expect(renameGroup('g', 'Office')).rejects.toThrow(/Only the group owner/);
+});
+
+test('owner RPCs send the right args and map errors', async () => {
+  rpc.mockResolvedValue({ data: null, error: null });
+  await removeMember('g', 'u');
+  expect(rpc).toHaveBeenCalledWith('remove_member', { p_group_id: 'g', p_user_id: 'u' });
+  await deleteMemberSteps('g', 'u', '2026-10-25');
+  expect(rpc).toHaveBeenCalledWith('delete_member_metric', { p_group_id: 'g', p_user_id: 'u', p_date: '2026-10-25', p_metric: 'steps' });
+  rpc.mockResolvedValue({ data: null, error: { message: 'no entry for that day' } });
+  await expect(deleteMemberSteps('g', 'u', '2026-10-25')).rejects.toThrow(/no steps for that day/);
 });
