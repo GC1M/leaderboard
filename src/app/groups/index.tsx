@@ -1,11 +1,10 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, RefreshControl, Text, View } from 'react-native';
+import { Pressable, RefreshControl, Text, View } from 'react-native';
 
 import { Button, ErrorText, Screen, Skeleton, styles } from '@/components/ui';
 import { useTheme } from '@/theme';
 import { listMyGroups, type MyGroup } from '@/lib/groups';
-import { supabase } from '@/lib/supabase';
 
 export default function Groups() {
   const c = useTheme();
@@ -41,16 +40,7 @@ export default function Groups() {
       <Button label="Create a group" onPress={() => router.push('/groups/new')} />
       <Button label="Join with a code" secondary onPress={() => router.push('/groups/join')} />
       <Button label="My steps" secondary onPress={() => router.push('/steps')} />
-      <Button
-        label="Sign out"
-        plain
-        onPress={() =>
-          Alert.alert('Sign out?', 'Your groups and steps stay saved.', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Sign out', style: 'destructive', onPress: () => supabase.auth.signOut() },
-          ])
-        }
-      />
+      <Button label="Profile" secondary onPress={() => router.push('/profile')} />
     </View>
   );
 

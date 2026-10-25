@@ -1,0 +1,33 @@
+import { deleteAccount, updateDisplayName } from './profile';
+import { supabase } from './supabase';
+
+jest.mock('./supabase', () => ({
+  supabase: { rpc: jest.fn(), from: jest.fn(), auth: { getSession: jest.fn(), signOut: jest.fn() } },
+}));
+const rpc = supabase.rpc as unknown as jest.Mock;
+const from = supabase.from as unknown as jest.Mock;
+const signOut = supabase.auth.signOut as unknown as jest.Mock;
+(supabase.auth.getSession as unknown as jest.Mock).mockResolvedValue({ data: { session: { user: { id: 'me' } } } });
+
+beforeEach(() => jest.clearAllMocks());
+
+test('updateDisplayName trims and validates', async () => {
+  await expect(updateDisplayName('  ')).rejects.toThrow(/1 to 40/);
+  await expect(updateDisplayName('x'.repeat(41))).rejects.toThrow(/1 to 40/);
+  const eq = jest.fn().mockResolvedValue({ error: null });
+  const update = jest.fn(() => ({ eq }));
+  from.mockReturnValue({ update });
+  await expect(updateDisplayName('  Shivam ')).resolves.toBe('Shivam');
+  expect(update).toHaveBeenCalledWith({ display_name: 'Shivam' });
+  expect(eq).toHaveBeenCalledWith('id', 'me');
+});
+
+test('deleteAccount signs out locally only after the server delete succeeds', async () => {
+  rpc.mockResolvedValue({ error: { message: 'boom' } });
+  await expect(deleteAccount()).rejects.toThrow(/Couldn't delete your account/);
+  expect(signOut).not.toHaveBeenCalled();
+  rpc.mockResolvedValue({ error: null });
+  await deleteAccount();
+  expect(rpc).toHaveBeenCalledWith('delete_my_account');
+  expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
+});
