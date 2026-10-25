@@ -60,12 +60,13 @@ export function Screen({
   );
 }
 
-// `secondary` is an outline button, `plain` is a text link (still 44pt tall).
+// `secondary` is an outline button, `plain` is a text link (still 44pt tall), `danger` colors a plain link red.
 export function Button({
   label,
   onPress,
   secondary,
   plain,
+  danger,
   busy,
   disabled,
 }: {
@@ -73,12 +74,13 @@ export function Button({
   onPress: () => void;
   secondary?: boolean;
   plain?: boolean;
+  danger?: boolean;
   busy?: boolean;
   disabled?: boolean;
 }) {
   const c = useTheme();
   const off = disabled || busy;
-  const fg = plain ? c.accent : secondary ? c.ink : c.onAccent;
+  const fg = danger ? c.danger : plain ? c.accent : secondary ? c.ink : c.onAccent;
   return (
     <Pressable
       accessibilityRole="button"
@@ -143,6 +145,18 @@ export function Field({
   );
 }
 
+// Flat placeholder rows while a list loads. No shimmer.
+export function Skeleton({ label, rows = 3 }: { label: string; rows?: number }) {
+  const c = useTheme();
+  return (
+    <View accessible accessibilityLabel={label} accessibilityRole="progressbar" style={{ gap: 12 }}>
+      {Array.from({ length: rows }, (_, i) => (
+        <View key={i} style={[styles.skeleton, { backgroundColor: c.lane }]} />
+      ))}
+    </View>
+  );
+}
+
 export function ErrorText({ children }: { children?: string | null }) {
   const c = useTheme();
   if (!children) return null;
@@ -164,5 +178,6 @@ export const styles = StyleSheet.create({
   button: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   link: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   input: { minHeight: 48, borderRadius: 8 },
+  skeleton: { height: 64, borderRadius: 8, opacity: 0.6 },
   code: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: 4, fontVariant: ['tabular-nums'] },
 });

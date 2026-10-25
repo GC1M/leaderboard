@@ -39,6 +39,7 @@ function Routes() {
           <Stack.Screen name="join/[code]" />
           <Stack.Screen name="steps/index" />
           <Stack.Screen name="steps/permission" />
+          <Stack.Screen name="steps/sources" />
         </Stack.Protected>
         <Stack.Protected guard={gate === 'signed-out'}>
           <Stack.Screen name="sign-in" />

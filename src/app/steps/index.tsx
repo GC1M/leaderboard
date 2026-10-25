@@ -87,6 +87,8 @@ export default function Steps() {
         </View>
       )}
 
+      {health && <Button plain label="Connect a watch or tracker" onPress={() => router.push('/steps/sources')} />}
+
       <View style={{ marginTop: 16 }}>
         <ManualEntry dates={dates} rows={rows ?? []} onSaved={load} />
       </View>

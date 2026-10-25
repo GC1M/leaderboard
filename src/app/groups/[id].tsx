@@ -1,12 +1,23 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, FlatList, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, ErrorText, styles as ui } from '@/components/ui';
+import { Button, ErrorText, Skeleton, styles as ui } from '@/components/ui';
 import { LeaderboardRowView } from '@/components/leaderboard/LeaderboardRowView';
 import { useAuth } from '@/lib/auth';
-import { getLeaderboard, hasNoData, rankLabels, type LeaderboardRow, type Metric, type Period } from '@/lib/leaderboard';
+import {
+  formatValue,
+  getLeaderboard,
+  getManualDays,
+  hasNoData,
+  rankLabels,
+  sourceLabel,
+  type LeaderboardRow,
+  type Metric,
+  type Period,
+} from '@/lib/leaderboard';
+import { deleteGroup, leaveGroup } from '@/lib/groups';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/theme';
 
@@ -17,7 +28,7 @@ const PERIODS: { key: Period; label: string }[] = [
   { key: 'week', label: 'This week' },
 ];
 
-type Group = { name: string; invite_code: string };
+type Group = { name: string; invite_code: string; owner_id: string };
 
 export default function GroupDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,15 +41,21 @@ export default function GroupDetail() {
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [manual, setManual] = useState<Record<string, number>>({});
+  const [visible, setVisible] = useState<string[] | null>(null);
+  const list = useRef<FlatList<LeaderboardRow>>(null);
+  const me = session?.user.id;
 
   const load = useCallback(
     () =>
-      Promise.all([supabase.from('groups').select('name, invite_code').eq('id', id).single(), getLeaderboard(id, METRIC, period)])
+      Promise.all([supabase.from('groups').select('name, invite_code, owner_id').eq('id', id).single(), getLeaderboard(id, METRIC, period)])
         .then(([g, r]) => {
           if (g.error) throw g.error;
           setGroup(g.data);
           setRows(r);
           setError(null);
+          // Source captions are extra; a failure here shouldn't hide the board.
+          return getManualDays(r.map((x) => x.userId), METRIC, period).then(setManual, () => setManual({}));
         })
         .catch(() => setError("Couldn't load the leaderboard. Pull down to try again.")),
     [id, period],
@@ -54,6 +71,34 @@ export default function GroupDetail() {
     setRefreshing(false);
   };
 
+  const owner = !!group && group.owner_id === me;
+  const [leaving, setLeaving] = useState(false);
+  const confirmLeave = () =>
+    group &&
+    Alert.alert(
+      owner ? `Delete ${group.name}?` : `Leave ${group.name}?`,
+      owner
+        ? 'Everyone in it loses this leaderboard. Steps stay in each person\'s history. This can\'t be undone.'
+        : 'You can join again later with the invite code.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: owner ? 'Delete group' : 'Leave group',
+          style: 'destructive',
+          onPress: async () => {
+            setLeaving(true);
+            try {
+              await (owner ? deleteGroup(id) : leaveGroup(id));
+              router.replace('/groups');
+            } catch (e) {
+              setLeaving(false);
+              Alert.alert(owner ? "Couldn't delete the group" : "Couldn't leave the group", e instanceof Error ? e.message : undefined);
+            }
+          },
+        },
+      ],
+    );
+
   const showCode = () =>
     group &&
     Alert.alert('Invite code', group.invite_code, [
@@ -67,6 +112,14 @@ export default function GroupDetail() {
   const labels = rows ? rankLabels(rows) : [];
   const ranked = rows ? rows.filter((r) => !hasNoData(r)).length : 0;
   const leader = rows ? Math.max(0, ...rows.map((r) => r.value)) : 0;
+  const youIndex = rows ? rows.findIndex((r) => r.userId === me) : -1;
+  const you = youIndex >= 0 ? rows![youIndex] : null;
+
+  // FlatList needs a stable function here.
+  const onViewable = useCallback(
+    ({ viewableItems }: { viewableItems: { item: LeaderboardRow }[] }) => setVisible(viewableItems.map((v) => v.item.userId)),
+    [],
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>
@@ -111,34 +164,58 @@ export default function GroupDetail() {
           <Button label="Try again" onPress={load} />
         </View>
       ) : !rows ? (
-        <View style={styles.center}>
-          <ActivityIndicator accessibilityLabel="Loading leaderboard" color={c.accent} />
+        <View style={{ paddingHorizontal: 16 }}>
+          <Skeleton label="Loading leaderboard" />
         </View>
       ) : (
         <FlatList
+          ref={list}
           data={rows}
+          onViewableItemsChanged={onViewable}
+          viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
+          onScrollToIndexFailed={() => {}}
           keyExtractor={(r) => r.userId}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 16 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListHeaderComponent={error ? <ErrorText>{error}</ErrorText> : undefined}
           ListEmptyComponent={<Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>No members yet.</Text>}
           ListFooterComponent={
-            rows.length > 0 && ranked === 0 ? (
-              <Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>
-                No steps recorded {period === 'day' ? 'today' : 'this week'} yet.
-              </Text>
-            ) : undefined
+            <>
+              {rows.length > 0 && ranked === 0 && (
+                <Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>
+                  No steps recorded {period === 'day' ? 'today' : 'this week'} yet.
+                </Text>
+              )}
+              {group && (
+                <View style={styles.manage}>
+                  <Button plain danger busy={leaving} label={owner ? 'Delete group' : 'Leave group'} onPress={confirmLeave} />
+                </View>
+              )}
+            </>
           }
           renderItem={({ item, index }) => (
             <LeaderboardRowView
               row={item}
               rankLabel={labels[index]}
               metric={METRIC}
-              isYou={item.userId === session?.user.id}
+              isYou={item.userId === me}
               leader={leader}
+              source={sourceLabel(period, manual[item.userId] ?? 0, hasNoData(item))}
             />
           )}
         />
+      )}
+      {you && visible && !visible.includes(you.userId) && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`You are ${hasNoData(you) ? 'unranked' : `rank ${labels[youIndex]}`}. Show your row.`}
+          onPress={() => list.current?.scrollToIndex({ index: youIndex, viewPosition: 0.5 })}
+          style={[styles.youBar, { backgroundColor: c.youTint, borderTopColor: c.line, paddingBottom: insets.bottom + 12 }]}
+        >
+          <Text style={[ui.bodyStrong, { color: c.ink }]}>
+            You: {hasNoData(you) ? 'no data yet' : `${labels[youIndex]}, ${formatValue(METRIC, you.value)}`}
+          </Text>
+        </Pressable>
       )}
     </View>
   );
@@ -151,4 +228,6 @@ const styles = StyleSheet.create({
   tab: { minHeight: 44, minWidth: 96, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 999 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
   empty: { textAlign: 'center', padding: 24 },
+  manage: { marginTop: 32 },
+  youBar: { paddingTop: 12, paddingHorizontal: 16, borderTopWidth: StyleSheet.hairlineWidth },
 });

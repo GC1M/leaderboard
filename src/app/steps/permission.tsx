@@ -35,6 +35,7 @@ export default function HealthPermission() {
       <ErrorText>{error}</ErrorText>
       <Button label="Allow Health access" busy={busy} onPress={allow} />
       <Button label="Enter steps manually" secondary disabled={busy} onPress={() => router.replace('/steps')} />
+      <Button plain label="Using a Garmin, Oura or other tracker?" onPress={() => router.push('/steps/sources')} />
     </Screen>
   );
 }

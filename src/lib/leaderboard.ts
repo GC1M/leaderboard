@@ -1,3 +1,4 @@
+import { localDateKey } from './health/dates';
 import { supabase } from './supabase';
 
 export type Metric = 'steps' | 'workout_minutes' | 'weight_kg' | 'screen_min';
@@ -45,4 +46,39 @@ export function rankLabels(rows: LeaderboardRow[]): string[] {
     const tied = rows.some((o) => o !== r && o.rank === r.rank && !hasNoData(o));
     return `${tied ? 'T' : ''}${r.rank}`;
   });
+}
+
+// Same window as group_leaderboard: today, or Monday to Sunday of this week. Uses the device date; the RPC uses the
+// profile timezone, which the app writes from the device on login, so they agree.
+export function periodRange(period: Period, now: Date = new Date()): { from: string; to: string } {
+  if (period === 'day') return { from: localDateKey(now), to: localDateKey(now) };
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+  return { from: localDateKey(monday), to: localDateKey(sunday) };
+}
+
+// Manual-entry day count per member for the period. RLS already lets members read each other's non-weight metrics.
+export async function getManualDays(userIds: string[], metric: Metric, period: Period): Promise<Record<string, number>> {
+  if (userIds.length === 0) return {};
+  const { from, to } = periodRange(period);
+  const { data, error } = await supabase
+    .from('daily_metrics')
+    .select('user_id')
+    .in('user_id', userIds)
+    .eq('metric', metric)
+    .eq('source', 'manual')
+    .gte('date', from)
+    .lte('date', to);
+  if (error) throw error;
+  const counts: Record<string, number> = {};
+  for (const r of data) counts[r.user_id] = (counts[r.user_id] ?? 0) + 1;
+  return counts;
+}
+
+// Caption under the name: where the number came from, so manual entries are visible, not hidden.
+export function sourceLabel(period: Period, manualDays: number, noData: boolean): { text: string; manual: boolean } {
+  if (noData) return { text: 'Not synced yet', manual: false };
+  if (manualDays === 0) return { text: 'Health', manual: false };
+  if (period === 'day') return { text: 'Manual', manual: true };
+  return { text: `${manualDays} of 7 days manual`, manual: true };
 }

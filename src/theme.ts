@@ -14,6 +14,8 @@ const light = {
   danger: '#B42318',
   manual: '#8A5A00',
   lane: '#C9D0DC',
+  // Rank 1 to 3 numerals only. At least 3:1 (large text) on bg and youTint.
+  medal: ['#9A6B00', '#5F6B7A', '#9C4F1F'],
 };
 
 const dark: typeof light = {
@@ -29,6 +31,7 @@ const dark: typeof light = {
   danger: '#FF8A80',
   manual: '#F5C451',
   lane: '#2E3957',
+  medal: ['#F2C14E', '#C3CCDA', '#E09A6B'],
 };
 
 export type Theme = typeof light;

@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, Text, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, Text, View } from 'react-native';
 
-import { Button, ErrorText, Screen, styles } from '@/components/ui';
+import { Button, ErrorText, Screen, Skeleton, styles } from '@/components/ui';
 import { useTheme } from '@/theme';
 import { listMyGroups, type MyGroup } from '@/lib/groups';
 import { supabase } from '@/lib/supabase';
@@ -63,7 +63,7 @@ export default function Groups() {
             <Button label="Try again" onPress={load} />
           </>
         ) : (
-          <ActivityIndicator accessibilityLabel="Loading groups" color={c.accent} />
+          <Skeleton label="Loading groups" />
         )}
       </Screen>
     );

@@ -1,4 +1,14 @@
-import { createGroup, friendlyError, inviteLink, isValidCode, joinGroup, listMyGroups, normalizeCode } from './groups';
+import {
+  createGroup,
+  deleteGroup,
+  friendlyError,
+  inviteLink,
+  isValidCode,
+  joinGroup,
+  leaveGroup,
+  listMyGroups,
+  normalizeCode,
+} from './groups';
 import { supabase } from './supabase';
 
 jest.mock('./supabase', () => ({
@@ -73,4 +83,33 @@ test('listMyGroups filters to the caller, flattens, sorts by name', async () => 
 test('listMyGroups rejects when signed out', async () => {
   getSession.mockResolvedValue({ data: { session: null } });
   await expect(listMyGroups()).rejects.toThrow(/sign in/);
+});
+
+// Chain stub for from(...).delete().eq().eq().select() resolving to `result`.
+function deleteChain(result: { data: unknown[] | null; error: unknown }) {
+  const chain: Record<string, jest.Mock> = {};
+  for (const k of ['delete', 'eq']) chain[k] = jest.fn(() => chain);
+  chain.select = jest.fn().mockResolvedValue(result);
+  from.mockReturnValue(chain);
+  return chain;
+}
+
+test('deleteGroup deletes by id and treats 0 rows as not allowed', async () => {
+  const chain = deleteChain({ data: [{ id: 'g' }], error: null });
+  await expect(deleteGroup('g')).resolves.toBeUndefined();
+  expect(from).toHaveBeenCalledWith('groups');
+  expect(chain.eq).toHaveBeenCalledWith('id', 'g');
+  deleteChain({ data: [], error: null });
+  await expect(deleteGroup('g')).rejects.toThrow(/Only the group owner/);
+});
+
+test('leaveGroup removes only my membership; owner gets told to delete', async () => {
+  getSession.mockResolvedValue({ data: { session: { user: { id: 'me' } } } });
+  const chain = deleteChain({ data: [{ user_id: 'me' }], error: null });
+  await expect(leaveGroup('g')).resolves.toBeUndefined();
+  expect(from).toHaveBeenCalledWith('group_members');
+  expect(chain.eq).toHaveBeenCalledWith('group_id', 'g');
+  expect(chain.eq).toHaveBeenCalledWith('user_id', 'me');
+  deleteChain({ data: [], error: null });
+  await expect(leaveGroup('g')).rejects.toThrow(/Delete the group instead/);
 });
