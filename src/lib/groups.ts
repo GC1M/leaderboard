@@ -22,6 +22,9 @@ export function friendlyError(e: unknown): string {
   const msg = e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String(e.message) : '';
   if (msg.includes('invalid invite code')) return "That code doesn't match a group. Check it with whoever invited you.";
   if (msg.includes('not authenticated') || msg.includes('permission denied')) return 'You need to sign in first.';
+  if (msg.includes('only the group owner')) return 'Only the group owner can do that.';
+  if (msg.includes('no entry for that day')) return 'There are no steps for that day to delete.';
+  if (msg.includes('not a member of this group')) return "That person isn't in this group anymore.";
   return 'Something went wrong. Check your connection and try again.';
 }
 
@@ -64,15 +67,15 @@ export async function joinGroup(input: string): Promise<string> {
   return friendly(supabase.rpc('join_group', { code }));
 }
 
-// RLS turns a forbidden delete into "0 rows", not an error, so check that a row actually went.
-async function deleteOne(p: PromiseLike<{ data: unknown[] | null; error: unknown }>, notAllowed: string) {
+// RLS turns a forbidden write into "0 rows", not an error, so check that a row was actually touched.
+async function touchedOne(p: PromiseLike<{ data: unknown[] | null; error: unknown }>, notAllowed: string) {
   const rows = await friendly(p);
   if (!rows?.length) throw new Error(notAllowed);
 }
 
 /** Owner only. Memberships go with it (on delete cascade). */
 export function deleteGroup(id: string): Promise<void> {
-  return deleteOne(supabase.from('groups').delete().eq('id', id).select('id'), 'Only the group owner can delete it.');
+  return touchedOne(supabase.from('groups').delete().eq('id', id).select('id'), 'Only the group owner can delete it.');
 }
 
 /** Members only; the owner deletes the group instead. */
@@ -80,8 +83,35 @@ export async function leaveGroup(id: string): Promise<void> {
   const { data: auth } = await supabase.auth.getSession();
   const uid = auth.session?.user.id;
   if (!uid) throw new Error(friendlyError({ message: 'not authenticated' }));
-  return deleteOne(
+  return touchedOne(
     supabase.from('group_members').delete().eq('group_id', id).eq('user_id', uid).select('user_id'),
     "The owner can't leave. Delete the group instead.",
   );
+}
+
+export type Member = { userId: string; name: string; role: 'owner' | 'member' };
+
+export async function listMembers(groupId: string): Promise<Member[]> {
+  const rows = await friendly(
+    supabase.from('group_members').select('user_id, role, profiles(display_name)').eq('group_id', groupId),
+  );
+  return rows
+    .map((r) => ({ userId: r.user_id, name: r.profiles?.display_name ?? 'Unknown', role: r.role as Member['role'] }))
+    .sort((a, b) => (a.role === b.role ? a.name.localeCompare(b.name) : a.role === 'owner' ? -1 : 1));
+}
+
+/** Owner only (groups_update policy). */
+export async function renameGroup(id: string, name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (trimmed.length < 1 || trimmed.length > 60) throw new Error('Group name must be 1 to 60 characters.');
+  return touchedOne(supabase.from('groups').update({ name: trimmed }).eq('id', id).select('id'), 'Only the group owner can rename it.');
+}
+
+export async function removeMember(groupId: string, userId: string): Promise<void> {
+  await friendly(supabase.rpc('remove_member', { p_group_id: groupId, p_user_id: userId }));
+}
+
+/** Owner deletes one day's steps for a member, e.g. an obviously wrong manual entry. */
+export async function deleteMemberSteps(groupId: string, userId: string, date: string): Promise<void> {
+  await friendly(supabase.rpc('delete_member_metric', { p_group_id: groupId, p_user_id: userId, p_date: date, p_metric: 'steps' }));
 }

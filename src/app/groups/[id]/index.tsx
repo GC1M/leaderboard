@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, ErrorText, Skeleton, styles as ui } from '@/components/ui';
@@ -17,7 +17,6 @@ import {
   type Metric,
   type Period,
 } from '@/lib/leaderboard';
-import { deleteGroup, leaveGroup } from '@/lib/groups';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/theme';
 
@@ -28,7 +27,7 @@ const PERIODS: { key: Period; label: string }[] = [
   { key: 'week', label: 'This week' },
 ];
 
-type Group = { name: string; invite_code: string; owner_id: string };
+type Group = { name: string };
 
 export default function GroupDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,7 +47,7 @@ export default function GroupDetail() {
 
   const load = useCallback(
     () =>
-      Promise.all([supabase.from('groups').select('name, invite_code, owner_id').eq('id', id).single(), getLeaderboard(id, METRIC, period)])
+      Promise.all([supabase.from('groups').select('name').eq('id', id).single(), getLeaderboard(id, METRIC, period)])
         .then(([g, r]) => {
           if (g.error) throw g.error;
           setGroup(g.data);
@@ -61,53 +60,18 @@ export default function GroupDetail() {
     [id, period],
   );
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  // Also reloads when coming back from group info, which can rename the group or remove members.
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
     await load();
     setRefreshing(false);
   };
-
-  const owner = !!group && group.owner_id === me;
-  const [leaving, setLeaving] = useState(false);
-  const confirmLeave = () =>
-    group &&
-    Alert.alert(
-      owner ? `Delete ${group.name}?` : `Leave ${group.name}?`,
-      owner
-        ? 'Everyone in it loses this leaderboard. Steps stay in each person\'s history. This can\'t be undone.'
-        : 'You can join again later with the invite code.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: owner ? 'Delete group' : 'Leave group',
-          style: 'destructive',
-          onPress: async () => {
-            setLeaving(true);
-            try {
-              await (owner ? deleteGroup(id) : leaveGroup(id));
-              router.replace('/groups');
-            } catch (e) {
-              setLeaving(false);
-              Alert.alert(owner ? "Couldn't delete the group" : "Couldn't leave the group", e instanceof Error ? e.message : undefined);
-            }
-          },
-        },
-      ],
-    );
-
-  const showCode = () =>
-    group &&
-    Alert.alert('Invite code', group.invite_code, [
-      {
-        text: 'Share',
-        onPress: () => Share.share({ message: `Join ${group.name} on Leaderboard with code ${group.invite_code}` }),
-      },
-      { text: 'Close', style: 'cancel' },
-    ]);
 
   const labels = rows ? rankLabels(rows) : [];
   const ranked = rows ? rows.filter((r) => !hasNoData(r)).length : 0;
@@ -125,7 +89,7 @@ export default function GroupDetail() {
     <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>
       <View style={styles.header}>
         <Button plain label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
-        <Button plain label="Invite" disabled={!group} onPress={showCode} />
+        <Button plain label="Group info" onPress={() => router.push(`/groups/${id}/info`)} />
       </View>
       <View style={styles.head}>
         <Text accessibilityRole="header" numberOfLines={2} style={[ui.title, { color: c.ink }]}>
@@ -180,18 +144,11 @@ export default function GroupDetail() {
           ListHeaderComponent={error ? <ErrorText>{error}</ErrorText> : undefined}
           ListEmptyComponent={<Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>No members yet.</Text>}
           ListFooterComponent={
-            <>
-              {rows.length > 0 && ranked === 0 && (
-                <Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>
-                  No steps recorded {period === 'day' ? 'today' : 'this week'} yet.
-                </Text>
-              )}
-              {group && (
-                <View style={styles.manage}>
-                  <Button plain danger busy={leaving} label={owner ? 'Delete group' : 'Leave group'} onPress={confirmLeave} />
-                </View>
-              )}
-            </>
+            rows.length > 0 && ranked === 0 ? (
+              <Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>
+                No steps recorded {period === 'day' ? 'today' : 'this week'} yet.
+              </Text>
+            ) : undefined
           }
           renderItem={({ item, index }) => (
             <LeaderboardRowView
@@ -228,6 +185,5 @@ const styles = StyleSheet.create({
   tab: { minHeight: 44, minWidth: 96, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 999 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
   empty: { textAlign: 'center', padding: 24 },
-  manage: { marginTop: 32 },
   youBar: { paddingTop: 12, paddingHorizontal: 16, borderTopWidth: StyleSheet.hairlineWidth },
 });
