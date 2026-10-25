@@ -5,6 +5,7 @@ import { secureStorage } from './secure-storage';
 jest.mock('expo-secure-store', () => {
   const store = new Map<string, string>();
   return {
+    AFTER_FIRST_UNLOCK: 'AFTER_FIRST_UNLOCK',
     __store: store,
     getItemAsync: jest.fn(async (k: string) => store.get(k) ?? null),
     setItemAsync: jest.fn(async (k: string, v: string) => {
@@ -55,4 +56,12 @@ test('a missing part reads as null', async () => {
   await secureStorage.setItem('k', 'x'.repeat(5000));
   store.delete('k.1');
   expect(await secureStorage.getItem('k')).toBeNull();
+});
+
+test('writes and reads with keychainAccessible AFTER_FIRST_UNLOCK', async () => {
+  await secureStorage.setItem('k', 'hello');
+  await secureStorage.getItem('k');
+  const opts = { keychainAccessible: 'AFTER_FIRST_UNLOCK' };
+  for (const call of (SecureStore.setItemAsync as jest.Mock).mock.calls) expect(call[2]).toEqual(opts);
+  for (const call of (SecureStore.getItemAsync as jest.Mock).mock.calls) expect(call[1]).toEqual(opts);
 });

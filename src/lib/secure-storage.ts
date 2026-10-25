@@ -5,10 +5,13 @@ import * as SecureStore from 'expo-secure-store';
 // 600 chars stays under 2KB even at 3 bytes per char.
 const CHUNK_SIZE = 600;
 
+// Readable while the phone is locked (after the first unlock), so background sync can use the session.
+const options = { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK };
+
 const partKey = (key: string, i: number) => `${key}.${i}`;
 
 async function readCount(key: string): Promise<number> {
-  const n = Number(await SecureStore.getItemAsync(key));
+  const n = Number(await SecureStore.getItemAsync(key, options));
   return Number.isInteger(n) && n > 0 ? n : 0;
 }
 
@@ -22,7 +25,7 @@ export const secureStorage = {
     if (count === 0) return null;
     let value = '';
     for (let i = 0; i < count; i++) {
-      const part = await SecureStore.getItemAsync(partKey(key, i));
+      const part = await SecureStore.getItemAsync(partKey(key, i), options);
       if (part === null) return null;
       value += part;
     }
@@ -33,9 +36,13 @@ export const secureStorage = {
     const previous = await readCount(key);
     const count = Math.max(1, Math.ceil(value.length / CHUNK_SIZE));
     for (let i = 0; i < count; i++) {
-      await SecureStore.setItemAsync(partKey(key, i), value.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
+      await SecureStore.setItemAsync(
+        partKey(key, i),
+        value.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE),
+        options,
+      );
     }
-    await SecureStore.setItemAsync(key, String(count));
+    await SecureStore.setItemAsync(key, String(count), options);
     await removeParts(key, count, previous);
   },
 
