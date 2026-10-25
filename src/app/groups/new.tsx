@@ -1,13 +1,14 @@
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
-import { Share, Text, TextInput } from 'react-native';
+import { Share, Text } from 'react-native';
 
-import { Button, ErrorText, Screen, styles, useColors } from '@/components/groups/ui';
+import { Button, Field, Screen, styles } from '@/components/ui';
+import { useTheme } from '@/theme';
 import { createGroup, inviteLink, type CreatedGroup } from '@/lib/groups';
 
 export default function NewGroup() {
-  const c = useColors();
+  const c = useTheme();
   const router = useRouter();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -67,9 +68,8 @@ export default function NewGroup() {
 
   return (
     <Screen title="New group" back>
-      <Text style={[styles.bodyStrong, { color: c.ink }]}>Group name</Text>
-      <TextInput
-        accessibilityLabel="Group name"
+      <Field
+        label="Group name"
         autoFocus
         maxLength={60}
         returnKeyType="done"
@@ -77,14 +77,9 @@ export default function NewGroup() {
         onChangeText={setName}
         onSubmitEditing={submit}
         placeholder="Office steps"
-        placeholderTextColor={c.inkSoft}
-        style={[
-          styles.body,
-          { minHeight: 48, borderWidth: 1, borderColor: c.border, borderRadius: 8, padding: 12, color: c.ink, backgroundColor: c.surface },
-        ]}
+        helper={`${name.length}/60. Friends see this name when they join.`}
+        error={error}
       />
-      <Text style={[styles.caption, { color: c.inkSoft }]}>{name.length}/60</Text>
-      <ErrorText>{error}</ErrorText>
       <Button label="Create group" busy={busy} disabled={!name.trim()} onPress={submit} />
     </Screen>
   );

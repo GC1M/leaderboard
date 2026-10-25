@@ -15,18 +15,20 @@ async function render(el: React.ReactElement) {
 
 test('highlights the current user', async () => {
   const out = await render(
-    <LeaderboardRowView row={{ userId: 'a', name: 'Alice', value: 12345, rank: 1 }} rankLabel="1" metric="steps" isYou />,
+    <LeaderboardRowView row={{ userId: 'a', name: 'Alice', value: 12345, rank: 1 }} rankLabel="1" metric="steps" isYou leader={12345} />,
   );
-  expect(out).toContain('(you)');
+  expect(out).toContain('"You"');
   expect(out).toContain('12,345');
-  expect(out).toContain('#e6f0ff');
+  expect(out).toContain('"width":"100%"');
+  expect(out).toContain('#E3E9FF');
 });
 
 test('other users are not highlighted; no-data rows say so', async () => {
   const out = await render(
-    <LeaderboardRowView row={{ userId: 'b', name: 'Bob', value: 0, rank: 3 }} rankLabel="-" metric="steps" isYou={false} />,
+    <LeaderboardRowView row={{ userId: 'b', name: 'Bob', value: 0, rank: 3 }} rankLabel="-" metric="steps" isYou={false} leader={12345} />,
   );
-  expect(out).not.toContain('(you)');
-  expect(out).not.toContain('#e6f0ff');
-  expect(out).toContain('no data yet');
+  expect(out).not.toContain('"You"');
+  expect(out).not.toContain('#E3E9FF');
+  expect(out).toContain('No data');
+  expect(out).toContain('"width":"0%"');
 });

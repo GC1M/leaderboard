@@ -1,12 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Text, TextInput } from 'react-native';
 
-import { Button, ErrorText, Screen, styles, useColors } from '@/components/groups/ui';
+import { Button, Field, Screen } from '@/components/ui';
 import { isValidCode, joinGroup, normalizeCode } from '@/lib/groups';
 
 export default function JoinGroup() {
-  const c = useColors();
   const router = useRouter();
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -26,9 +24,9 @@ export default function JoinGroup() {
 
   return (
     <Screen title="Join a group" back>
-      <Text style={[styles.bodyStrong, { color: c.ink }]}>Invite code</Text>
-      <TextInput
-        accessibilityLabel="Invite code"
+      <Field
+        label="Invite code"
+        code
         autoFocus
         autoCapitalize="characters"
         autoCorrect={false}
@@ -38,14 +36,9 @@ export default function JoinGroup() {
         onChangeText={(t) => setCode(normalizeCode(t).slice(0, 8))}
         onSubmitEditing={submit}
         placeholder="K74MQ29X"
-        placeholderTextColor={c.inkSoft}
-        style={[
-          styles.code,
-          { minHeight: 56, borderWidth: 1, borderColor: c.border, borderRadius: 8, padding: 12, color: c.ink, backgroundColor: c.surface },
-        ]}
+        helper="8 characters, no I, O, 0 or 1. Paste works too."
+        error={error}
       />
-      <Text style={[styles.caption, { color: c.inkSoft }]}>8 characters, no I, O, 0 or 1. Paste works too.</Text>
-      <ErrorText>{error}</ErrorText>
       <Button label="Join group" busy={busy} disabled={!isValidCode(code)} onPress={submit} />
     </Screen>
   );

@@ -1,29 +1,20 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Button,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  Share,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Button, ErrorText, styles as ui } from '@/components/ui';
 import { LeaderboardRowView } from '@/components/leaderboard/LeaderboardRowView';
 import { useAuth } from '@/lib/auth';
 import { getLeaderboard, hasNoData, rankLabels, type LeaderboardRow, type Metric, type Period } from '@/lib/leaderboard';
 import { supabase } from '@/lib/supabase';
+import { useTheme } from '@/theme';
 
 // Metric picker comes later; the screen is already parameterised on it.
 const METRIC: Metric = 'steps';
 const PERIODS: { key: Period; label: string }[] = [
-  { key: 'day', label: 'Day' },
-  { key: 'week', label: 'Week' },
+  { key: 'day', label: 'Today' },
+  { key: 'week', label: 'This week' },
 ];
 
 type Group = { name: string; invite_code: string };
@@ -31,8 +22,9 @@ type Group = { name: string; invite_code: string };
 export default function GroupDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
-  const dark = useColorScheme() === 'dark';
-  const fg = dark ? '#fff' : '#111';
+  const c = useTheme();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [group, setGroup] = useState<Group | null>(null);
   const [period, setPeriod] = useState<Period>('day');
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
@@ -48,7 +40,7 @@ export default function GroupDetail() {
           setRows(r);
           setError(null);
         })
-        .catch((e) => setError(e instanceof Error ? e.message : 'Could not load the leaderboard')),
+        .catch(() => setError("Couldn't load the leaderboard. Pull down to try again.")),
     [id, period],
   );
 
@@ -74,54 +66,77 @@ export default function GroupDetail() {
 
   const labels = rows ? rankLabels(rows) : [];
   const ranked = rows ? rows.filter((r) => !hasNoData(r)).length : 0;
+  const leader = rows ? Math.max(0, ...rows.map((r) => r.value)) : 0;
 
   return (
-    <View style={styles.container}>
-      <Stack.Screen options={{ headerShown: true, title: group?.name ?? 'Group' }} />
-      <View style={styles.bar}>
-        <View style={styles.toggle} accessibilityRole="tablist">
-          {PERIODS.map((p) => (
-            <Pressable
-              key={p.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: period === p.key }}
-              accessibilityLabel={`${p.label} leaderboard`}
-              onPress={() => {
-                setRows(null);
-                setPeriod(p.key);
-              }}
-              style={[styles.tab, period === p.key && styles.tabOn]}
-            >
-              <Text style={{ color: period === p.key ? '#fff' : fg, fontWeight: '600' }}>{p.label}</Text>
-            </Pressable>
-          ))}
+    <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>
+      <View style={styles.header}>
+        <Button plain label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+        <Button plain label="Invite" disabled={!group} onPress={showCode} />
+      </View>
+      <View style={styles.head}>
+        <Text accessibilityRole="header" numberOfLines={2} style={[ui.title, { color: c.ink }]}>
+          {group?.name ?? ' '}
+        </Text>
+        <View style={[styles.toggle, { backgroundColor: c.surface, borderColor: c.border }]} accessibilityRole="tablist">
+          {PERIODS.map((p) => {
+            const on = period === p.key;
+            return (
+              <Pressable
+                key={p.key}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={`${p.label} leaderboard`}
+                onPress={() => {
+                  if (on) return;
+                  setRows(null);
+                  setPeriod(p.key);
+                }}
+                style={[styles.tab, on && { backgroundColor: c.accent }]}
+              >
+                <Text style={[ui.bodyStrong, { color: on ? c.onAccent : c.ink }]}>{p.label}</Text>
+              </Pressable>
+            );
+          })}
         </View>
-        <Text style={{ color: fg }}>{rows ? `${rows.length} member${rows.length === 1 ? '' : 's'}` : ''}</Text>
-        <Button title="Invite code" onPress={showCode} disabled={!group} accessibilityLabel="Show invite code" />
+        {rows && (
+          <Text style={[ui.caption, { color: c.inkSoft }]}>
+            {rows.length} member{rows.length === 1 ? '' : 's'}
+          </Text>
+        )}
       </View>
       {error && !rows ? (
         <View style={styles.center}>
-          <Text style={{ color: fg }}>{error}</Text>
-          <Button title="Retry" onPress={load} />
+          <ErrorText>{error}</ErrorText>
+          <Button label="Try again" onPress={load} />
         </View>
       ) : !rows ? (
         <View style={styles.center}>
-          <ActivityIndicator accessibilityLabel="Loading leaderboard" />
+          <ActivityIndicator accessibilityLabel="Loading leaderboard" color={c.accent} />
         </View>
       ) : (
         <FlatList
           data={rows}
           keyExtractor={(r) => r.userId}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 16 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListHeaderComponent={error ? <Text style={styles.err}>Refresh failed: {error}</Text> : undefined}
-          ListEmptyComponent={<Text style={[styles.empty, { color: fg }]}>No members yet.</Text>}
+          ListHeaderComponent={error ? <ErrorText>{error}</ErrorText> : undefined}
+          ListEmptyComponent={<Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>No members yet.</Text>}
           ListFooterComponent={
             rows.length > 0 && ranked === 0 ? (
-              <Text style={[styles.empty, { color: fg }]}>No steps recorded this {period} yet.</Text>
+              <Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>
+                No steps recorded {period === 'day' ? 'today' : 'this week'} yet.
+              </Text>
             ) : undefined
           }
           renderItem={({ item, index }) => (
-            <LeaderboardRowView row={item} rankLabel={labels[index]} metric={METRIC} isYou={item.userId === session?.user.id} />
+            <LeaderboardRowView
+              row={item}
+              rankLabel={labels[index]}
+              metric={METRIC}
+              isYou={item.userId === session?.user.id}
+              leader={leader}
+            />
           )}
         />
       )}
@@ -130,12 +145,10 @@ export default function GroupDetail() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, gap: 8 },
-  toggle: { flexDirection: 'row', borderWidth: 1, borderColor: '#999', borderRadius: 8, overflow: 'hidden' },
-  tab: { minHeight: 44, minWidth: 64, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
-  tabOn: { backgroundColor: '#2563eb' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
+  head: { paddingHorizontal: 16, paddingBottom: 12, gap: 12 },
+  toggle: { flexDirection: 'row', borderWidth: 1, borderRadius: 999, padding: 2, alignSelf: 'flex-start' },
+  tab: { minHeight: 44, minWidth: 96, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 999 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
   empty: { textAlign: 'center', padding: 24 },
-  err: { color: '#dc2626', padding: 16 },
 });

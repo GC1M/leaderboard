@@ -19,7 +19,7 @@ const config: ExpoConfig = {
   android: {
     package: 'com.shivamlalakiya.leaderboard',
     adaptiveIcon: {
-      backgroundColor: '#E6F4FE',
+      backgroundColor: '#2340D8',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
@@ -33,7 +33,7 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#208AEF',
+        backgroundColor: '#0D1424',
         image: './assets/images/splash-icon.png',
         imageWidth: 76,
       },

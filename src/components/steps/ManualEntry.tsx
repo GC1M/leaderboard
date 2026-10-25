@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { Button, Field, styles as ui } from '@/components/ui';
 
 import { validateSteps, type StepRow } from '@/lib/health/rules';
 import { upsertDailyMetrics } from '@/lib/metrics';
 
-import { useStepsTheme } from './theme';
+import { useTheme } from '@/theme';
 
 type Props = { dates: string[]; rows: StepRow[]; onSaved: () => void };
 
 // `dates` is oldest first; chips show newest first.
 export function ManualEntry({ dates, rows, onSaved }: Props) {
-  const t = useStepsTheme();
+  const t = useTheme();
   const today = dates[dates.length - 1];
   const [date, setDate] = useState(today);
   const [text, setText] = useState('');
@@ -46,7 +48,7 @@ export function ManualEntry({ dates, rows, onSaved }: Props) {
 
   return (
     <View>
-      <Text style={[styles.heading, { color: t.ink }]}>Add steps manually</Text>
+      <Text style={[ui.heading, styles.heading, { color: t.ink }]}>Add steps manually</Text>
       <View style={styles.chips} accessibilityRole="radiogroup">
         {[...dates].reverse().map((d) => (
           <Pressable
@@ -61,43 +63,28 @@ export function ManualEntry({ dates, rows, onSaved }: Props) {
           </Pressable>
         ))}
       </View>
-      <TextInput
+      <Field
+        label="Steps"
         value={text}
-        onChangeText={(s) => {
-          setText(s);
+        onChangeText={(v) => {
+          setText(v);
           setError(null);
         }}
         keyboardType="number-pad"
         placeholder="8000"
-        placeholderTextColor={t.inkSoft}
-        accessibilityLabel="Steps"
-        style={[styles.input, { color: t.ink, backgroundColor: t.surface, borderColor: error ? t.danger : t.border }]}
+        helper='Manual entries are marked "Manual" on the leaderboard.'
+        error={error}
       />
-      {error && (
-        <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: t.danger }]}>
-          {error}
-        </Text>
-      )}
-      <Text style={[styles.caption, { color: t.inkSoft }]}>Manual entries are marked &quot;Manual&quot; on the leaderboard.</Text>
-      <Pressable
-        onPress={onPress}
-        disabled={busy || text.trim() === ''}
-        accessibilityRole="button"
-        accessibilityLabel={existing ? 'Replace steps' : 'Save steps'}
-        style={({ pressed }) => [styles.button, { backgroundColor: t.accent, opacity: busy || text.trim() === '' ? 0.5 : pressed ? 0.7 : 1 }]}
-      >
-        {busy ? <ActivityIndicator color={t.onAccent} /> : <Text style={[styles.buttonText, { color: t.onAccent }]}>{existing ? 'Replace steps' : 'Save steps'}</Text>}
-      </Pressable>
+      <View style={styles.save}>
+        <Button label={existing ? 'Replace steps' : 'Save steps'} busy={busy} disabled={text.trim() === ''} onPress={onPress} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  heading: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
+  heading: { marginBottom: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   chip: { minHeight: 44, minWidth: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 1 },
-  input: { minHeight: 48, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, fontSize: 16 },
-  caption: { fontSize: 13, marginTop: 6 },
-  button: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
-  buttonText: { fontSize: 16, fontWeight: '600' },
+  save: { marginTop: 16 },
 });

@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { authGate } from '@/lib/auth-gate';
 import { useStepSync } from '@/lib/health/sync';
 import { watchAppStateForAuthRefresh } from '@/lib/supabase';
+import { useTheme } from '@/theme';
 
 // Keep the splash up until the stored session is read, so there is no blank frame.
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -18,6 +19,7 @@ function StepSync() {
 
 function Routes() {
   const { session, loading } = useAuth();
+  const { bg } = useTheme();
   const gate = authGate(loading, session);
   useEffect(() => {
     if (gate !== 'loading') SplashScreen.hideAsync().catch(() => {});
@@ -26,7 +28,8 @@ function Routes() {
   return (
     <>
       {gate === 'signed-in' && <StepSync />}
-      <Stack screenOptions={{ headerShown: false }}>
+      {/* Without contentStyle the stack stays white in dark mode. */}
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: bg } }}>
         <Stack.Protected guard={gate === 'signed-in'}>
           <Stack.Screen name="index" />
           <Stack.Screen name="groups/index" />

@@ -1,35 +1,51 @@
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { formatValue, hasNoData, type LeaderboardRow, type Metric } from '@/lib/leaderboard';
+import { useTheme } from '@/theme';
 
-type Props = { row: LeaderboardRow; rankLabel: string; metric: Metric; isYou: boolean };
+type Props = { row: LeaderboardRow; rankLabel: string; metric: Metric; isYou: boolean; leader: number };
 
-export function LeaderboardRowView({ row, rankLabel, metric, isYou }: Props) {
-  const dark = useColorScheme() === 'dark';
+// Race-board row: heavy rank numeral, name, score, and a lane bar filled relative to the leader.
+export function LeaderboardRowView({ row, rankLabel, metric, isYou, leader }: Props) {
+  const c = useTheme();
   const noData = hasNoData(row);
-  const fg = dark ? '#fff' : '#111';
-  const valueText = noData ? 'no data yet' : formatValue(metric, row.value);
-  const youBg = dark ? '#1e3a5f' : '#e6f0ff';
+  const valueText = noData ? 'No data' : formatValue(metric, row.value);
+  const fill = noData || leader <= 0 ? 0 : Math.min(1, row.value / leader);
   return (
     <View
       accessible
-      accessibilityLabel={`${noData ? 'unranked' : `rank ${rankLabel}`}, ${row.name}${isYou ? ', you' : ''}, ${valueText}`}
-      style={[styles.row, isYou && { backgroundColor: youBg }, noData && styles.dim]}
+      accessibilityLabel={`${noData ? 'Unranked' : `Rank ${rankLabel}`}, ${row.name}${isYou ? ', you' : ''}, ${valueText}`}
+      style={[styles.row, isYou ? { backgroundColor: c.youTint, borderRadius: 14 } : { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line }]}
     >
-      <Text style={[styles.rank, { color: fg }]}>{rankLabel}</Text>
-      <Text style={[styles.name, { color: fg }]} numberOfLines={1}>
-        {row.name}
-        {isYou ? ' (you)' : ''}
-      </Text>
-      <Text style={[styles.value, { color: fg }]}>{valueText}</Text>
+      <View style={styles.top}>
+        <Text maxFontSizeMultiplier={1.3} style={[styles.rank, { color: noData ? c.inkSoft : c.ink }]}>
+          {rankLabel}
+        </Text>
+        <View style={styles.name}>
+          <Text numberOfLines={1} style={[styles.nameText, { color: c.ink }]}>
+            {row.name}
+          </Text>
+          {isYou && <Text style={[styles.tag, { color: c.accent }]}>You</Text>}
+        </View>
+        <Text maxFontSizeMultiplier={1.3} style={[noData ? styles.none : styles.score, { color: noData ? c.inkSoft : c.ink }]}>
+          {valueText}
+        </Text>
+      </View>
+      <View style={[styles.lane, { backgroundColor: c.lane }]}>
+        <View style={[styles.lane, { width: `${fill * 100}%`, backgroundColor: isYou ? c.accent : c.border }]} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingHorizontal: 16, gap: 12 },
-  dim: { opacity: 0.5 },
-  rank: { width: 36, fontSize: 16, fontWeight: '600' },
-  name: { flex: 1, fontSize: 16 },
-  value: { fontSize: 16, fontVariant: ['tabular-nums'] },
+  row: { minHeight: 64, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  top: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rank: { minWidth: 44, fontSize: 28, lineHeight: 32, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  name: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  nameText: { flexShrink: 1, fontSize: 16, lineHeight: 24, fontWeight: '600' },
+  tag: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  score: { fontSize: 22, lineHeight: 28, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  none: { fontSize: 16, lineHeight: 24 },
+  lane: { height: 4, borderRadius: 999 },
 });

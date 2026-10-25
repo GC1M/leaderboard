@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { StepRow as Row } from '@/lib/health/rules';
 
-import { useStepsTheme } from './theme';
+import { useTheme } from '@/theme';
 
 const dayLabel = (date: string, today: string) => {
   if (date === today) return 'Today';
@@ -11,7 +11,7 @@ const dayLabel = (date: string, today: string) => {
 };
 
 export function StepRow({ date, today, row, onUseHealth }: { date: string; today: string; row?: Row; onUseHealth?: () => void }) {
-  const t = useStepsTheme();
+  const t = useTheme();
   const label = dayLabel(date, today);
   const source = row?.source === 'manual' ? 'Manual' : 'Health';
   const a11y = row ? `${label}, ${row.value.toLocaleString()} steps, ${source}` : `${label}, no data`;

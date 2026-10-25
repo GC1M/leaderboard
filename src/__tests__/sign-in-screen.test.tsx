@@ -15,6 +15,8 @@ jest.mock('expo-apple-authentication', () => {
   };
 });
 jest.mock('expo-crypto', () => ({}));
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 // Simulates Expo Go: the native module throws on require.
 jest.mock('@react-native-google-signin/google-signin', () => {
   throw new Error('RNGoogleSignin could not be found');
@@ -63,7 +65,7 @@ test('after sending: shows destination, change link and a 30s resend cooldown', 
     await type('a@b.co');
     await press('Send me a code');
     expect(mockOtp).toHaveBeenCalledWith({ email: 'a@b.co' });
-    expect(text()).toContain('"Code sent to ","a@b.co"');
+    expect(text()).toContain('Enter the 6-digit code sent to a@b.co');
     expect(text()).toContain('Change email');
     expect(text()).toContain('Resend code in 30s');
     for (let i = 0; i < 30; i++) await act(async () => jest.advanceTimersByTime(1000));
@@ -76,11 +78,20 @@ test('after sending: shows destination, change link and a 30s resend cooldown', 
   }
 });
 
-test('errors show inline, not as an alert', async () => {
-  mockOtp.mockResolvedValue({ error: new Error('rate limited') });
+test('errors show inline in plain words, not as an alert', async () => {
+  mockOtp.mockResolvedValue({ error: new Error('smtp exploded') });
   const { text, type, press } = await setup();
   await type('a@b.co');
   await press('Send me a code');
-  expect(text()).toContain('rate limited');
-  expect(text()).not.toContain('Code sent to');
+  expect(text()).toContain("Couldn't send a code. Check the email and try again.");
+  expect(text()).not.toContain('smtp exploded');
+  expect(text()).not.toContain('code sent to');
+});
+
+test('rate limits get their own message', async () => {
+  mockOtp.mockResolvedValue({ error: Object.assign(new Error('rate limited'), { status: 429 }) });
+  const { text, type, press } = await setup();
+  await type('a@b.co');
+  await press('Send me a code');
+  expect(text()).toContain('Too many tries. Wait a minute, then request a new code.');
 });
