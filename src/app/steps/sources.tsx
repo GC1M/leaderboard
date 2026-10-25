@@ -17,9 +17,9 @@ const SOURCES = [
 export default function Sources() {
   const c = useTheme();
   return (
-    <Screen title="Connect a watch or tracker" back>
+    <Screen title="Connect a Watch or Tracker" back>
       <Text style={[styles.body, { color: c.inkSoft }]}>
-        Leaderboard reads steps from Apple Health. Let your tracker&apos;s app write steps to Apple Health, then pull down on My steps to sync.
+        Leaderboard reads steps from Apple Health. Let your tracker&apos;s app write steps to Apple Health, then pull down on My Steps to sync.
       </Text>
       {SOURCES.map((s) => (
         <View key={s.name} accessible style={{ gap: 4, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line }}>

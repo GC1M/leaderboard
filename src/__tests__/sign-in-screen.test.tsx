@@ -54,7 +54,7 @@ beforeEach(() => {
 test('renders without the Google module, keeps Apple and email', async () => {
   const { text } = await setup();
   expect(text()).toContain('Apple button');
-  expect(text()).toContain('Send me a code');
+  expect(text()).toContain('Send Me a Code');
   expect(text()).not.toContain('Sign in with Google');
 });
 
@@ -63,16 +63,16 @@ test('after sending: shows destination, change link and a 30s resend cooldown', 
   try {
     const { text, type, press } = await setup();
     await type('a@b.co');
-    await press('Send me a code');
+    await press('Send Me a Code');
     expect(mockOtp).toHaveBeenCalledWith({ email: 'a@b.co' });
     expect(text()).toContain('Enter the 6-digit code sent to a@b.co');
-    expect(text()).toContain('Change email');
-    expect(text()).toContain('Resend code in 30s');
+    expect(text()).toContain('Change Email');
+    expect(text()).toContain('Resend Code in 30s');
     for (let i = 0; i < 30; i++) await act(async () => jest.advanceTimersByTime(1000));
-    expect(text()).not.toContain('Resend code in');
-    expect(text()).toContain('Resend code');
-    await press('Change email');
-    expect(text()).toContain('Send me a code');
+    expect(text()).not.toContain('Resend Code in');
+    expect(text()).toContain('Resend Code');
+    await press('Change Email');
+    expect(text()).toContain('Send Me a Code');
   } finally {
     jest.useRealTimers();
   }
@@ -82,7 +82,7 @@ test('errors show inline in plain words, not as an alert', async () => {
   mockOtp.mockResolvedValue({ error: new Error('smtp exploded') });
   const { text, type, press } = await setup();
   await type('a@b.co');
-  await press('Send me a code');
+  await press('Send Me a Code');
   expect(text()).toContain("Couldn't send a code. Check the email and try again.");
   expect(text()).not.toContain('smtp exploded');
   expect(text()).not.toContain('code sent to');
@@ -92,6 +92,6 @@ test('rate limits get their own message', async () => {
   mockOtp.mockResolvedValue({ error: Object.assign(new Error('rate limited'), { status: 429 }) });
   const { text, type, press } = await setup();
   await type('a@b.co');
-  await press('Send me a code');
+  await press('Send Me a Code');
   expect(text()).toContain('Too many tries. Wait a minute, then request a new code.');
 });

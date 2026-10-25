@@ -62,13 +62,13 @@ export default function Steps() {
 
   return (
     <Screen
-      title="My steps"
+      title="My Steps"
       back
       refreshControl={health ? <RefreshControl refreshing={syncing} onRefresh={refresh} /> : undefined}
     >
       <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: syncError ? t.danger : t.inkSoft }]}>{status}</Text>
       {result?.status === 'needs-permission' && (
-        <Button plain label="Set up Health access" onPress={() => router.push('/steps/permission')} />
+        <Button plain label="Set Up Health Access" onPress={() => router.push('/steps/permission')} />
       )}
 
       {rows === null && !loadError ? (
@@ -76,7 +76,7 @@ export default function Steps() {
       ) : loadError ? (
         <View>
           <ErrorText>{loadError}</ErrorText>
-          <Button plain label="Try again" onPress={load} />
+          <Button plain label="Try Again" onPress={load} />
         </View>
       ) : (
         <View>
@@ -87,7 +87,7 @@ export default function Steps() {
         </View>
       )}
 
-      {health && <Button plain label="Connect a watch or tracker" onPress={() => router.push('/steps/sources')} />}
+      {health && <Button plain label="Connect a Watch or Tracker" onPress={() => router.push('/steps/sources')} />}
 
       <View style={{ marginTop: 16 }}>
         <ManualEntry dates={dates} rows={rows ?? []} onSaved={load} />

@@ -76,7 +76,7 @@ export function ManualEntry({ dates, rows, onSaved }: Props) {
         error={error}
       />
       <View style={styles.save}>
-        <Button label={existing ? 'Replace steps' : 'Save steps'} busy={busy} disabled={text.trim() === ''} onPress={onPress} />
+        <Button label={existing ? 'Replace Steps' : 'Save Steps'} busy={busy} disabled={text.trim() === ''} onPress={onPress} />
       </View>
     </View>
   );

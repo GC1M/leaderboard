@@ -23,7 +23,7 @@ export default function JoinGroup() {
   };
 
   return (
-    <Screen title="Join a group" back>
+    <Screen title="Join a Group" back>
       <Field
         label="Invite code"
         code
@@ -39,7 +39,7 @@ export default function JoinGroup() {
         helper="8 characters, no I, O, 0 or 1. Paste works too."
         error={error}
       />
-      <Button label="Join group" busy={busy} disabled={!isValidCode(code)} onPress={submit} />
+      <Button label="Join Group" busy={busy} disabled={!isValidCode(code)} onPress={submit} />
     </Screen>
   );
 }

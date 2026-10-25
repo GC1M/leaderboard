@@ -1,9 +1,9 @@
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, Share, Text, View } from 'react-native';
+import { Alert, Share, Text, View } from 'react-native';
 
-import { Button, ErrorText, Field, Screen, Skeleton, styles } from '@/components/ui';
+import { Button, ErrorText, Field, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
   deleteGroup,
@@ -71,11 +71,11 @@ export default function GroupInfo() {
 
   if (!group || !members) {
     return (
-      <Screen title="Group info" back>
+      <Screen title="Group Info" back>
         {error ? (
           <>
             <ErrorText>{error}</ErrorText>
-            <Button label="Try again" onPress={load} />
+            <Button label="Try Again" onPress={load} />
           </>
         ) : (
           <Skeleton label="Loading group" />
@@ -91,12 +91,12 @@ export default function GroupInfo() {
   const memberOptions = (m: Member) =>
     Alert.alert(m.name, undefined, [
       {
-        text: "Delete today's steps",
+        text: "Delete Today's Steps",
         style: 'destructive',
         onPress: () => act(() => deleteMemberSteps(id, m.userId, localDateKey(new Date()))),
       },
       {
-        text: 'Remove from group',
+        text: 'Remove from Group',
         style: 'destructive',
         onPress: () =>
           Alert.alert(`Remove ${m.name}?`, 'They can join again with the invite code unless you share a new one.', [
@@ -116,7 +116,7 @@ export default function GroupInfo() {
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: owner ? 'Delete group' : 'Leave group',
+          text: owner ? 'Delete Group' : 'Leave Group',
           style: 'destructive',
           onPress: async () => {
             setBusy(true);
@@ -133,75 +133,65 @@ export default function GroupInfo() {
     );
 
   return (
-    <Screen title="Group info" back>
+    <Screen title="Group Info" back>
       <ErrorText>{error}</ErrorText>
 
       {owner ? (
         <>
           <Field label="Group name" maxLength={60} value={name} onChangeText={setName} returnKeyType="done" helper={`${name.length}/60`} />
-          {renamed && <Button label="Save name" busy={busy} onPress={() => act(() => renameGroup(id, name))} />}
+          {renamed && <Button label="Save Name" busy={busy} onPress={() => act(() => renameGroup(id, name))} />}
         </>
       ) : (
         <Text style={[styles.heading, { color: c.ink }]}>{group.name}</Text>
       )}
 
-      <View style={{ gap: 8 }}>
-        <Text style={[styles.heading, { color: c.ink }]}>Invite friends</Text>
-        <Text selectable accessibilityLabel={`Invite code ${code.split('').join(' ')}`} style={[styles.code, { color: c.ink }]}>
-          {`${code.slice(0, 4)} ${code.slice(4)}`}
-        </Text>
-        <Button
-          label="Share invite link"
+      <Section title="Invite friends" footer="Anyone with this code can join. Only share it with people you trust.">
+        <View style={{ padding: 16 }}>
+          <Text selectable accessibilityLabel={`Invite code ${code.split('').join(' ')}`} style={[styles.code, { color: c.ink }]}>
+            {`${code.slice(0, 4)} ${code.slice(4)}`}
+          </Text>
+        </View>
+        <Row
+          label="Share Invite Link"
+          icon={{ ios: 'square.and.arrow.up', android: 'share', web: 'share' }}
+          action
           onPress={() =>
             Share.share({ message: `Join my group "${group.name}" on Leaderboard: ${inviteLink(code)} (code ${code})` }).catch(() => {})
           }
         />
-        <Button
-          label={copied ? 'Copied' : 'Copy code'}
-          secondary
+        <Row
+          label={copied ? 'Copied' : 'Copy Code'}
+          icon={{ ios: 'doc.on.doc', android: 'content_copy', web: 'content_copy' }}
+          action
+          last
           onPress={async () => {
             await Clipboard.setStringAsync(code);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
           }}
         />
-      </View>
+      </Section>
 
-      <View>
-        <Text style={[styles.heading, { color: c.ink, marginBottom: 8 }]}>
-          {members.length} {members.length === 1 ? 'member' : 'members'}
-        </Text>
-        {members.map((m) => {
+      <Section title={`${members.length} ${members.length === 1 ? 'member' : 'members'}`} footer={owner ? 'Tap a member to delete their steps for today or remove them.' : undefined}>
+        {members.map((m, i) => {
           const manageable = owner && m.userId !== me;
           const tag = [m.userId === me && 'You', m.role === 'owner' && 'Owner'].filter(Boolean).join(', ');
           return (
-            <Pressable
+            <Row
               key={m.userId}
-              disabled={!manageable || busy}
-              accessibilityRole={manageable ? 'button' : undefined}
-              accessibilityLabel={`${m.name}${tag ? `, ${tag}` : ''}`}
-              accessibilityHint={manageable ? 'Opens options to delete their steps or remove them' : undefined}
-              onPress={() => memberOptions(m)}
-              style={({ pressed }) => ({
-                minHeight: 52,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                borderBottomWidth: 1,
-                borderBottomColor: c.line,
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <Text numberOfLines={1} style={[styles.bodyStrong, { color: c.ink, flexShrink: 1 }]}>
-                {m.name}
-              </Text>
-              <Text style={[styles.caption, { color: manageable ? c.accent : c.inkSoft }]}>{manageable ? 'Manage' : tag}</Text>
-            </Pressable>
+              label={m.name}
+              value={tag || undefined}
+              last={i === members.length - 1}
+              disabled={busy}
+              onPress={manageable ? () => memberOptions(m) : undefined}
+            />
           );
         })}
-      </View>
+      </Section>
 
-      <Button plain danger busy={busy} label={owner ? 'Delete group' : 'Leave group'} onPress={confirmLeave} />
+      <Section>
+        <Row label={owner ? 'Delete Group' : 'Leave Group'} danger last disabled={busy} onPress={confirmLeave} />
+      </Section>
     </Screen>
   );
 }

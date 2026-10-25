@@ -41,7 +41,7 @@ export default function NewGroup() {
           {`${inviteCode.slice(0, 4)} ${inviteCode.slice(4)}`}
         </Text>
         <Button
-          label={copied ? 'Copied' : 'Copy code'}
+          label={copied ? 'Copied' : 'Copy Code'}
           secondary
           onPress={async () => {
             await Clipboard.setStringAsync(inviteCode);
@@ -50,7 +50,7 @@ export default function NewGroup() {
           }}
         />
         <Button
-          label="Share invite link"
+          label="Share Invite Link"
           onPress={() =>
             // Include the plain code: a custom scheme isn't clickable in every messenger.
             Share.share({
@@ -67,7 +67,7 @@ export default function NewGroup() {
   }
 
   return (
-    <Screen title="New group" back>
+    <Screen title="New Group" back>
       <Field
         label="Group name"
         autoFocus
@@ -80,7 +80,7 @@ export default function NewGroup() {
         helper={`${name.length}/60. Friends see this name when they join.`}
         error={error}
       />
-      <Button label="Create group" busy={busy} disabled={!name.trim()} onPress={submit} />
+      <Button label="Create Group" busy={busy} disabled={!name.trim()} onPress={submit} />
     </Screen>
   );
 }

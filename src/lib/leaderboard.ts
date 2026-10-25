@@ -82,3 +82,12 @@ export function sourceLabel(period: Period, manualDays: number, noData: boolean)
   if (period === 'day') return { text: 'Manual', manual: true };
   return { text: `${manualDays} of 7 days manual`, manual: true };
 }
+
+export type Standing = { rankLabel: string; members: number; value: number; leader: number };
+
+// Your place in one group's rows, for the summary cards. null if you're not in the rows.
+export function myStanding(rows: LeaderboardRow[], me: string): Standing | null {
+  const i = rows.findIndex((r) => r.userId === me);
+  if (i < 0) return null;
+  return { rankLabel: rankLabels(rows)[i], members: rows.length, value: rows[i].value, leader: Math.max(0, ...rows.map((r) => r.value)) };
+}

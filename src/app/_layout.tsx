@@ -31,8 +31,7 @@ function Routes() {
       {/* Without contentStyle the stack stays white in dark mode. */}
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: bg } }}>
         <Stack.Protected guard={gate === 'signed-in'}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="groups/index" />
+          <Stack.Screen name="(tabs)" />
           <Stack.Screen name="groups/[id]/index" />
           <Stack.Screen name="groups/[id]/info" />
           <Stack.Screen name="groups/join" />
@@ -41,7 +40,6 @@ function Routes() {
           <Stack.Screen name="steps/index" />
           <Stack.Screen name="steps/permission" />
           <Stack.Screen name="steps/sources" />
-          <Stack.Screen name="profile" />
         </Stack.Protected>
         <Stack.Protected guard={gate === 'signed-out'}>
           <Stack.Screen name="sign-in" />
