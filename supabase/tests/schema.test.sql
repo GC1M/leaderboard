@@ -1,5 +1,5 @@
 begin;
-select plan(26);
+select plan(29);
 
 -- fixtures (postgres role bypasses RLS; trigger creates profiles)
 insert into auth.users (id, email, raw_user_meta_data) values
@@ -46,6 +46,9 @@ select lives_ok($$insert into daily_metrics values (auth.uid(), current_date - 6
 select is((select value from daily_metrics where user_id = auth.uid() and date = current_date - 6 and metric = 'steps'), 100000::numeric, 'health steps stored uncapped');
 select throws_ok($$update daily_metrics set source = 'manual' where user_id = auth.uid() and date = current_date - 6 and metric = 'steps'$$, '23514', null, 'uncapped health row cannot become manual');
 delete from daily_metrics where user_id = auth.uid() and date = current_date - 6 and metric = 'steps';
+select throws_ok($$insert into daily_metrics values (auth.uid(), current_date - 6, 'steps', 'NaN', 'healthkit')$$, '23514', null, 'NaN steps rejected');
+select throws_ok($$insert into daily_metrics values (auth.uid(), current_date - 6, 'steps', 'Infinity', 'healthkit')$$, '23514', null, 'infinite steps rejected');
+select throws_ok($$insert into daily_metrics values (auth.uid(), current_date - 6, 'steps', 1.5, 'healthkit')$$, '23514', null, 'fractional steps rejected');
 
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
 insert into daily_metrics (user_id, date, metric, value, source) values
