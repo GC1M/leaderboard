@@ -25,21 +25,38 @@ export type Database = {
           Tables: {
             "daily_metrics": {
                   Row: {
-                    "health_device_id": string | null,
-                    "date": string,"metric": string,"source": string,"updated_at": string,"user_id": string,"value": number,"window_end": string | null,"window_start": string | null
+                    "date": string,"health_device_id": string | null,"metric": string,"source": string,"updated_at": string,"user_id": string,"value": number,"window_end": string | null,"window_start": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "health_device_id"?: string | null,
-                    "date": string,"metric": string,"source": string,"updated_at"?: string,"user_id": string,"value": number,"window_end"?: string | null,"window_start"?: string | null
+                    "date": string,"health_device_id"?: string | null,"metric": string,"source": string,"updated_at"?: string,"user_id": string,"value": number,"window_end"?: string | null,"window_start"?: string | null
                   }
                   Update: {
-                    "health_device_id"?: string | null,
-                    "date"?: string,"metric"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string,"value"?: number,"window_end"?: string | null,"window_start"?: string | null
+                    "date"?: string,"health_device_id"?: string | null,"metric"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string,"value"?: number,"window_end"?: string | null,"window_start"?: string | null
                   }
                   Relationships: [
                     {
       foreignKeyName: "daily_metrics_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"exercises": {
+                  Row: {
+                    "category": string,"id": string,"name": string,"updated_at": string,"user_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "category": string,"id"?: string,"name": string,"updated_at"?: string,"user_id"?: string | null
+                  }
+                  Update: {
+                    "category"?: string,"id"?: string,"name"?: string,"updated_at"?: string,"user_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "exercises_user_id_fkey"
       columns: ["user_id"]
 isOneToOne: false
       referencedRelation: "profiles"
@@ -148,21 +165,84 @@ isOneToOne: false
                   ]
                 },"weight_measurements": {
                   Row: {
-                    "health_device_id": string | null,
-                    "id": string,"kg": number,"measured_at": string,"source": string,"updated_at": string,"user_id": string
+                    "health_device_id": string | null,"id": string,"kg": number,"measured_at": string,"source": string,"updated_at": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "health_device_id"?: string | null,
-                    "id"?: string,"kg": number,"measured_at": string,"source": string,"updated_at"?: string,"user_id": string
+                    "health_device_id"?: string | null,"id"?: string,"kg": number,"measured_at": string,"source": string,"updated_at"?: string,"user_id": string
                   }
                   Update: {
-                    "health_device_id"?: string | null,
-                    "id"?: string,"kg"?: number,"measured_at"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string
+                    "health_device_id"?: string | null,"id"?: string,"kg"?: number,"measured_at"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
       foreignKeyName: "weight_measurements_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"workout_exercises": {
+                  Row: {
+                    "exercise_id": string,"id": string,"notes": string | null,"position": number,"workout_id": string,"workout_source": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "exercise_id": string,"id"?: string,"notes"?: string | null,"position": number,"workout_id": string,"workout_source"?: string
+                  }
+                  Update: {
+                    "exercise_id"?: string,"id"?: string,"notes"?: string | null,"position"?: number,"workout_id"?: string,"workout_source"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "workout_exercises_exercise_id_fkey"
+      columns: ["exercise_id"]
+isOneToOne: false
+      referencedRelation: "exercises"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "workout_exercises_workout_id_workout_source_fkey"
+      columns: ["workout_id","workout_source"]
+isOneToOne: false
+      referencedRelation: "workouts"
+      referencedColumns: ["id","source"]
+    }
+                  ]
+                },"workout_sets": {
+                  Row: {
+                    "distance_m": number | null,"duration_s": number | null,"id": string,"load_kg": number | null,"position": number,"reps": number | null,"workout_exercise_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "distance_m"?: number | null,"duration_s"?: number | null,"id"?: string,"load_kg"?: number | null,"position": number,"reps"?: number | null,"workout_exercise_id": string
+                  }
+                  Update: {
+                    "distance_m"?: number | null,"duration_s"?: number | null,"id"?: string,"load_kg"?: number | null,"position"?: number,"reps"?: number | null,"workout_exercise_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "workout_sets_workout_exercise_id_fkey"
+      columns: ["workout_exercise_id"]
+isOneToOne: false
+      referencedRelation: "workout_exercises"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"workouts": {
+                  Row: {
+                    "activity_type": string,"distance_m": number | null,"duration_s": number | null,"ended_at": string,"energy_kcal": number | null,"health_device_id": string | null,"health_uuid": string | null,"id": string,"notes": string | null,"source": string,"started_at": string,"timezone": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "activity_type": string,"distance_m"?: number | null,"duration_s"?: number | null,"ended_at": string,"energy_kcal"?: number | null,"health_device_id"?: string | null,"health_uuid"?: string | null,"id"?: string,"notes"?: string | null,"source": string,"started_at": string,"timezone": string,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "activity_type"?: string,"distance_m"?: number | null,"duration_s"?: number | null,"ended_at"?: string,"energy_kcal"?: number | null,"health_device_id"?: string | null,"health_uuid"?: string | null,"id"?: string,"notes"?: string | null,"source"?: string,"started_at"?: string,"timezone"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "workouts_user_id_fkey"
       columns: ["user_id"]
 isOneToOne: false
       referencedRelation: "profiles"
@@ -189,8 +269,10 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "apply_health_changes": { Args: { p_owner: string; p_device: string; p_metric: string; p_daily: Json; p_remove_daily: string[]; p_weight: Json; p_remove_weight: string[] }; Returns: undefined },
-            "create_group":
+            "apply_health_changes":
+{ Args: { "p_daily": Json,"p_device": string,"p_metric": string,"p_owner": string,"p_remove_daily": (string)[],"p_remove_weight": (string)[],"p_weight": Json }; Returns: undefined
+                           },
+"create_group":
 { Args: { "name": string }; Returns: {
               "created_at": string,
 "id": string,
