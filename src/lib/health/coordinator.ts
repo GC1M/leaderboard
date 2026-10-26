@@ -16,6 +16,7 @@ export type CoordinatorDependencies = {
   access: (metric: HealthMetric) => Promise<HealthAccess>;
   reconcile: (metric: HealthMetric, checkOwner: ReconcileOptions['checkOwner']) => Promise<{ hasMore: boolean; knownSamples: number; written: number }>;
   recheck: () => Promise<void>;
+  deleteImports: () => Promise<void>;
 };
 const initialMetric = (): MetricSyncState => ({ status:'idle',lastSuccess:null,knownSamples:0,error:null });
 export const initialHealthState = (): HealthSyncState => ({ ready:false,connected:false,syncing:false,error:null,metrics:{steps:initialMetric(),sleep:initialMetric(),weight:initialMetric()} });
@@ -26,6 +27,7 @@ export function createHealthCoordinator(deps: CoordinatorDependencies) {
   let state = initialHealthState();
   let alive = true, epoch = 0;
   let flight: Promise<void> | null = null;
+  let deleting: Promise<void> | null = null;
   const listeners = new Set<() => void>();
   const emit = (patch: Partial<HealthSyncState>) => { if (alive) { state = { ...state,...patch }; listeners.forEach((f)=>f()); } };
   const metric = (key: HealthMetric, patch: Partial<MetricSyncState>) => emit({metrics:{...state.metrics,[key]:{...state.metrics[key],...patch}}});
@@ -84,6 +86,8 @@ export function createHealthCoordinator(deps: CoordinatorDependencies) {
       }catch(e){if(alive && epoch===token)emit({ready:true,error:e instanceof Error?e.message:'Could not load Health connection.'});}
     },
     async connect(){
+      // Reconnecting mid-delete would re-upload rows the delete then wipes.
+      if(deleting)await deleting.catch(()=>{});
       const token=++epoch;
       await account(token);
       await deps.requestAccess();await account(token);
@@ -95,6 +99,18 @@ export function createHealthCoordinator(deps: CoordinatorDependencies) {
     async disconnect(){
       const token=++epoch;emit({connected:false});
       await account(token);await persist({...connection(),connected:false},token);await account(token);
+    },
+    // Stops imports, waits out any upload in flight, then deletes imported data. Imports stay off until the
+    // user reconnects, which starts a fresh history import.
+    deleteImports(){
+      const token=++epoch;emit({connected:false,metrics:initialHealthState().metrics});
+      const run=async()=>{
+        await account(token);await persist({connected:false,lastSuccess:{}},token);
+        if(flight)await flight;
+        await account(token);await deps.deleteImports();await account(token);
+      };
+      const current=deleting=run().finally(()=>{if(deleting===current)deleting=null;});
+      return current;
     },
     async recheck(){
       if(flight)await flight;

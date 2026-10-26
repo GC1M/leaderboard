@@ -4,6 +4,10 @@ import { supabase } from './supabase';
 jest.mock('./supabase', () => ({
   supabase: { rpc: jest.fn(), from: jest.fn(), auth: { getSession: jest.fn(), signOut: jest.fn() } },
 }));
+const mockDeleteJournal = jest.fn(async (_uid: string) => {});
+const mockRemoveItem = jest.fn(async (_key: string) => {});
+jest.mock('./health/journal', () => ({ deleteHealthJournal: (uid: string) => mockDeleteJournal(uid) }));
+jest.mock('./secure-storage', () => ({ secureStorage: { removeItem: (key: string) => mockRemoveItem(key) } }));
 const rpc = supabase.rpc as unknown as jest.Mock;
 const from = supabase.from as unknown as jest.Mock;
 const signOut = supabase.auth.signOut as unknown as jest.Mock;
@@ -26,8 +30,12 @@ test('deleteAccount signs out locally only after the server delete succeeds', as
   rpc.mockResolvedValue({ error: { message: 'boom' } });
   await expect(deleteAccount()).rejects.toThrow(/Couldn't delete your account/);
   expect(signOut).not.toHaveBeenCalled();
+  expect(mockDeleteJournal).not.toHaveBeenCalled();
   rpc.mockResolvedValue({ error: null });
+  mockDeleteJournal.mockRejectedValueOnce(new Error('locked'));
   await deleteAccount();
   expect(rpc).toHaveBeenCalledWith('delete_my_account');
+  expect(mockDeleteJournal).toHaveBeenCalledWith('me');
+  expect(mockRemoveItem).toHaveBeenCalledWith('health-connection-me');
   expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
 });

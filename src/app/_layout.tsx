@@ -39,6 +39,7 @@ function Routes() {
         <Stack.Protected guard={gate === 'signed-out'}>
           <Stack.Screen name="sign-in" />
         </Stack.Protected>
+        <Stack.Screen name="privacy" />
       </Stack>
     </>
   );

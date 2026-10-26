@@ -1,7 +1,6 @@
+import { deleteHealthJournal } from './health/journal';
+import { secureStorage } from './secure-storage';
 import { supabase } from './supabase';
-
-// ponytail: placeholder. Replace with the real policy URL before TestFlight external testing (App Store requires one for HealthKit apps).
-export const PRIVACY_POLICY_URL = 'https://example.com/leaderboard/privacy';
 
 export const NAME_MAX = 40;
 
@@ -26,9 +25,12 @@ export async function updateDisplayName(name: string): Promise<string> {
   return trimmed;
 }
 
-// Deletes the auth user server-side (cascades to everything), then clears the local session.
+// Deletes the auth user server-side (cascades to everything), then the local session, which stops Health
+// sync, then this device's Health import state. Local cleanup is best effort: the account is already gone.
 export async function deleteAccount(): Promise<void> {
+  const uid = await myId();
   const { error } = await supabase.rpc('delete_my_account');
   if (error) throw new Error("Couldn't delete your account. Check your connection and try again.");
   await supabase.auth.signOut({ scope: 'local' });
+  await Promise.allSettled([deleteHealthJournal(uid), secureStorage.removeItem(`health-connection-${uid}`)]);
 }
