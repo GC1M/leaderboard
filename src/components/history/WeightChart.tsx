@@ -32,9 +32,9 @@ export function WeightChart({ readings, days, to, unit }: {
           <Text style={[ui.caption, { color: c.inkSoft }]}>{points.length ? formatWeight(min, unit) : ''}</Text>
         </View>
         <View style={[styles.area, { borderColor: c.line }]}>
-          {points.map((p) => (
+          {points.map((p, i) => (
             <View
-              key={p.x}
+              key={i}
               style={[styles.dot, { left: `${p.x * 100}%`, bottom: `${p.y * 100}%`, backgroundColor: c.accent }]}
             />
           ))}

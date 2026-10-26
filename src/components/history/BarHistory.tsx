@@ -10,8 +10,9 @@ import { useTheme } from '@/theme';
 type Day = { date: string; value: number };
 
 // 7/30/90-day bars for a daily metric (steps, sleep minutes). `fetch` must be stable (module function or useCallback).
+// A new `refresh` value refetches the current range, e.g. after the screen's own reload.
 // Days without a row draw a dashed outline, never a zero bar; the summary averages recorded days only.
-export function BarHistory({ fetch, fmt, noun }: { fetch: (days: number) => Promise<Day[]>; fmt: (v: number) => string; noun: string }) {
+export function BarHistory({ fetch, fmt, noun, refresh }: { fetch: (days: number) => Promise<Day[]>; fmt: (v: number) => string; noun: string; refresh?: unknown }) {
   const c = useTheme();
   const [days, setDays] = useState<Range>(7);
   const [tries, setTries] = useState(0);
@@ -25,7 +26,7 @@ export function BarHistory({ fetch, fmt, noun }: { fetch: (days: number) => Prom
       (e) => live && setRes({ days, error: e instanceof Error ? e.message : `Couldn't load your ${noun}.` }),
     );
     return () => { live = false; };
-  }, [fetch, days, noun, tries]);
+  }, [fetch, days, noun, tries, refresh]);
 
   const current = res?.days === days ? res : null;
   const rows = current?.rows ?? null;

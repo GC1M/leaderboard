@@ -81,7 +81,7 @@ export default function Steps() {
         />
       )}
 
-      <BarHistory fetch={getMyRecentSteps} fmt={(v) => `${Math.round(v).toLocaleString()} steps`} noun="steps" />
+      <BarHistory refresh={rows} fetch={getMyRecentSteps} fmt={(v) => `${Math.round(v).toLocaleString()} steps`} noun="steps" />
 
       {rows === null && !loadError ? (
         <ActivityIndicator accessibilityLabel="Loading steps" color={t.accent} />

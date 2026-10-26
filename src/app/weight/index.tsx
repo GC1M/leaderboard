@@ -66,8 +66,10 @@ export default function Weight() {
         <Skeleton label="Loading weight" rows={2} />
       ) : !latest ? (
         <Text style={[styles.body, { color: c.inkSoft }]}>No weight recorded yet. Readings imported from Apple Health appear here.</Text>
+      ) : !current.rows?.length ? (
+        <Text style={[styles.body, { color: c.inkSoft }]}>{`No weight recorded in the last ${days} days.`}</Text>
       ) : (
-        <WeightChart readings={current.rows ?? []} days={days} to={new Date()} unit={unit} />
+        <WeightChart readings={current.rows} days={days} to={new Date()} unit={unit} />
       )}
       <Text style={[styles.caption, { color: c.inkSoft }]}>Readings are plotted at the time they were taken. Only you can see this.</Text>
     </Screen>
