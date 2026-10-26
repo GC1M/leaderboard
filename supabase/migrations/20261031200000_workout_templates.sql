@@ -17,7 +17,8 @@ create index on public.workout_templates (user_id, updated_at desc);
 create table public.workout_template_exercises (
   id uuid primary key default gen_random_uuid(),
   template_id uuid not null references public.workout_templates on delete cascade,
-  exercise_id uuid not null references public.exercises,
+  -- Deferred so deleting an account can remove the user's custom exercises and their templates in one cascade.
+  exercise_id uuid not null references public.exercises deferrable initially deferred,
   position integer not null check (position >= 0),
   notes text check (char_length(notes) <= 2000),
   unique (template_id, position) deferrable initially deferred
