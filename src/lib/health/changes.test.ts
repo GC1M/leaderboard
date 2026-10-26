@@ -88,3 +88,12 @@ test('sleep recomputation removes previously stored date keys after timezone rea
  await reconcileHealth('sleep',{journal:mem.journal,query:async()=>page([x]),upload,checkOwner:async()=>{}});
  expect(upload.mock.calls[0][1].removeDaily).toContain('2026-10-24');
 });
+test('a corrected sample replaces the old value instead of adding to it',async()=>{
+ const a=sample('a',undefined,undefined,80),fixed=sample('a',undefined,undefined,79);
+ const merged=mergeSamples([a],page([fixed]));
+ expect(merged).toHaveLength(1);expect(merged[0].value).toBe(79);
+ expect((await deriveChanges('weight',[a],merged,page([fixed]))).weight[0].kg).toBe(79);
+});
+test('invalid changes from Health are rejected rather than stored',()=>{
+ expect(()=>mergeSamples([],page([sample('x','2026-10-25T02:00:00','2026-10-25T01:00:00')]))).toThrow('Invalid Health change');
+});
