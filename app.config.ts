@@ -40,6 +40,7 @@ const config: ExpoConfig = {
       },
     ],
     'expo-secure-store',
+    ['expo-sqlite', { useSQLCipher: true }],
     [
       '@kingstinct/react-native-healthkit',
       {
