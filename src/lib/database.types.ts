@@ -25,13 +25,16 @@ export type Database = {
           Tables: {
             "daily_metrics": {
                   Row: {
+                    "health_device_id": string | null,
                     "date": string,"metric": string,"source": string,"updated_at": string,"user_id": string,"value": number,"window_end": string | null,"window_start": string | null
                   }
                   ComputedFields: never
                   Insert: {
+                    "health_device_id"?: string | null,
                     "date": string,"metric": string,"source": string,"updated_at"?: string,"user_id": string,"value": number,"window_end"?: string | null,"window_start"?: string | null
                   }
                   Update: {
+                    "health_device_id"?: string | null,
                     "date"?: string,"metric"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string,"value"?: number,"window_end"?: string | null,"window_start"?: string | null
                   }
                   Relationships: [
@@ -145,13 +148,16 @@ isOneToOne: false
                   ]
                 },"weight_measurements": {
                   Row: {
+                    "health_device_id": string | null,
                     "id": string,"kg": number,"measured_at": string,"source": string,"updated_at": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
+                    "health_device_id"?: string | null,
                     "id"?: string,"kg": number,"measured_at": string,"source": string,"updated_at"?: string,"user_id": string
                   }
                   Update: {
+                    "health_device_id"?: string | null,
                     "id"?: string,"kg"?: number,"measured_at"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
@@ -183,6 +189,7 @@ isOneToOne: false
                 }
           }
           Functions: {
+            "apply_health_changes": { Args: { p_owner: string; p_device: string; p_metric: string; p_daily: Json; p_remove_daily: string[]; p_weight: Json; p_remove_weight: string[] }; Returns: undefined },
             "create_group":
 { Args: { "name": string }; Returns: {
               "created_at": string,
