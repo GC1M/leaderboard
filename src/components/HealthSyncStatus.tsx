@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
 import { Button, ErrorText, styles } from '@/components/ui';
 import { useHealthSync } from '@/lib/health/sync';
@@ -9,7 +10,7 @@ const names={steps:'Steps',sleep:'Sleep',weight:'Weight'};
 export function describeHealthSync(m:MetricSyncState):string {
   switch(m.status){
     case 'syncing':return 'Checking Health…';
-    case 'importing':return `Importing history (${m.knownSamples.toLocaleString()} samples checked)…`;
+    case 'importing':return `Importing history (${m.knownSamples.toLocaleString()} readings checked)…`;
     case 'unavailable':return 'Requires the native iPhone app build.';
     case 'needs-permission':return 'Health access has not been requested.';
     case 'no-data':return 'No readings returned. Access may be limited or nothing was recorded.';
@@ -20,7 +21,7 @@ export function describeHealthSync(m:MetricSyncState):string {
   }
 }
 export function HealthSyncStatus(){
-  const t=useTheme(),health=useHealthSync();
+  const t=useTheme(),health=useHealthSync(),router=useRouter();
   const [busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null);
   const action=async(fn:()=>Promise<void>)=>{setBusy(true);setError(null);try{await fn();}catch(e){setError(e instanceof Error?e.message:'Could not connect to Health.');}finally{setBusy(false);}};
   return <View style={{gap:8,marginBottom:16}}>
@@ -34,7 +35,7 @@ export function HealthSyncStatus(){
         {m.lastSuccess && <Text style={[styles.caption,{color:t.inkSoft}]}>Last completed import: {new Date(m.lastSuccess).toLocaleString()}</Text>}
       </View>;
     })}
-    <Button label={health.connected?'Review Health Access':'Connect Apple Health'} busy={busy} disabled={!health.ready || health.syncing} onPress={()=>action(health.connect)}/>
+    <Button label={health.connected?'Review Health Access':'Connect Apple Health'} busy={busy} disabled={!health.ready || health.syncing} onPress={()=>health.connected?router.push('/steps/permission'):action(health.connect)}/>
     {health.connected && <>
       <Button label={health.syncing?'Importing…':'Refresh Health Data'} secondary disabled={busy || health.syncing} onPress={()=>action(health.sync)}/>
       <Button plain label="Recheck Health History" disabled={busy || health.syncing} onPress={()=>action(health.recheck)}/>
