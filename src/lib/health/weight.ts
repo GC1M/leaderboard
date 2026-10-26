@@ -6,6 +6,7 @@ export type WeightReading = { sampleId: string; measuredAt: string; kg: number }
 export type WeightSample = { uuid: string; startDate: Date; quantity: number; unit: string };
 const KG_PER_LB = 0.45359237;
 export const displayWeight = (kg: number, unit: 'kg' | 'lb') => unit === 'lb' ? kg / KG_PER_LB : kg;
+export const kgFromDisplay = (value: number, unit: 'kg' | 'lb') => unit === 'lb' ? value * KG_PER_LB : value;
 
 // The DB has one Health row per timestamp. If two sources record at exactly the same time,
 // choose the lexicographically greatest sample UUID; sorting makes imports/retries deterministic.

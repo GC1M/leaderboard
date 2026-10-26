@@ -159,6 +159,19 @@ test('clear (account deletion) empties the local queue', async () => {
   expect(queue.getSnapshot().entries).toEqual([]);
 });
 
+test('discard (exports turned off) drops unsent saves of that kind so a later grant writes nothing', async () => {
+  const { queue, rows, deps, writer } = setup('denied');
+  await queue.initialize();
+  await queue.enqueue('weight', 'r1', 'save', { kg: 80 }, 1);
+  await queue.enqueue('weight', 'r2', 'delete', null, 1);
+  await queue.discard('weight');
+  (deps.access as jest.Mock).mockReturnValue('granted');
+  await queue.process();
+  expect(writer.save).not.toHaveBeenCalled();
+  expect(writer.remove).toHaveBeenCalledTimes(1);
+  expect(rows.has('weight:r1')).toBe(false);
+});
+
 test('an edit enqueued while the old version is exporting is not overwritten by the old result', async () => {
   const { queue, writer, rows } = setup();
   await queue.initialize();

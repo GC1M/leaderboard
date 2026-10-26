@@ -1,3 +1,5 @@
+import { kgFromDisplay } from './weight';
+
 // Manual entry only. Health totals are measurements and are never capped.
 export const MAX_MANUAL_STEPS = 80000;
 
@@ -28,4 +30,22 @@ export function planSync(health: { date: string; value: number }[], existing: St
     else plan.rows.push({ date: h.date, value: Math.round(h.value), source: 'healthkit' });
   }
   return plan;
+}
+
+// Manual weight: a positive number in the display unit. The DB accepts kg above 0 and below 1000.
+export type WeightValidation = { ok: true; kg: number } | { ok: false; message: string };
+export function validateWeight(input: string, unit: 'kg' | 'lb'): WeightValidation {
+  const value = Number(input.trim().replace(',', '.'));
+  const kg = Math.round(kgFromDisplay(value, unit) * 1000) / 1000;
+  if (!/^\d+([.,]\d+)?$/.test(input.trim()) || !(kg > 0 && kg < 1000)) return { ok: false, message: `Enter your weight in ${unit}.` };
+  return { ok: true, kg };
+}
+
+// Manual sleep: one interval that ends after it starts and lasts at most 24 hours. Counted on the day it ends.
+export function validateSleep(start: Date | null, end: Date | null): { ok: true } | { ok: false; message: string } {
+  if (!start || !end) return { ok: false, message: 'Enter times as YYYY-MM-DD HH:mm.' };
+  if (end <= start) return { ok: false, message: 'Wake time must be after bedtime.' };
+  if (end.getTime() - start.getTime() > 24 * 3600 * 1000) return { ok: false, message: "Sleep can't be longer than 24 hours." };
+  if (end.getTime() > Date.now()) return { ok: false, message: "Wake time can't be in the future." };
+  return { ok: true };
 }

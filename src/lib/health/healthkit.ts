@@ -16,6 +16,7 @@ export const HEALTH_TYPES = {
   steps: STEPS,
   sleep: 'HKCategoryTypeIdentifierSleepAnalysis',
   weight: 'HKQuantityTypeIdentifierBodyMass',
+  workouts: 'HKWorkoutTypeIdentifier',
 } as const;
 export type HealthMetric = keyof typeof HEALTH_TYPES;
 const METRICS = Object.keys(HEALTH_TYPES) as HealthMetric[];

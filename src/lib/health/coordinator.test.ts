@@ -7,7 +7,7 @@ function setup(connected=true){
 test('does not read Health until this account explicitly connects',async()=>{
  const {c,deps}=setup(false);await c.initialize();await c.sync();
  expect(deps.access).not.toHaveBeenCalled();
- await c.connect();expect(deps.requestAccess).toHaveBeenCalledTimes(1);expect(deps.reconcile).toHaveBeenCalledTimes(3);
+ await c.connect();expect(deps.requestAccess).toHaveBeenCalledTimes(1);expect(deps.reconcile).toHaveBeenCalledTimes(4);
  expect(c.getSnapshot().connected).toBe(true);
 });
 test('all concurrent callers share one import; permission gaps do not block other metrics',async()=>{
@@ -15,7 +15,7 @@ test('all concurrent callers share one import; permission gaps do not block othe
  (deps.access as jest.Mock).mockImplementation(async(m)=>m==='sleep'?'not-asked':'asked');
  (deps.reconcile as jest.Mock).mockImplementation(async()=>{await wait.promise;return {hasMore:false,written:1,knownSamples:1};});
  const a=c.sync(),b=c.sync();expect(a).toBe(b);wait.resolve();await a;
- expect(deps.reconcile).toHaveBeenCalledTimes(2);expect(c.getSnapshot().metrics.sleep.status).toBe('needs-permission');
+ expect(deps.reconcile).toHaveBeenCalledTimes(3);expect(c.getSnapshot().metrics.sleep.status).toBe('needs-permission');
  expect(c.getSnapshot().metrics.weight.status).toBe('synced');
 });
 test('one metric failure preserves its prior success time and other successful imports',async()=>{
@@ -75,7 +75,7 @@ test('deleting imports stops sync, waits for the upload in flight, and stays off
  expect(c.getSnapshot()).toMatchObject({connected:false});
  expect(c.getSnapshot().metrics.steps.lastSuccess).toBeNull();
  const saves=(deps.save as jest.Mock).mock.calls;expect(saves[saves.length-1][0]).toEqual({connected:false,lastSuccess:{}});
- await c.sync();expect(deps.reconcile).toHaveBeenCalledTimes(3);
+ await c.sync();expect(deps.reconcile).toHaveBeenCalledTimes(4);
 });
 
 test('connecting during a delete waits for the delete to finish first',async()=>{
