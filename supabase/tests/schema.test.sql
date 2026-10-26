@@ -40,6 +40,7 @@ insert into daily_metrics (user_id, date, metric, value, source) values
 insert into weight_measurements (user_id, measured_at, kg, source) values (auth.uid(), now(), 90, 'manual');
 insert into goals (user_id, metric, start_value, target_value, start_date)
   values (auth.uid(), 'weight_kg', 100, 80, current_date - 30);
+insert into metric_shares (group_id, user_id, metric) values ((select id from g1), auth.uid(), 'weight');
 select throws_ok($$insert into daily_metrics values (auth.uid(), current_date - 5, 'steps', 80001, 'manual')$$, '23514', null, 'steps over 80000 rejected');
 select lives_ok($$insert into daily_metrics values (auth.uid(), current_date - 5, 'steps', 80000, 'manual')$$, 'steps at cap accepted');
 

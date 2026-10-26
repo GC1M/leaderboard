@@ -115,3 +115,30 @@ export async function removeMember(groupId: string, userId: string): Promise<voi
 export async function deleteMemberManualSteps(groupId: string, userId: string): Promise<void> {
   await friendly(supabase.rpc('delete_member_manual_entry', { p_group_id: groupId, p_user_id: userId, p_metric: 'steps' }));
 }
+
+export type SharedMetric = 'steps' | 'sleep' | 'weight';
+
+async function myId(): Promise<string> {
+  const { data: auth } = await supabase.auth.getSession();
+  const uid = auth.session?.user.id;
+  if (!uid) throw new Error(friendlyError({ message: 'not authenticated' }));
+  return uid;
+}
+
+/** What the caller shares with this group. No row means not shared. */
+export async function getMyShares(groupId: string): Promise<SharedMetric[]> {
+  const uid = await myId();
+  const rows = await friendly(supabase.from('metric_shares').select('metric').eq('group_id', groupId).eq('user_id', uid));
+  return rows.map((r) => r.metric as SharedMetric);
+}
+
+/** Turns sharing of one metric with one group on or off. Takes effect on the group's next read. */
+export async function setShare(groupId: string, metric: SharedMetric, on: boolean): Promise<void> {
+  const uid = await myId();
+  const row = { group_id: groupId, user_id: uid, metric };
+  await friendly(
+    on
+      ? supabase.from('metric_shares').upsert(row, { ignoreDuplicates: true })
+      : supabase.from('metric_shares').delete().match(row),
+  );
+}

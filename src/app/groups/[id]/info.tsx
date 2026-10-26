@@ -8,17 +8,26 @@ import { useAuth } from '@/lib/auth';
 import {
   deleteGroup,
   deleteMemberManualSteps,
+  getMyShares,
   inviteLink,
   leaveGroup,
   listMembers,
   removeMember,
   renameGroup,
+  setShare,
   type Member,
+  type SharedMetric,
 } from '@/lib/groups';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/theme';
 
 type Group = { name: string; invite_code: string; owner_id: string };
+
+const SHARE_ROWS: { metric: SharedMetric; label: string }[] = [
+  { metric: 'steps', label: 'Steps' },
+  { metric: 'sleep', label: 'Sleep' },
+  { metric: 'weight', label: 'Weight' },
+];
 
 export default function GroupInfo() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,6 +37,7 @@ export default function GroupInfo() {
   const router = useRouter();
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<Member[] | null>(null);
+  const [shares, setShares] = useState<SharedMetric[] | null>(null);
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -35,14 +45,16 @@ export default function GroupInfo() {
 
   const load = useCallback(async () => {
     try {
-      const [g, m] = await Promise.all([
+      const [g, m, s] = await Promise.all([
         supabase.from('groups').select('name, invite_code, owner_id').eq('id', id).single(),
         listMembers(id),
+        getMyShares(id),
       ]);
       if (g.error) throw g.error;
       setGroup(g.data);
       setName(g.data.name);
       setMembers(m);
+      setShares(s);
       setError(null);
     } catch {
       setError("Couldn't load this group. Check your connection and try again.");
@@ -68,7 +80,7 @@ export default function GroupInfo() {
     }
   };
 
-  if (!group || !members) {
+  if (!group || !members || !shares) {
     return (
       <Screen title="Group Info" back>
         {error ? (
@@ -171,6 +183,25 @@ export default function GroupInfo() {
             setTimeout(() => setCopied(false), 2000);
           }}
         />
+      </Section>
+
+      <Section
+        title="What you share with this group"
+        footer="Health access on your iPhone decides what this app can read. These switches decide what this group sees, and you can change them any time. Sleep shares nightly totals only. Weight shares your latest reading and goal progress."
+      >
+        {SHARE_ROWS.map(({ metric, label }, i) => {
+          const on = shares.includes(metric);
+          return (
+            <Row
+              key={metric}
+              label={label}
+              value={on ? 'Shared' : 'Not shared'}
+              last={i === SHARE_ROWS.length - 1}
+              disabled={busy}
+              onPress={() => act(() => setShare(id, metric, !on))}
+            />
+          );
+        })}
       </Section>
 
       <Section title={`${members.length} ${members.length === 1 ? 'member' : 'members'}`} footer={owner ? 'Tap a member to remove them or delete steps they typed in today. Health steps can\'t be deleted.' : undefined}>
