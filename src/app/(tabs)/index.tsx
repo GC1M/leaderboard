@@ -5,7 +5,7 @@ import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
 
 import { HealthSyncStatus } from '@/components/HealthSyncStatus';
 import { WeekChart } from '@/components/steps/WeekChart';
-import { Button, ErrorText, Icon, Screen, Section, Skeleton, styles as ui } from '@/components/ui';
+import { Button, ErrorText, Icon, Row, Screen, Section, Skeleton, styles as ui } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { listMyGroups, type MyGroup } from '@/lib/groups';
 import { lastNDates, localDateKey, readingDateLabel } from '@/lib/health/dates';
@@ -111,6 +111,9 @@ export default function Summary() {
             state={weight === 'error' ? 'error' : weight ? 'ok' : 'empty'}
             onPress={() => router.push('/weight')}
           />
+          <Section>
+            <Row last icon={{ ios: 'dumbbell.fill', android: 'fitness_center', web: 'fitness_center' }} label="Workouts" onPress={() => router.push('/workouts')} />
+          </Section>
 
           {cards.length === 0 ? (
             <Section title="Groups" footer="Start a group for your friends, or join with a code someone sent you.">
