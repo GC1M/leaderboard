@@ -4,11 +4,12 @@ import { AppState, Text } from 'react-native';
 
 import { Button, ErrorText, Screen, styles } from '@/components/ui';
 import { useTheme } from '@/theme';
-import { getAllHealthAccess, requestHealthAccess, type HealthAccess, type HealthMetric } from '@/lib/health/healthkit';
-import { syncSteps } from '@/lib/health/sync';
+import { getAllHealthAccess, type HealthAccess, type HealthMetric } from '@/lib/health/healthkit';
+import { useHealthSync } from '@/lib/health/sync';
 
 export default function HealthPermission() {
   const t = useTheme();
+  const healthSync = useHealthSync();
   const router = useRouter();
   const [access, setAccess] = useState<Record<HealthMetric, HealthAccess> | null>(null);
   const [busy, setBusy] = useState(false);
@@ -36,8 +37,7 @@ export default function HealthPermission() {
     setBusy(true);
     setError(null);
     try {
-      await requestHealthAccess();
-      await syncSteps();
+      await healthSync.connect();
       router.replace('/steps');
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't connect to Health. Try again.");
@@ -53,8 +53,8 @@ export default function HealthPermission() {
   return (
     <Screen title="Connect Apple Health" back>
       <Text style={[styles.body, { color: t.ink }]}>
-        Leaderboard can read your steps, sleep, and weight from Apple Health. You can allow any of them. It uploads daily step totals to your account
-        so your groups can rank them. Never your location or workouts.
+        Leaderboard can read your steps, sleep, and weight from Apple Health. You can allow any of them. It uploads daily step totals, nightly sleep summaries, and weight readings to your private account.
+        Choose what to share separately in each group. Imports run while you use the app. Never your location or workouts.
       </Text>
       {unavailable ? (
         <Text style={[styles.body, { color: t.inkSoft }]}>
@@ -69,7 +69,7 @@ export default function HealthPermission() {
       ) : null}
       <ErrorText>{error}</ErrorText>
       {/* Also shown if the status check failed, so there is always a way to retry. */}
-      {(!access || notAsked) && <Button label="Allow Health Access" busy={busy} onPress={allow} />}
+      {!unavailable && <Button label={notAsked ? "Allow Health Access" : "Connect Health Data"} busy={busy} onPress={allow} />}
       <Button label="Enter Steps Manually" secondary disabled={busy} onPress={() => router.replace('/steps')} />
       <Button plain label="Using a Garmin, Oura or Other Tracker?" onPress={() => router.push('/steps/sources')} />
     </Screen>

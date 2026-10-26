@@ -73,3 +73,18 @@ test('empty initial read remains retryable after granting permission',async()=>{
  await reconcileHealth('sleep',{journal:mem.journal,query:async()=>page(),upload:async()=>{},checkOwner:async()=>{}});
  expect(mem.state()?.anchor).toBeUndefined();
 });
+
+test('history recheck resumes after pending retry instead of losing the reset request',async()=>{
+ const changes={daily:[],removeDaily:[],weight:[],removeWeight:[]};
+ const mem=memory({from:'2026-01-01T00:00:00Z',samples:[sample('x')],pending:{anchor:'pending',changes,hasMore:false},resetAfterPending:true});
+ const query=jest.fn().mockResolvedValue(page());
+ await reconcileHealth('sleep',{journal:mem.journal,query,upload:async()=>{},checkOwner:async()=>{}});
+ expect(query).toHaveBeenCalledTimes(1);expect(query.mock.calls[0][1].anchor).toBeUndefined();
+});
+test('sleep recomputation removes previously stored date keys after timezone reassignment',async()=>{
+ const x=sample('x');
+ const mem=memory({from:'2026-01-01T00:00:00Z',anchor:'a',samples:[x],dailyKeys:['2026-10-24']});
+ const upload=jest.fn();
+ await reconcileHealth('sleep',{journal:mem.journal,query:async()=>page([x]),upload,checkOwner:async()=>{}});
+ expect(upload.mock.calls[0][1].removeDaily).toContain('2026-10-24');
+});

@@ -3,11 +3,11 @@ import { HEALTH_TYPES, loadHealthKit, type HealthMetric } from './healthkit';
 import { summarizeSleep } from './sleep';
 import { normalizeWeight, readLatestWeight } from './weight';
 
-export type StoredSample = { id: string; start: string; end: string; value: number };
+export type StoredSample = { id: string; start: string; end: string; value: number; dates?: string[] };
 export type ChangePage = { samples: StoredSample[]; deleted: string[]; anchor: string; hasMore: boolean };
 export type DailyChange = { date: string; value: number; window_start?: string; window_end?: string };
 export type HealthChanges = { daily: DailyChange[]; removeDaily: string[]; weight: { measured_at: string; kg: number }[]; removeWeight: string[] };
-export type JournalState = { from: string; anchor?: string; samples: StoredSample[]; pending?: { anchor: string; changes: HealthChanges; hasMore: boolean } };
+export type JournalState = { from: string; anchor?: string; samples: StoredSample[]; dailyKeys?: string[]; resetAfterPending?: boolean; pending?: { anchor: string; changes: HealthChanges; hasMore: boolean } };
 export interface HealthJournal { read(metric: HealthMetric): Promise<JournalState | null>; write(metric: HealthMetric, state: JournalState): Promise<void> }
 export const CHANGE_PAGE_SIZE = 500;
 
@@ -30,6 +30,7 @@ export async function queryChanges(metric: HealthMetric, state: JournalState): P
 
 // End is exclusive when crossing midnight, so a sample ending at midnight doesn't affect tomorrow.
 export function sampleDates(sample: StoredSample): string[] {
+  if (sample.dates) return sample.dates;
   const start = new Date(sample.start), end = new Date(sample.end);
   const stop = Math.max(start.getTime(), end.getTime() - 1);
   const dates: string[] = [];
@@ -43,7 +44,7 @@ export function mergeSamples(previous: readonly StoredSample[], page: ChangePage
   for (const sample of page.samples) {
     if (!sample.id || !Number.isFinite(Date.parse(sample.start)) || !Number.isFinite(Date.parse(sample.end)) ||
       Date.parse(sample.end) < Date.parse(sample.start) || !Number.isFinite(sample.value) || sample.value < 0) throw new Error('Invalid Health change.');
-    next.set(sample.id, sample);
+    next.set(sample.id, { ...sample, dates: sampleDates(sample) });
   }
   return [...next.values()];
 }
@@ -114,8 +115,13 @@ export async function reconcileHealth(metric: HealthMetric, options: ReconcileOp
       }
       const next = mergeSamples(state.samples, page);
       const changes = await deriveChanges(metric, state.samples, next, page);
+      const changed = page.samples.length > 0 || page.deleted.length > 0;
+      if (metric === 'sleep' && changed && state.dailyKeys) {
+        const nextKeys = new Set(changes.daily.map((d) => d.date));
+        changes.removeDaily = [...new Set([...changes.removeDaily, ...state.dailyKeys.filter((d) => !nextKeys.has(d))])];
+      }
       await checkOwner();
-      state = { ...state, samples: next, pending: { anchor: page.anchor, changes, hasMore: page.hasMore } };
+      state = { ...state, samples: next, ...(metric === 'sleep' && changed ? { dailyKeys: changes.daily.map((d) => d.date) } : {}), pending: { anchor: page.anchor, changes, hasMore: page.hasMore } };
       await journal.write(metric, state);
     }
     await checkOwner();
@@ -124,9 +130,10 @@ export async function reconcileHealth(metric: HealthMetric, options: ReconcileOp
     await checkOwner();
     written += pending.changes.daily.length + pending.changes.weight.length + pending.changes.removeDaily.length + pending.changes.removeWeight.length;
     // Never advance an empty initial read: newly granted access must still import historical data.
-    state = { ...state, anchor: state.samples.length || state.anchor || pending.changes.removeDaily.length || pending.changes.removeWeight.length ? pending.anchor : state.anchor, pending: undefined };
+    const recheck = state.resetAfterPending;
+    state = { ...state, anchor: recheck ? undefined : state.samples.length || state.anchor || pending.changes.removeDaily.length || pending.changes.removeWeight.length ? pending.anchor : state.anchor, pending: undefined, resetAfterPending: undefined };
     await journal.write(metric, state);
-    if (!pending.hasMore) return { hasMore: false, written, knownSamples: state.samples.length };
+    if (!pending.hasMore && !recheck) return { hasMore: false, written, knownSamples: state.samples.length };
   }
   return { hasMore: true, written, knownSamples: state.samples.length };
 }
