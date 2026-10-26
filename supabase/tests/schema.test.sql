@@ -40,6 +40,7 @@ insert into daily_metrics (user_id, date, metric, value, source) values
 insert into weight_measurements (user_id, measured_at, kg, source) values (auth.uid(), now(), 90, 'manual');
 insert into goals (user_id, metric, start_value, target_value, start_date)
   values (auth.uid(), 'weight_kg', 100, 80, current_date - 30);
+insert into metric_shares (group_id, user_id, metric) values ((select id from g1), auth.uid(), 'weight');
 select throws_ok($$insert into daily_metrics values (auth.uid(), current_date - 5, 'steps', 80001, 'manual')$$, '23514', null, 'manual steps over 80000 rejected');
 select lives_ok($$insert into daily_metrics values (auth.uid(), current_date - 5, 'steps', 80000, 'manual')$$, 'manual steps at cap accepted');
 select lives_ok($$insert into daily_metrics values (auth.uid(), current_date - 6, 'steps', 100000, 'healthkit')$$, 'health steps above manual cap accepted');
@@ -58,7 +59,7 @@ insert into goals (user_id, metric, start_value, target_value, start_date)
   values (auth.uid(), 'weight_kg', 100, 80, current_date - 30);
 
 -- RLS isolation / privacy
-select is((select count(*)::int from daily_metrics where user_id = '00000000-0000-0000-0000-00000000000a' and metric = 'steps'), 4, 'group-mate sees steps');
+select is((select count(*)::int from group_steps((select id from g1), current_date - 30, current_date) where user_id = '00000000-0000-0000-0000-00000000000a'), 4, 'group-mate sees steps');
 select is((select count(*)::int from weight_measurements where user_id = '00000000-0000-0000-0000-00000000000a'), 0, 'group-mate cannot read raw weight');
 select is((select count(*)::int from goals where user_id = '00000000-0000-0000-0000-00000000000a'), 0, 'group-mate cannot read weight goal');
 
@@ -74,11 +75,11 @@ select results_eq(
   $$values ('bob'::text, 7000::numeric, 1::bigint), ('Alice', 5000, 2)$$, 'day ranking order');
 select is(
   (select value from group_leaderboard((select id from g1), 'steps', 'week') where display_name = 'Alice'),
-  (select sum(value) from daily_metrics where user_id = '00000000-0000-0000-0000-00000000000a' and metric = 'steps' and date >= date_trunc('week', current_date)),
+  (select sum(steps) from group_steps((select id from g1), date_trunc('week', current_date)::date, current_date + 7) where user_id = '00000000-0000-0000-0000-00000000000a'),
   'week window starts Monday');
 select ok(
   (select value from group_leaderboard((select id from g1), 'steps', 'week') where display_name = 'Alice')
-  < (select sum(value) from daily_metrics where user_id = '00000000-0000-0000-0000-00000000000a' and metric = 'steps'),
+  < (select sum(steps) from group_steps((select id from g1), current_date - 30, current_date + 7) where user_id = '00000000-0000-0000-0000-00000000000a'),
   'week window excludes older rows');
 select results_eq(
   $$select value from group_leaderboard((select id from g1), 'weight_kg', 'week') order by rank$$,

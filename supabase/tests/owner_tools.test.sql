@@ -31,8 +31,10 @@ select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
 select throws_ok($$select delete_member_manual_entry((select id from g), '00000000-0000-0000-0000-0000000000b1', 'weight_kg')$$, 'weight entries cannot be deleted by the owner', 'owner cannot touch weight');
 select throws_ok($$select delete_member_manual_entry((select id from g), '00000000-0000-0000-0000-0000000000c1', 'steps')$$, 'not a member of this group', 'owner cannot delete an outsider''s entry');
 select lives_ok($$select delete_member_manual_entry((select id from g), '00000000-0000-0000-0000-0000000000b1', 'steps')$$, 'owner deletes a member''s manual steps for today');
+reset role; -- owners can't read members' rows directly
 select is((select count(*)::int from daily_metrics where user_id = '00000000-0000-0000-0000-0000000000b1' and metric = 'steps' and date = current_date), 0, 'today''s manual entry is gone');
 select is((select count(*)::int from daily_metrics where user_id = '00000000-0000-0000-0000-0000000000b1' and source = 'healthkit'), 1, 'health rows are untouched');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
 select throws_ok($$select delete_member_manual_entry((select id from g), '00000000-0000-0000-0000-0000000000b1', 'steps')$$, 'no manual entry for today', 'deleting twice reports it');
 -- "today" is the member's, from their profile timezone (UTC+14 here), not the caller's
 reset role;

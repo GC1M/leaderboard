@@ -36,7 +36,7 @@ export default function JoinGroup() {
         onChangeText={(t) => setCode(normalizeCode(t).slice(0, 8))}
         onSubmitEditing={submit}
         placeholder="K74MQ29X"
-        helper="8 characters, no I, O, 0 or 1. Paste works too."
+        helper="8 characters, no I, O, 0 or 1. Paste works too. Joining shares your steps with the group; sleep and weight stay private unless you turn them on in Group Info."
         error={error}
       />
       <Button label="Join Group" busy={busy} disabled={!isValidCode(code)} onPress={submit} />

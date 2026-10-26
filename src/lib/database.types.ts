@@ -109,6 +109,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"metric_shares": {
+                  Row: {
+                    "created_at": string,"group_id": string,"metric": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"group_id": string,"metric": string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"group_id"?: string,"metric"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "metric_shares_group_id_user_id_fkey"
+      columns: ["group_id","user_id"]
+isOneToOne: false
+      referencedRelation: "group_members"
+      referencedColumns: ["group_id","user_id"]
+    }
+                  ]
                 },"profiles": {
                   Row: {
                     "avatar_url": string | null,"created_at": string,"display_name": string,"id": string,"timezone": string
@@ -186,9 +206,24 @@ isOneToOne: false
 "gen_invite_code":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"group_latest_weight":
+{ Args: { "p_group_id": string }; Returns: {
+              "kg": number,"measured_on": string,"user_id": string
+            }[]
+                           },
 "group_leaderboard":
 { Args: { "p_group_id": string,"p_metric": string,"p_period": string }; Returns: {
               "display_name": string,"rank": number,"user_id": string,"value": number
+            }[]
+                           },
+"group_sleep":
+{ Args: { "p_from": string,"p_group_id": string,"p_to": string }; Returns: {
+              "date": string,"minutes": number,"user_id": string
+            }[]
+                           },
+"group_steps":
+{ Args: { "p_from": string,"p_group_id": string,"p_to": string }; Returns: {
+              "date": string,"source": string,"steps": number,"user_id": string
             }[]
                            },
 "is_group_member":

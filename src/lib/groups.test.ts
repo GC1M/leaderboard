@@ -3,6 +3,7 @@ import {
   deleteGroup,
   deleteMemberManualSteps,
   friendlyError,
+  getMyShares,
   inviteLink,
   isValidCode,
   joinGroup,
@@ -10,6 +11,7 @@ import {
   listMyGroups,
   removeMember,
   renameGroup,
+  setShare,
   normalizeCode,
 } from './groups';
 import { supabase } from './supabase';
@@ -134,4 +136,29 @@ test('owner RPCs send the right args and map errors', async () => {
   expect(rpc).toHaveBeenCalledWith('delete_member_manual_entry', { p_group_id: 'g', p_user_id: 'u', p_metric: 'steps' });
   rpc.mockResolvedValue({ data: null, error: { message: 'no manual entry for today' } });
   await expect(deleteMemberManualSteps('g', 'u')).rejects.toThrow(/no manual steps for today/);
+});
+
+test('getMyShares reads only my rows for the group', async () => {
+  getSession.mockResolvedValue({ data: { session: { user: { id: 'me' } } } });
+  const eq = jest.fn();
+  const chain = { eq };
+  eq.mockReturnValueOnce(chain).mockResolvedValueOnce({ data: [{ metric: 'steps' }, { metric: 'sleep' }], error: null });
+  from.mockReturnValue({ select: () => chain });
+  await expect(getMyShares('g')).resolves.toEqual(['steps', 'sleep']);
+  expect(from).toHaveBeenCalledWith('metric_shares');
+  expect(eq).toHaveBeenCalledWith('group_id', 'g');
+  expect(eq).toHaveBeenCalledWith('user_id', 'me');
+});
+
+test('setShare inserts my row to share and deletes it to stop', async () => {
+  getSession.mockResolvedValue({ data: { session: { user: { id: 'me' } } } });
+  const upsert = jest.fn().mockResolvedValue({ data: null, error: null });
+  const match = jest.fn().mockResolvedValue({ data: null, error: null });
+  from.mockReturnValue({ upsert, delete: () => ({ match }) });
+  await setShare('g', 'weight', true);
+  expect(upsert).toHaveBeenCalledWith({ group_id: 'g', user_id: 'me', metric: 'weight' }, { ignoreDuplicates: true });
+  await setShare('g', 'weight', false);
+  expect(match).toHaveBeenCalledWith({ group_id: 'g', user_id: 'me', metric: 'weight' });
+  upsert.mockResolvedValue({ data: null, error: { message: 'permission denied' } });
+  await expect(setShare('g', 'sleep', true)).rejects.toThrow(/sign in/);
 });

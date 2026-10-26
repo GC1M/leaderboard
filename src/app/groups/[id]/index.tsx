@@ -54,7 +54,7 @@ export default function GroupDetail() {
           setRows(r);
           setError(null);
           // Source captions are extra; a failure here shouldn't hide the board.
-          return getManualDays(r.map((x) => x.userId), METRIC, period).then(setManual, () => setManual({}));
+          return getManualDays(id, period).then(setManual, () => setManual({}));
         })
         .catch(() => setError("Couldn't load the leaderboard. Pull down to try again.")),
     [id, period],

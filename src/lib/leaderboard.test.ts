@@ -1,6 +1,7 @@
-import { formatValue, hasNoData, myStanding, periodRange, rankLabels, sourceLabel, type LeaderboardRow } from './leaderboard';
+import { formatValue, getManualDays, hasNoData, myStanding, periodRange, rankLabels, sourceLabel, type LeaderboardRow } from './leaderboard';
 
-jest.mock('./supabase', () => ({ supabase: {} }));
+const mockRpc = jest.fn();
+jest.mock('./supabase', () => ({ supabase: { rpc: (...a: unknown[]) => mockRpc(...a) } }));
 
 const row = (userId: string, value: number, rank: number): LeaderboardRow => ({ userId, name: userId, value, rank });
 
@@ -40,4 +41,18 @@ test('myStanding', () => {
   expect(myStanding(rows, 'c')).toEqual({ rankLabel: 'T2', members: 4, value: 5000, leader: 9000 });
   expect(myStanding(rows, 'd')).toEqual({ rankLabel: '-', members: 4, value: 0, leader: 9000 });
   expect(myStanding(rows, 'zz')).toBeNull();
+});
+
+test('getManualDays counts manual days per member from the group-scoped RPC', async () => {
+  mockRpc.mockResolvedValue({
+    data: [
+      { user_id: 'a', source: 'manual' },
+      { user_id: 'a', source: 'healthkit' },
+      { user_id: 'a', source: 'manual' },
+      { user_id: 'b', source: 'healthkit' },
+    ],
+    error: null,
+  });
+  expect(await getManualDays('g', 'week')).toEqual({ a: 2 });
+  expect(mockRpc).toHaveBeenCalledWith('group_steps', expect.objectContaining({ p_group_id: 'g' }));
 });
