@@ -6,7 +6,20 @@ import { localDateKey, startOfLocalDay } from './dates';
 type HealthKit = typeof import('@kingstinct/react-native-healthkit');
 
 const STEPS = 'HKQuantityTypeIdentifierStepCount' as const;
-const SHOULD_REQUEST = 1; // AuthorizationRequestStatus.shouldRequest
+const UNNECESSARY = 2; // AuthorizationRequestStatus.unnecessary: the user has already been asked
+
+// Each metric is requested separately in the Health sheet, so the user can allow any subset.
+export const HEALTH_TYPES = {
+  steps: STEPS,
+  sleep: 'HKCategoryTypeIdentifierSleepAnalysis',
+  weight: 'HKQuantityTypeIdentifierBodyMass',
+} as const;
+export type HealthMetric = keyof typeof HEALTH_TYPES;
+const METRICS = Object.keys(HEALTH_TYPES) as HealthMetric[];
+
+// HealthKit never reveals whether read access was granted, only whether we have asked. 'asked' means queries may still return
+// nothing (access off or no data); only a query result can tell, so callers must not show it as "connected".
+export type HealthAccess = 'unavailable' | 'not-asked' | 'asked';
 
 let cached: HealthKit | null | undefined;
 
@@ -32,16 +45,24 @@ export function resetHealthKitCache() {
   cached = undefined;
 }
 
-export async function needsStepsPermission(): Promise<boolean> {
+export async function getHealthAccess(metric: HealthMetric): Promise<HealthAccess> {
   const hk = loadHealthKit();
-  if (!hk) return false;
-  return (await hk.getRequestStatusForAuthorization({ toRead: [STEPS] })) === SHOULD_REQUEST;
+  if (!hk) return 'unavailable';
+  const status = await hk.getRequestStatusForAuthorization({ toRead: [HEALTH_TYPES[metric]] });
+  return status === UNNECESSARY ? 'asked' : 'not-asked';
 }
 
-export async function requestStepsPermission(): Promise<boolean> {
+export async function getAllHealthAccess(): Promise<Record<HealthMetric, HealthAccess>> {
+  const all = await Promise.all(METRICS.map(getHealthAccess));
+  return Object.fromEntries(METRICS.map((m, i) => [m, all[i]])) as Record<HealthMetric, HealthAccess>;
+}
+
+// Shows the Health sheet for any metric not asked yet; iOS never shows it again for ones already asked.
+// Resolves when the sheet closes, which says nothing about what the user allowed.
+export async function requestHealthAccess(): Promise<void> {
   const hk = loadHealthKit();
-  if (!hk) return false;
-  return hk.requestAuthorization({ toRead: [STEPS] });
+  if (!hk) return;
+  await hk.requestAuthorization({ toRead: METRICS.map((m) => HEALTH_TYPES[m]) });
 }
 
 // One cumulative-sum bucket per local calendar day. HealthKit de-duplicates overlapping sources (iPhone + Watch) inside the statistics query, so totals match the Health app.

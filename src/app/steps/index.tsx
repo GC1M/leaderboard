@@ -51,9 +51,11 @@ export default function Steps() {
       ? syncError
       : result?.status === 'needs-permission'
         ? 'Health access is not set up yet.'
-        : result?.status === 'synced'
-          ? `Synced at ${result.at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
-          : 'Syncing...';
+        : result?.status === 'no-data'
+          ? 'No steps from Health in the last week. Steps may be off in Health access, or nothing was recorded.'
+          : result?.status === 'synced'
+            ? `Synced at ${result.at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+            : 'Syncing...';
 
   const refresh = async () => {
     await sync();
@@ -67,8 +69,12 @@ export default function Steps() {
       refreshControl={health ? <RefreshControl refreshing={syncing} onRefresh={refresh} /> : undefined}
     >
       <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: syncError ? t.danger : t.inkSoft }]}>{status}</Text>
-      {result?.status === 'needs-permission' && (
-        <Button plain label="Set Up Health Access" onPress={() => router.push('/steps/permission')} />
+      {(result?.status === 'needs-permission' || result?.status === 'no-data') && (
+        <Button
+          plain
+          label={result.status === 'no-data' ? 'Check Health Access' : 'Set Up Health Access'}
+          onPress={() => router.push('/steps/permission')}
+        />
       )}
 
       {rows === null && !loadError ? (
