@@ -26,3 +26,6 @@ npm-debug.*
 # Local-only planning files
 PLAN.md
 notes/
+
+# Test output
+coverage/
