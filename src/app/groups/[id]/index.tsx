@@ -8,7 +8,7 @@ import { LeaderboardRowView } from '@/components/leaderboard/LeaderboardRowView'
 import { MemberSummaries } from '@/components/leaderboard/MemberSummaries';
 import { useAuth } from '@/lib/auth';
 import { buildMemberSummaries, type MemberSummary } from '@/lib/group-summaries';
-import { getGroupShares, getGroupSleep, getGroupWeights, isNotMember, listMembers } from '@/lib/groups';
+import { getGroupShares, getGroupSleep, getGroupWeights, getGroupWorkouts, isNotMember, listMembers } from '@/lib/groups';
 import { useWeightUnit } from '@/lib/weight-unit';
 import {
   formatValue,
@@ -64,9 +64,9 @@ export default function GroupDetail() {
           // Source captions are extra; a failure here shouldn't hide the board.
           return Promise.all([
             getManualDays(id, period).then(setManual, () => setManual({})),
-            // Same for the sleep and weight summaries, except that losing access must leave the screen.
-            Promise.all([listMembers(id), getGroupShares(id), getGroupSleep(id), getGroupWeights(id)]).then(
-              ([m, sh, sl, w]) => setSummaries(buildMemberSummaries(m, sh, sl, w)),
+            // Same for the sleep, weight and workout summaries, except that losing access must leave the screen.
+            Promise.all([listMembers(id), getGroupShares(id), getGroupSleep(id), getGroupWeights(id), getGroupWorkouts(id)]).then(
+              ([m, sh, sl, w, wo]) => setSummaries(buildMemberSummaries(m, sh, sl, w, wo)),
               (e) => {
                 if (isNotMember(e)) throw e;
                 setSummaries(null);

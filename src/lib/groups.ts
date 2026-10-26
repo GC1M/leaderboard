@@ -1,4 +1,4 @@
-import { lastNDates, localDateKey, startOfLocalDay } from './health/dates';
+import { lastNDates, localDateKey, startOfLocalDay, weekStartKey } from './health/dates';
 import { supabase } from './supabase';
 
 // Mirrors gen_invite_code(): no I, O, 0, 1.
@@ -117,7 +117,7 @@ export async function deleteMemberManualSteps(groupId: string, userId: string): 
   await friendly(supabase.rpc('delete_member_manual_entry', { p_group_id: groupId, p_user_id: userId, p_metric: 'steps' }));
 }
 
-export type SharedMetric = 'steps' | 'sleep' | 'weight';
+export type SharedMetric = 'steps' | 'sleep' | 'weight' | 'workouts';
 
 async function myId(): Promise<string> {
   const { data: auth } = await supabase.auth.getSession();
@@ -165,6 +165,17 @@ export async function getGroupSleep(groupId: string, days = 7) {
 
 export async function getGroupWeights(groupId: string) {
   const { data, error } = await supabase.rpc('group_latest_weight', { p_group_id: groupId });
+  if (error) throw error;
+  return data;
+}
+
+// Weekly workout count and total time per member who shares workouts with this group, and nothing else.
+// From the Monday `weeks - 1` weeks back through tomorrow (a member ahead of you can already be in tomorrow's week).
+export async function getGroupWorkouts(groupId: string, weeks = 4) {
+  const now = new Date();
+  const { data, error } = await supabase.rpc('group_workouts', {
+    p_group_id: groupId, p_from: weekStartKey(now, weeks - 1), p_to: localDateKey(startOfLocalDay(now, -1)),
+  });
   if (error) throw error;
   return data;
 }

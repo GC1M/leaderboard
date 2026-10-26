@@ -37,7 +37,8 @@ function Routes() {
           <Stack.Screen name="weight/index" />
           <Stack.Screen name="workouts/index" />
           <Stack.Screen name="workouts/new" />
-          <Stack.Screen name="workouts/[id]" />
+          <Stack.Screen name="workouts/[id]/index" />
+          <Stack.Screen name="workouts/[id]/edit" />
           <Stack.Screen name="workouts/templates/index" />
           <Stack.Screen name="workouts/templates/new" />
           <Stack.Screen name="workouts/templates/[id]" />

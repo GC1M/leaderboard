@@ -15,6 +15,12 @@ export function lastNDates(days: number, now: Date = new Date()): string[] {
   return Array.from({ length: days }, (_, i) => localDateKey(startOfLocalDay(now, days - 1 - i)));
 }
 
+// Monday (as YYYY-MM-DD) of the local week `weeksAgo` weeks before the one containing `now`. Weeks run Monday
+// to Sunday, like the group leaderboard's week and the server's week_start.
+export function weekStartKey(now: Date, weeksAgo = 0): string {
+  return localDateKey(startOfLocalDay(now, ((now.getDay() + 6) % 7) + weeksAgo * 7));
+}
+
 // When a reading was taken, in local days: "Today", "Yesterday", or the date. A latest weight from last
 // week must say so, not pass for today's.
 export function readingDateLabel(at: Date, now: Date = new Date()): string {

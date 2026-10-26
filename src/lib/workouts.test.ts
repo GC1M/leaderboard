@@ -4,6 +4,7 @@ import {
   deleteWorkout,
   getWorkout,
   listExercises,
+  listWorkoutsSince,
   updateManualWorkout,
   type ManualWorkoutInput,
 } from './workouts';
@@ -18,7 +19,7 @@ const mockRpc = jest.fn();
 function mockChainFor(table: string, op: string) {
   const chain: Record<string, unknown> = {};
   const self = () => chain;
-  for (const m of ['eq', 'order', 'limit', 'select']) chain[m] = self;
+  for (const m of ['eq', 'gte', 'order', 'limit', 'select']) chain[m] = self;
   chain.single = () => Promise.resolve(results[`${table}.${op}`] ?? { data: null, error: null });
   chain.maybeSingle = chain.single;
   chain.then = (res: (r: Result) => unknown, rej: (e: unknown) => unknown) =>
@@ -164,5 +165,17 @@ describe('exercises', () => {
     results['exercises.insert'] = { data: { id: 'x', name: 'Sled Push', category: 'strength' }, error: null };
     await expect(createCustomExercise(' Sled Push ', 'strength')).resolves.toEqual({ id: 'x', name: 'Sled Push', category: 'strength', isCustom: true });
     expect(calls[0].arg).toEqual({ user_id: 'u1', name: 'Sled Push', category: 'strength' });
+  });
+});
+
+describe('listWorkoutsSince', () => {
+  it('returns my workout summaries', async () => {
+    results['workouts.select'] = { data: [{ id: 'w1' }], error: null };
+    await expect(listWorkoutsSince(new Date('2026-10-05T00:00:00Z'))).resolves.toEqual([{ id: 'w1' }]);
+    expect(calls[0]).toMatchObject({ table: 'workouts', op: 'select' });
+  });
+  it('fails with a friendly message', async () => {
+    results['workouts.select'] = { data: null, error: { message: 'boom: secret' } };
+    await expect(listWorkoutsSince(new Date())).rejects.toThrow(/Couldn't load your workouts/);
   });
 });
