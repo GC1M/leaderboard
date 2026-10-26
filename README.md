@@ -96,3 +96,32 @@ Run on a signed physical-device build with real Health data.
 - [ ] Account deletion
 - [ ] Delete imported Health data
 - [ ] Values match the same day/window in Apple Health; investigate and document any differences
+
+## Phase 2 regression checklist (workouts, issue #37)
+
+Run on a signed physical-device build with real Health data, after the Phase 1 checklist above. CI covers logic, RLS and the bundle; these steps cover what only a device can show.
+
+**Logging and templates**
+- [ ] Log a strength workout (sets, reps, load) and a timed or distance activity; each saves and appears in My Workouts with the right totals
+- [ ] Switch kg/lb mid-entry: the lifted weight does not change, only its label
+- [ ] Force-quit mid-entry, reopen: the draft is offered and restores what was typed
+- [ ] Edit and delete a manual workout; the weekly totals update
+- [ ] Create, edit, duplicate and delete a template; applying it twice to different days gives two independent workouts, and editing the template afterwards leaves both unchanged
+
+**Import**
+- [ ] Workouts recorded by Apple Watch or another app appear once; re-syncing, correcting or deleting them in Health is reflected, and missing distance/energy shows as not recorded
+- [ ] A workout recorded by the watch and one by the phone at the same time both appear (documented dedup rule)
+- [ ] Deny workout permission only: steps, sleep and weight still sync
+
+**Export to Health** (details in docs/workout-export.md)
+- [ ] Turn on "Also save to Apple Health" for a workout: it appears in Health with the right type, times and duration, and with no heart rate, route or energy
+- [ ] Edit it (including changing the activity type): Health shows one workout, updated; delete it here: it disappears from Health
+- [ ] Deny write permission, save, then allow it: the entry retries and exports; the entry was kept locally throughout
+- [ ] Next import does not add the exported workout back as a second session
+- [ ] Manual weight, sleep and steps export with the right values and source; steps are not added on top of an already synced daily total
+
+**Sharing and privacy**
+- [ ] Group Info: Workouts is off by default and after joining; turning it on shows only weekly count and total time to group members; turning it off removes it immediately
+- [ ] Leaving or being removed from a group stops sharing; rejoining does not turn it back on
+- [ ] The privacy page matches what the app reads, saves to Health, stores and shares
+- [ ] Account deletion removes workouts, templates and exported-record mappings; sign-out then another account shows none of the first account's data
