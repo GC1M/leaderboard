@@ -71,3 +71,11 @@ test('deleting imports stops sync, waits for the upload in flight, and stays off
  const saves=(deps.save as jest.Mock).mock.calls;expect(saves[saves.length-1][0]).toEqual({connected:false,lastSuccess:{}});
  await c.sync();expect(deps.reconcile).toHaveBeenCalledTimes(3);
 });
+
+test('connecting during a delete waits for the delete to finish first',async()=>{
+ const {c,deps}=setup();await c.initialize();const wait=deferred<void>(),order:string[]=[];
+ (deps.deleteImports as jest.Mock).mockImplementation(async()=>{await wait.promise;order.push('delete');});
+ (deps.requestAccess as jest.Mock).mockImplementation(async()=>{order.push('connect');});
+ const d=c.deleteImports();await Promise.resolve();const r=c.connect();wait.resolve();await Promise.all([d,r]);
+ expect(order).toEqual(['delete','connect']);expect(c.getSnapshot().connected).toBe(true);
+});
