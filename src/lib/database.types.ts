@@ -220,7 +220,7 @@ isOneToOne: false
                            },
 "group_leaderboard":
 { Args: { "p_group_id": string,"p_metric": string,"p_period": string }; Returns: {
-              "display_name": string,"rank": number,"user_id": string,"value": number
+              "display_name": string,"rank": number,"state": string,"user_id": string,"value": number
             }[]
                            },
 "group_sleep":

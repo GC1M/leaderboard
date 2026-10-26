@@ -64,7 +64,7 @@ export default function Summary() {
         <>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Steps today, ${today ? `${today.value.toLocaleString()}, from ${today.source === 'manual' ? 'manual entry' : 'Health'}` : 'none yet'}. Opens My Steps.`}
+            accessibilityLabel={`Steps today, ${today ? `${today.value.toLocaleString()}, from ${today.source === 'manual' ? 'manual entry' : 'Health'}` : 'no data yet'}. Opens My Steps.`}
             onPress={() => router.push('/steps')}
             style={({ pressed }) => [styles.card, { backgroundColor: c.surface, opacity: pressed ? 0.8 : 1 }]}
           >
@@ -74,7 +74,7 @@ export default function Summary() {
               <Icon name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} color={c.inkSoft} size={14} />
             </View>
             <Text style={[ui.caption, { color: c.inkSoft }]}>Today</Text>
-            <Text style={[styles.big, { color: c.ink }]}>{today ? today.value.toLocaleString() : '0'}</Text>
+            <Text style={[styles.big, { color: today ? c.ink : c.inkSoft }]}>{today ? today.value.toLocaleString() : 'No data'}</Text>
             {today?.source === 'manual' && <Text style={[ui.caption, { color: c.manual }]}>Manual</Text>}
             <WeekChart dates={dates} rows={steps} />
           </Pressable>
@@ -91,13 +91,14 @@ export default function Summary() {
               <Text style={[ui.heading, { color: c.ink }]}>Today in your groups</Text>
               {cards.map((g) => {
                 const s = g.standing;
-                const noData = !s || s.value === 0;
-                const fill = s && s.leader > 0 ? s.value / s.leader : 0;
+                const value = s?.value ?? null;
+                const noData = value === null;
+                const fill = !noData && s!.leader > 0 ? value / s!.leader : 0;
                 return (
                   <Pressable
                     key={g.id}
                     accessibilityRole="button"
-                    accessibilityLabel={`${g.name}. ${noData ? 'No steps yet today' : `You are ${s!.rankLabel} of ${s!.members}, ${formatValue('steps', s!.value)} steps`}.`}
+                    accessibilityLabel={`${g.name}. ${noData ? 'No steps data yet today' : `You are ${s!.rankLabel} of ${s!.members}, ${formatValue('steps', value)} steps`}.`}
                     onPress={() => router.push(`/groups/${g.id}`)}
                     style={({ pressed }) => [styles.card, { backgroundColor: c.surface, opacity: pressed ? 0.8 : 1 }]}
                   >
@@ -113,7 +114,7 @@ export default function Summary() {
                       </Text>
                       <Text style={[ui.body, { color: c.inkSoft, flex: 1 }]}>of {g.memberCount}</Text>
                       <Text style={[styles.score, { color: noData ? c.inkSoft : c.ink }]}>
-                        {noData ? 'No data' : formatValue('steps', s!.value)}
+                        {noData ? 'No data' : formatValue('steps', value)}
                       </Text>
                     </View>
                     <View style={[styles.lane, { backgroundColor: c.lane }]}>
