@@ -63,10 +63,35 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.122.0
-      - run: supabase start
+      - run: supabase start # applies every migration from scratch
       - run: supabase test db
+      # src/lib/database.types.ts must be exactly what the migrations generate.
+      - name: Generated types match src/lib/database.types.ts
+        run: |
+          supabase gen types typescript --local > database.types.generated.ts
+          if ! diff -u src/lib/database.types.ts database.types.generated.ts > database.types.diff; then
+            {
+              echo "### database.types.ts is out of date"
+              echo "Regenerate with: \`npx supabase@2.122.0 gen types typescript --local > src/lib/database.types.ts\`"
+              echo '```diff'
+              head -n 80 database.types.diff
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error file=src/lib/database.types.ts::Out of date with supabase/migrations. Regenerate and commit it."
+            exit 1
+          fi
+      - name: Upload generated types
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-types-generated
+          path: |
+            database.types.generated.ts
+            database.types.diff
+          if-no-files-found: ignore
+          retention-days: 14
 
-  # Report-only for now: findings show up in the job summary and as warnings, they do not fail the build.
+  # npm audit is report-only (findings go to the job summary); the gitleaks scan fails the job.
   supply-chain:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -94,7 +119,6 @@ jobs:
           cat audit.txt
           exit $code
       - name: Secrets scan (gitleaks)
-        continue-on-error: true
         run: |
           set +e
           docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0 \
