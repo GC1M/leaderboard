@@ -202,3 +202,19 @@ jobs:
           path: web-smoke-*.png
           if-no-files-found: ignore
           retention-days: 14
+
+  # One status for branch protection: green only when every job above succeeded (skipped counts as not green).
+  ci-ok:
+    if: always()
+    needs: [check, db, supply-chain, smoke-api, smoke-web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to have succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for r in $RESULTS; do
+            [ "$r" = success ] || { echo "::error::A required job did not succeed ($r)"; exit 1; }
+          done
