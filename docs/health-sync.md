@@ -45,3 +45,14 @@ Shared write infrastructure for features that save app records (workouts, manual
 - No import loop: the importer drops samples carrying our key (`queryChanges`), and statistics/latest-weight queries exclude them with `EXCLUDE_OWN_EXPORTS`. The anchored query predicate is not changed, since it must stay fixed per anchor.
 - Accounts: `stop()` on sign-out or account switch invalidates any export in flight; unfinished entries stay in that account's own local store. Account deletion removes the whole local database (queue included) and the server rows cascade. Stop/delete imports keeps the queue (`deleteImportedJournal` clears only imported history).
 - Requires a new iOS build: `NSHealthUpdateUsageDescription` is now set. Add the write types a feature needs when it registers its writer.
+
+## Manual weight, sleep and steps to Health (#36)
+
+Writers live in `manual-export.ts` (registered when `sync.tsx` loads). Kinds: `manual-weight` (recordId = `weight_measurements.id`), `manual-sleep` (recordId = wake-up date), `manual-steps` (recordId = local date).
+
+- Entry: the weight and sleep screens add, edit and delete manual rows (`source = 'manual'`); steps keep their existing manual entry. Imported rows (`healthkit`) have no edit, delete or export path (`canExport`, and the update/delete queries filter `source = 'manual'`). No schema change: manual rows were already allowed, and Health import never overwrites a manual sleep or steps row.
+- Choice: "Also save to Apple Health" is a per-type switch (`useExportChoice`, remembered per account on the device). Turning it on requests write access for that one type only. If Health does not grant it, the switch stays off and says how to allow it.
+- Samples: weight is a `kg` body mass sample at the reading time. Sleep is an asleep (unspecified) category sample from the real start to end. Steps are a `count` sample over the local day (today ends at the save time). All carry `exportMetadata`; an edit re-enqueues with a higher version (replaces in place), a delete enqueues a delete op. Editing a sleep entry so it wakes on another day deletes the old day's sample.
+- Steps overlap: Health sums samples, so a manual total is added on top of steps Health already has. When the choice is on and Health (excluding our own exports) has steps for that day, saving asks first: cancel, save without Health, or add to Health.
+- Permission: a denied type keeps the local entry and the queue entry (`failed`, reason `permission`); the form shows the state and a retry button. Retry, edit and delete are idempotent (same sync identifier, versioned).
+- Limit: the delete or edit is only queued while the switch is on. Turning it off and then deleting an entry leaves its Health sample; remove it in the Health app.

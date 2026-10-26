@@ -4,13 +4,15 @@ import { ActivityIndicator, Platform, RefreshControl, Text, View } from 'react-n
 
 import { BarHistory } from '@/components/history/BarHistory';
 import { Button, ErrorText, Screen, styles } from '@/components/ui';
+import { useExportChoice } from '@/components/health/ExportOption';
 import { ManualEntry } from '@/components/steps/ManualEntry';
 import { StepRow } from '@/components/steps/StepRow';
 import { useTheme } from '@/theme';
 import { isHealthAvailable } from '@/lib/health/healthkit';
 import { lastNDates, localDateKey } from '@/lib/health/dates';
 import type { StepRow as Row } from '@/lib/health/rules';
-import { SYNC_DAYS, useStepSync } from '@/lib/health/sync';
+import { MANUAL_KINDS } from '@/lib/health/manual-export';
+import { SYNC_DAYS, useHealthExport, useStepSync } from '@/lib/health/sync';
 import { deleteManualSteps, getMyRecentSteps } from '@/lib/metrics';
 
 export default function Steps() {
@@ -21,6 +23,8 @@ export default function Steps() {
   const dates = lastNDates(SYNC_DAYS);
   const today = localDateKey(new Date());
   const health = isHealthAvailable();
+  const choice = useExportChoice('steps');
+  const exp = useHealthExport();
 
   const load = useCallback(async () => {
     try {
@@ -40,6 +44,7 @@ export default function Steps() {
   const switchToHealth = async (date: string) => {
     try {
       await deleteManualSteps(date);
+      if (choice.on) void exp.enqueue(MANUAL_KINDS.steps, date, 'delete', null).catch(() => {});
       await recheck();
       await load();
     } catch (e) {
@@ -103,7 +108,7 @@ export default function Steps() {
       {Platform.OS === 'ios' && <Button plain label="Connect a Watch or Tracker" onPress={() => router.push('/steps/sources')} />}
 
       <View style={{ marginTop: 16 }}>
-        <ManualEntry dates={dates} rows={rows ?? []} onSaved={load} />
+        <ManualEntry dates={dates} rows={rows ?? []} onSaved={load} choice={choice} />
       </View>
     </Screen>
   );
