@@ -1,7 +1,7 @@
 import { createHealthCoordinator, type CoordinatorDependencies } from './coordinator';
 const deferred=<T,>()=>{let resolve!:(v:T)=>void;const promise=new Promise<T>((r)=>{resolve=r;});return {promise,resolve};};
 function setup(connected=true){
- const deps:CoordinatorDependencies={checkAccount:jest.fn(async()=>{}),load:jest.fn(async()=>({connected,lastSuccess:{}})),save:jest.fn(async()=>{}),requestAccess:jest.fn(async()=>{}),access:jest.fn(async()=>'asked'),reconcile:jest.fn(async(_m,guard)=>{await guard();return {hasMore:false,written:1,knownSamples:2};}),recheck:jest.fn(async()=>{})};
+ const deps:CoordinatorDependencies={checkAccount:jest.fn(async()=>{}),load:jest.fn(async()=>({connected,lastSuccess:{}})),save:jest.fn(async()=>{}),requestAccess:jest.fn(async()=>{}),access:jest.fn(async()=>'asked'),reconcile:jest.fn(async(_m,guard)=>{await guard();return {hasMore:false,written:1,knownSamples:2};}),recheck:jest.fn(async()=>{}),deleteImports:jest.fn(async()=>{})};
  return {deps,c:createHealthCoordinator(deps)};
 }
 test('does not read Health until this account explicitly connects',async()=>{
@@ -64,4 +64,24 @@ test('retry after a failed sync recovers the metric and clears its error',async(
  (deps.reconcile as jest.Mock).mockRejectedValueOnce(new Error('offline'));
  await c.sync();expect(c.getSnapshot().metrics.steps.status).toBe('error');
  await c.sync();expect(c.getSnapshot().metrics.steps).toMatchObject({status:'synced',error:null});
+});
+
+test('deleting imports stops sync, waits for the upload in flight, and stays off',async()=>{
+ const {c,deps}=setup();await c.initialize();const wait=deferred<void>(),started=deferred<void>(),order:string[]=[];
+ (deps.reconcile as jest.Mock).mockImplementation(async(_m,guard)=>{started.resolve();await wait.promise;order.push('upload');await guard();return {hasMore:false,written:1,knownSamples:1};});
+ (deps.deleteImports as jest.Mock).mockImplementation(async()=>{order.push('delete');});
+ const p=c.sync();await started.promise;const d=c.deleteImports();wait.resolve();await Promise.all([p,d]);
+ expect(order[order.length-1]).toBe('delete');
+ expect(c.getSnapshot()).toMatchObject({connected:false});
+ expect(c.getSnapshot().metrics.steps.lastSuccess).toBeNull();
+ const saves=(deps.save as jest.Mock).mock.calls;expect(saves[saves.length-1][0]).toEqual({connected:false,lastSuccess:{}});
+ await c.sync();expect(deps.reconcile).toHaveBeenCalledTimes(3);
+});
+
+test('connecting during a delete waits for the delete to finish first',async()=>{
+ const {c,deps}=setup();await c.initialize();const wait=deferred<void>(),order:string[]=[];
+ (deps.deleteImports as jest.Mock).mockImplementation(async()=>{await wait.promise;order.push('delete');});
+ (deps.requestAccess as jest.Mock).mockImplementation(async()=>{order.push('connect');});
+ const d=c.deleteImports();await Promise.resolve();const r=c.connect();wait.resolve();await Promise.all([d,r]);
+ expect(order).toEqual(['delete','connect']);expect(c.getSnapshot().connected).toBe(true);
 });

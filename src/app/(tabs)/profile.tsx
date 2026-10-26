@@ -1,13 +1,15 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton } from '@/components/ui';
-import { NAME_MAX, PRIVACY_POLICY_URL, deleteAccount, getDisplayName, updateDisplayName } from '@/lib/profile';
+import { useHealthSync } from '@/lib/health/sync';
+import { NAME_MAX, deleteAccount, getDisplayName, updateDisplayName } from '@/lib/profile';
 import { supabase } from '@/lib/supabase';
 
 export default function Profile() {
   const router = useRouter();
+  const health = useHealthSync();
   const [saved, setSaved] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -41,10 +43,20 @@ export default function Profile() {
       { text: 'Sign Out', style: 'destructive', onPress: () => supabase.auth.signOut() },
     ]);
 
+  const confirmDeleteImports = () =>
+    Alert.alert(
+      'Delete imported Health data?',
+      "This stops Health imports and deletes the steps, sleep, and weight Leaderboard imported from Apple Health, here and in your groups. Manual entries stay. Nothing is uploaded again until you reconnect Apple Health. Your data in the Health app isn't touched.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete Imported Data', style: 'destructive', onPress: () => run(health.deleteImports) },
+      ],
+    );
+
   const confirmDelete = () =>
     Alert.alert(
       'Delete your account?',
-      "This deletes your profile, your steps and your memberships. Groups you own are deleted for everyone in them. This can't be undone.",
+      "This deletes your profile, your steps, sleep and weight, your sharing choices and your memberships. Groups you own are deleted for everyone in them. This can't be undone.",
       [
         { text: 'Cancel', style: 'cancel' },
         // The session ends after the delete, and the route guard takes over from there.
@@ -75,19 +87,29 @@ export default function Profile() {
       <ErrorText>{error}</ErrorText>
 
       {Platform.OS === 'ios' && (
-        <Section title="Apple Health" footer="Leaderboard works with Apple Health. It reads your daily step count and uploads only the daily total.">
+        <Section
+          title="Apple Health"
+          footer="Leaderboard reads steps, sleep, and weight that you allow. Deleting imported data doesn't change Apple's permissions: to change what Leaderboard can read, open the Health app, tap your profile picture, then Apps, then Leaderboard."
+        >
           <Row label="Health Access" icon={{ ios: 'heart.text.square', android: 'favorite', web: 'favorite' }} onPress={() => router.push('/steps/permission')} />
           <Row
             label="Connect a Watch or Tracker"
             icon={{ ios: 'applewatch', android: 'watch', web: 'watch' }}
-            last
             onPress={() => router.push('/steps/sources')}
+          />
+          <Row
+            label="Delete Imported Health Data"
+            icon={{ ios: 'trash', android: 'delete', web: 'delete' }}
+            danger
+            last
+            disabled={busy || !health.ready}
+            onPress={confirmDeleteImports}
           />
         </Section>
       )}
 
       <Section title="Account">
-        <Row label="Privacy Policy" icon={{ ios: 'hand.raised', android: 'privacy_tip', web: 'privacy_tip' }} onPress={() => Linking.openURL(PRIVACY_POLICY_URL).catch(() => {})} />
+        <Row label="Privacy Policy" icon={{ ios: 'hand.raised', android: 'privacy_tip', web: 'privacy_tip' }} onPress={() => router.push('/privacy')} />
         <Row label="Sign Out" icon={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} action onPress={confirmSignOut} />
         <Row label="Delete Account" icon={{ ios: 'trash', android: 'delete', web: 'delete' }} danger last disabled={busy} onPress={confirmDelete} />
       </Section>
