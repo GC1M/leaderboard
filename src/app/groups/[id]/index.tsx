@@ -50,6 +50,7 @@ export default function GroupDetail() {
   const [unit] = useWeightUnit();
   const [visible, setVisible] = useState<string[] | null>(null);
   const list = useRef<FlatList<LeaderboardRow>>(null);
+  const focused = useRef(false);
   const me = session?.user.id;
 
   const load = useCallback(
@@ -75,7 +76,11 @@ export default function GroupDetail() {
         })
         .catch((e) => {
           // Removed or left: don't keep showing the group's data.
-          if (isNotMember(e)) return router.replace('/groups');
+          // Only while on screen: from underneath Group Info it would replace that route instead. The next focus redirects.
+          if (isNotMember(e)) {
+            if (focused.current) router.replace('/groups');
+            return;
+          }
           setError("Couldn't load the leaderboard. Pull down to try again.");
         }),
     [id, period, router],
@@ -84,7 +89,11 @@ export default function GroupDetail() {
   // Also reloads when coming back from group info, which can rename the group or remove members.
   useFocusEffect(
     useCallback(() => {
+      focused.current = true;
       load();
+      return () => {
+        focused.current = false;
+      };
     }, [load]),
   );
 

@@ -1,4 +1,4 @@
-import { lastNDates } from './health/dates';
+import { lastNDates, localDateKey, startOfLocalDay } from './health/dates';
 import { supabase } from './supabase';
 
 // Mirrors gen_invite_code(): no I, O, 0, 1.
@@ -154,8 +154,11 @@ export async function getGroupShares(groupId: string): Promise<Record<string, Sh
 
 // Raw rows: the server only returns members who share. A "not a member" error is left as is for isNotMember.
 export async function getGroupSleep(groupId: string, days = 7) {
-  const dates = lastNDates(days);
-  const { data, error } = await supabase.rpc('group_sleep', { p_group_id: groupId, p_from: dates[0], p_to: dates[days - 1] });
+  // Through tomorrow: a member in a timezone ahead of yours can already have tonight's sleep dated tomorrow.
+  const now = new Date();
+  const { data, error } = await supabase.rpc('group_sleep', {
+    p_group_id: groupId, p_from: lastNDates(days, now)[0], p_to: localDateKey(startOfLocalDay(now, -1)),
+  });
   if (error) throw error;
   return data;
 }
