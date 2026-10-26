@@ -53,7 +53,11 @@ export function emptyForm(now: Date, weightUnit: WeightUnit, distanceUnit: Dista
 
 // Re-express typed values in new units so flipping a toggle never changes what was meant.
 export function convertUnits(f: WorkoutForm, weightUnit: WeightUnit, distanceUnit: DistanceUnit): WorkoutForm {
-  const conv = (s: string, to: (v: number) => number) => (/^\d*\.?\d+$/.test(s.trim()) ? tidy(to(Number(s))) : s);
+  // Same number syntax as num(), so anything the save path accepts also converts.
+  const conv = (s: string, to: (v: number) => number) => {
+    const n = s.trim().replace(',', '.');
+    return /^(\d+\.?\d*|\.\d+)$/.test(n) ? tidy(to(Number(n))) : s;
+  };
   return {
     ...f,
     weightUnit,

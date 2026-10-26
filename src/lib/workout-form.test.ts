@@ -71,6 +71,8 @@ test('unit conversion round-trips through storage', () => {
   const mi = convertUnits(base({ exercises: [{ ...squat({ distance: '5' }), category: 'cardio' }] }), 'kg', 'mi');
   expect(mi.exercises[0].sets[0].distance).toBe('3.11');
   expect(convertUnits(base({ exercises: [squat({ load: 'x' })] }), 'lb', 'km').exercises[0].sets[0].load).toBe('x');
+  expect(convertUnits(base({ exercises: [squat({ load: '22,5' })] }), 'lb', 'km').exercises[0].sets[0].load).toBe('49.6');
+  expect(convertUnits(base({ exercises: [squat({ load: '100.' })] }), 'lb', 'km').exercises[0].sets[0].load).toBe('220.46');
 });
 
 test('default distance unit follows the region', () => {
