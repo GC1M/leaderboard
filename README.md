@@ -27,7 +27,7 @@ Names only. Copy `.env.example` to `.env`; never commit values.
 
 | Name | Purpose |
 | --- | --- |
-| `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL (`http://localhost:54321` for the local stack) |
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL (`http://localhost:54321` for the local stack). On a phone, use your Mac's LAN IP instead of `localhost` (`ipconfig getifaddr en0`); it changes when your network does |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (`npx supabase@2.122.0 status` prints the local one) |
 | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Google sign-in. Leave empty to hide the Google button |
 | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | Google sign-in on iOS |
