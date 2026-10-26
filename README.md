@@ -19,7 +19,7 @@ npm start              # press i for the iOS simulator, or a for Android
 
 Expo Go and simulators are fine for everything except Apple Health. See "Apple Health needs a native build".
 
-Checks (all run in CI): `npm run typecheck`, `npm run lint`, `npm test`.
+Checks (all run in CI): `npm run typecheck`, `npm run lint`, `npm test`. The full pipeline (coverage floor, database and types checks, API and web smoke tests, audit and secrets scan) is described in `docs/ci.md`.
 
 ## Environment variables
 
