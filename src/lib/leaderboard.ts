@@ -57,21 +57,13 @@ export function periodRange(period: Period, now: Date = new Date()): { from: str
   return { from: localDateKey(monday), to: localDateKey(sunday) };
 }
 
-// Manual-entry day count per member for the period. RLS already lets members read each other's non-weight metrics.
-export async function getManualDays(userIds: string[], metric: Metric, period: Period): Promise<Record<string, number>> {
-  if (userIds.length === 0) return {};
+// Manual-entry step day count per member for the period, for members who share steps with this group.
+export async function getManualDays(groupId: string, period: Period): Promise<Record<string, number>> {
   const { from, to } = periodRange(period);
-  const { data, error } = await supabase
-    .from('daily_metrics')
-    .select('user_id')
-    .in('user_id', userIds)
-    .eq('metric', metric)
-    .eq('source', 'manual')
-    .gte('date', from)
-    .lte('date', to);
+  const { data, error } = await supabase.rpc('group_steps', { p_group_id: groupId, p_from: from, p_to: to });
   if (error) throw error;
   const counts: Record<string, number> = {};
-  for (const r of data) counts[r.user_id] = (counts[r.user_id] ?? 0) + 1;
+  for (const r of data) if (r.source === 'manual') counts[r.user_id] = (counts[r.user_id] ?? 0) + 1;
   return counts;
 }
 

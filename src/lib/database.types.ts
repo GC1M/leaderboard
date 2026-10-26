@@ -208,7 +208,7 @@ isOneToOne: false
                            },
 "group_latest_weight":
 { Args: { "p_group_id": string }; Returns: {
-              "kg": number,"measured_at": string,"user_id": string
+              "kg": number,"measured_on": string,"user_id": string
             }[]
                            },
 "group_leaderboard":
@@ -219,6 +219,11 @@ isOneToOne: false
 "group_sleep":
 { Args: { "p_from": string,"p_group_id": string,"p_to": string }; Returns: {
               "date": string,"minutes": number,"user_id": string
+            }[]
+                           },
+"group_steps":
+{ Args: { "p_from": string,"p_group_id": string,"p_to": string }; Returns: {
+              "date": string,"source": string,"steps": number,"user_id": string
             }[]
                            },
 "is_group_member":
@@ -232,9 +237,6 @@ isOneToOne: false
                            },
 "shares_group_with":
 { Args: { "p_user_id": string }; Returns: boolean
-                           },
-"shares_metric_with":
-{ Args: { "p_metric": string,"p_user_id": string }; Returns: boolean
                            }
           }
           Enums: {

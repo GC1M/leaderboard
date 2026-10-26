@@ -56,7 +56,7 @@ select is((select value from group_leaderboard((select id from g), 'weight_kg', 
 
 -- group-mate view
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000b1');
-select is((select count(*)::int from daily_metrics where metric = 'steps'), 1, 'group-mate still sees steps');
+select is((select count(*)::int from group_steps((select id from g), current_date - 7, current_date)), 1, 'group-mate still sees steps');
 select is((select count(*)::int from daily_metrics where metric = 'sleep_min'), 0, 'group-mate cannot see sleep');
 select is((select count(*)::int from weight_measurements), 0, 'group-mate cannot see weight readings');
 select is((select count(*)::int from latest_weight), 0, 'group-mate cannot see latest weight');

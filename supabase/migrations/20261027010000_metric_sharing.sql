@@ -1,8 +1,11 @@
 -- Per-group, per-metric sharing (issue #16). Health access (granted on the phone) and sharing (stored
 -- here) are separate: a row means "show my <metric> to this group"; no row means not shared.
---   steps:  daily totals, readable directly and ranked by group_leaderboard().
+--   steps:  daily totals and their source, via group_steps() and group_leaderboard().
 --   sleep:  daily asleep minutes only, never the asleep window, via group_sleep().
---   weight: latest reading and goal progress, via group_latest_weight() and group_leaderboard().
+--   weight: latest reading (kg and local date) and goal progress, via group_latest_weight() and
+--           group_leaderboard().
+-- Peers never read daily_metrics steps or sleep directly: rows carry no group, so a direct read can't
+-- honor a share given to one group and withheld from another.
 -- Steps are shared on join, as before this change (a steps group is what people join); members can
 -- turn it off. Sleep and weight are never shared without an explicit opt-in.
 -- Leaving or being removed from a group drops its shares (cascade from group_members).
@@ -41,26 +44,30 @@ end $$;
 create trigger group_members_share_steps after insert on public.group_members
   for each row execute function public.share_steps_on_join();
 
--- True when p_user_id shares p_metric with at least one group the caller is in.
-create function public.shares_metric_with(p_user_id uuid, p_metric text) returns boolean
-language sql stable security definer set search_path = '' as $$
-  select exists (
-    select 1
-    from public.group_members me
-    join public.metric_shares s on s.group_id = me.group_id
-    where me.user_id = (select auth.uid()) and s.user_id = p_user_id and s.metric = p_metric
-  );
-$$;
-
--- Steps need a steps share. Sleep rows hold the asleep window, so peers never read them directly
--- (group_sleep() returns the minutes only). Workout and screen time are unchanged (not Phase 1).
+-- Steps and sleep only through the group functions below. Workout and screen time are unchanged
+-- (not Phase 1).
 drop policy daily_metrics_select on public.daily_metrics;
 create policy daily_metrics_select on public.daily_metrics for select to authenticated
   using (
     user_id = (select auth.uid())
-    or (metric = 'steps' and public.shares_metric_with(user_id, 'steps'))
     or (metric in ('workout_minutes', 'screen_min') and public.shares_group_with(user_id))
   );
+
+-- Daily step totals for members who share steps with this group.
+create function public.group_steps(p_group_id uuid, p_from date, p_to date)
+returns table (user_id uuid, date date, steps numeric, source text)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_group_member(p_group_id) then
+    raise exception 'not a member of this group';
+  end if;
+  return query
+  select dm.user_id, dm.date, dm.value, dm.source
+  from public.daily_metrics dm
+  join public.metric_shares s on s.user_id = dm.user_id and s.group_id = p_group_id and s.metric = 'steps'
+  where dm.metric = 'steps' and dm.date between p_from and p_to
+  order by dm.date, dm.user_id;
+end $$;
 
 -- Daily asleep minutes for members who share sleep with this group.
 create function public.group_sleep(p_group_id uuid, p_from date, p_to date)
@@ -79,16 +86,18 @@ begin
 end $$;
 
 -- Latest weight reading for members who share weight with this group. Same order as latest_weight.
+-- Only the member's local date of the reading, not its exact time.
 create function public.group_latest_weight(p_group_id uuid)
-returns table (user_id uuid, measured_at timestamptz, kg numeric)
+returns table (user_id uuid, measured_on date, kg numeric)
 language plpgsql stable security definer set search_path = '' as $$
 begin
   if not public.is_group_member(p_group_id) then
     raise exception 'not a member of this group';
   end if;
   return query
-  select distinct on (wm.user_id) wm.user_id, wm.measured_at, wm.kg
+  select distinct on (wm.user_id) wm.user_id, (wm.measured_at at time zone p.timezone)::date, wm.kg
   from public.weight_measurements wm
+  join public.profiles p on p.id = wm.user_id
   join public.metric_shares s on s.user_id = wm.user_id and s.group_id = p_group_id and s.metric = 'weight'
   order by wm.user_id, wm.measured_at desc, (wm.source = 'manual') desc, wm.updated_at desc, wm.id desc;
 end $$;
@@ -159,11 +168,36 @@ begin
   order by 4, 2;
 end $$;
 
+-- Owners may only delete a member's manual steps. Sleep is private unless shared, and this function
+-- would otherwise let an owner touch (and probe for) a member's manual sleep.
+create or replace function public.delete_member_manual_entry(p_group_id uuid, p_user_id uuid, p_metric text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  member_today date;
+begin
+  if not exists (select 1 from public.groups g where g.id = p_group_id and g.owner_id = auth.uid()) then
+    raise exception 'only the group owner can delete entries';
+  end if;
+  if p_metric = 'weight_kg' then
+    raise exception 'weight entries cannot be deleted by the owner';
+  end if;
+  if p_metric <> 'steps' then
+    raise exception 'only steps entries can be deleted by the owner';
+  end if;
+  if not exists (select 1 from public.group_members m where m.group_id = p_group_id and m.user_id = p_user_id) then
+    raise exception 'not a member of this group';
+  end if;
+  select (now() at time zone p.timezone)::date into member_today from public.profiles p where p.id = p_user_id;
+  delete from public.daily_metrics
+  where user_id = p_user_id and date = member_today and metric = p_metric and source = 'manual';
+  if not found then raise exception 'no manual entry for today'; end if;
+end $$;
+
 -- New functions are executable by public by default.
 revoke execute on function
-  public.share_steps_on_join(), public.shares_metric_with(uuid, text),
+  public.share_steps_on_join(), public.group_steps(uuid, date, date),
   public.group_sleep(uuid, date, date), public.group_latest_weight(uuid)
 from public, anon;
 grant execute on function
-  public.shares_metric_with(uuid, text), public.group_sleep(uuid, date, date), public.group_latest_weight(uuid)
+  public.group_steps(uuid, date, date), public.group_sleep(uuid, date, date), public.group_latest_weight(uuid)
 to authenticated;
