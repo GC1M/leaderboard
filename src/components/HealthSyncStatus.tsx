@@ -6,7 +6,7 @@ import { useHealthSync } from '@/lib/health/sync';
 import { HEALTH_METRICS, type MetricSyncState } from '@/lib/health/coordinator';
 import { useTheme } from '@/theme';
 
-const names={steps:'Steps',sleep:'Sleep',weight:'Weight'};
+const names={steps:'Steps',sleep:'Sleep',weight:'Weight',workouts:'Workouts'};
 export function describeHealthSync(m:MetricSyncState):string {
   switch(m.status){
     case 'syncing':return 'Checking Health…';

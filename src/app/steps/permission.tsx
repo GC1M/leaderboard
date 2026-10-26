@@ -53,8 +53,8 @@ export default function HealthPermission() {
   return (
     <Screen title="Connect Apple Health" back>
       <Text style={[styles.body, { color: t.ink }]}>
-        Leaderboard can read your steps, sleep, and weight from Apple Health. You can allow any of them. It uploads daily step totals, nightly sleep summaries, and weight readings to your private account.
-        Choose what to share separately in each group. Imports run while you use the app. Never your location or workouts.
+        Leaderboard can read your steps, sleep, weight, and workouts from Apple Health. You can allow any of them. It uploads daily step totals, nightly sleep summaries, weight readings, and workout summaries to your private account.
+        Choose what to share separately in each group. Imports run while you use the app. Never your location.
       </Text>
       {unavailable ? (
         <Text style={[styles.body, { color: t.inkSoft }]}>
