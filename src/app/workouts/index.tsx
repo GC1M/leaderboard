@@ -30,6 +30,7 @@ export default function Workouts() {
   return (
     <Screen title="Workouts" back>
       <Button label="New Workout" onPress={() => router.push('/workouts/new')} />
+      <Button secondary label="Start from Template" onPress={() => router.push('/workouts/templates')} />
       {drafts.length > 0 && (
         <Section>
           {drafts.map((d, i) => (
