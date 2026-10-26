@@ -4,18 +4,12 @@ import { useEffect } from 'react';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { authGate } from '@/lib/auth-gate';
-import { useStepSync } from '@/lib/health/sync';
+import { HealthSyncProvider } from '@/lib/health/sync';
 import { watchAppStateForAuthRefresh } from '@/lib/supabase';
 import { useTheme } from '@/theme';
 
 // Keep the splash up until the stored session is read, so there is no blank frame.
 SplashScreen.preventAutoHideAsync().catch(() => {});
-
-// App-wide step sync on launch and every foreground, while signed in.
-function StepSync() {
-  useStepSync();
-  return null;
-}
 
 function Routes() {
   const { session, loading } = useAuth();
@@ -27,7 +21,6 @@ function Routes() {
   if (gate === 'loading') return null;
   return (
     <>
-      {gate === 'signed-in' && <StepSync />}
       {/* Without contentStyle the stack stays white in dark mode. */}
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: bg } }}>
         <Stack.Protected guard={gate === 'signed-in'}>
@@ -53,7 +46,9 @@ export default function RootLayout() {
   useEffect(() => watchAppStateForAuthRefresh(), []);
   return (
     <AuthProvider>
-      <Routes />
+      <HealthSyncProvider>
+        <Routes />
+      </HealthSyncProvider>
     </AuthProvider>
   );
 }

@@ -2,13 +2,14 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
+import { HealthSyncStatus } from '@/components/HealthSyncStatus';
 import { WeekChart } from '@/components/steps/WeekChart';
 import { Button, ErrorText, Icon, Screen, Section, Skeleton, styles as ui } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { listMyGroups, type MyGroup } from '@/lib/groups';
 import { lastNDates, localDateKey } from '@/lib/health/dates';
 import type { StepRow } from '@/lib/health/rules';
-import { syncSteps } from '@/lib/health/sync';
+import { useHealthSync } from '@/lib/health/sync';
 import { formatValue, getLeaderboard, myStanding, type Standing } from '@/lib/leaderboard';
 import { getMyRecentSteps } from '@/lib/metrics';
 import { useTheme } from '@/theme';
@@ -19,6 +20,7 @@ export default function Summary() {
   const c = useTheme();
   const router = useRouter();
   const { session } = useAuth();
+  const health = useHealthSync();
   const me = session?.user.id ?? '';
   const [steps, setSteps] = useState<StepRow[] | null>(null);
   const [cards, setCards] = useState<Card[] | null>(null);
@@ -40,15 +42,12 @@ export default function Summary() {
     }
   }, [me]);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load]),
-  );
+  const lastImport = Object.values(health.metrics).map((m) => `${m.status}:${m.lastSuccess ?? ''}`).join('|');
+  useFocusEffect(useCallback(() => { if (!health.syncing && lastImport) void load(); }, [health.syncing, lastImport, load]));
 
   const refresh = async () => {
     setRefreshing(true);
-    await syncSteps().catch(() => {});
+    await health.sync();
     await load();
     setRefreshing(false);
   };
@@ -57,6 +56,7 @@ export default function Summary() {
 
   return (
     <Screen title="Summary" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
+      <HealthSyncStatus />
       <ErrorText>{error}</ErrorText>
       {!steps || !cards ? (
         !error && <Skeleton label="Loading summary" />

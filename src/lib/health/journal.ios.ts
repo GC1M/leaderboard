@@ -58,7 +58,7 @@ export async function resetHealthAnchors(userId: string): Promise<void> {
   const store = healthJournal(userId);
   for (const metric of ['steps','sleep','weight'] as const) {
     const state = await store.read(metric);
-    if (state) await store.write(metric, { ...state, anchor: undefined });
+    if (state) await store.write(metric, { ...state, anchor: undefined, resetAfterPending: !!state.pending });
   }
 }
 

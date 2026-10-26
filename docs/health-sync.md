@@ -25,3 +25,11 @@ A fresh native build is required after adding `expo-sqlite` with `useSQLCipher: 
 Stop the account coordinator before calling `deleteHealthJournal(userId)` to remove local imported history and its key. Removing cloud data must disable future imports until the account explicitly reconnects. Account deletion and disconnect controls are owned by issue #26; do not delete Health samples in Apple's store when deleting our imported copies.
 
 Foreground orchestration and user-visible status are implemented separately in issue #22. Personal sleep/weight dashboards remain issue #24. No background delivery or Apple sign-in is introduced here.
+
+## Foreground coordinator
+
+`HealthSyncProvider` is mounted under `AuthProvider`, with one coordinator per account. Connect consent is stored under the user ID in Keychain storage; granting Apple's sheet alone never connects another account. Launch/foreground and pull-to-refresh share one in-flight run. Each metric fails independently, and a failed/no-data check does not update its last-success time. A large import continues in bounded slices while the app is active and resumes after restart.
+
+Summary exposes per-metric state, last completed import, retry, history recheck, and Stop Health Imports. My Steps uses the same coordinator. After replacing a manual override with Health, it explicitly rechecks history to refill the row even if Health has no new anchored events. A recheck preserves pending upload retries and old date keys, so it can safely repair calendar-date reassignment after a device timezone change.
+
+Sign-out disposes the coordinator and invalidates its upload guards; the SQL owner check independently rejects an old account payload authenticated with a new account's token. Connection-metadata writes are serialized so a pending successful sync cannot re-enable consent after Stop Health Imports. Local journal cleanup is exposed separately for the data-control feature; stopping imports does not erase existing history.

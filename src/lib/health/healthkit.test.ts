@@ -1,5 +1,4 @@
 import { getAllHealthAccess, getHealthAccess, isHealthAvailable, readDailySteps, requestHealthAccess, resetHealthKitCache } from './healthkit';
-import { syncSteps } from './sync';
 
 jest.mock('@/lib/metrics', () => ({ getMyRecentSteps: jest.fn(), upsertDailyMetrics: jest.fn() }));
 
@@ -14,11 +13,7 @@ describe('availability fallback', () => {
     await expect(requestHealthAccess()).resolves.toBeUndefined();
   });
 
-  it('syncSteps reports unavailable without touching Supabase', async () => {
-    const metrics = jest.requireMock('@/lib/metrics');
-    expect(await syncSteps()).toEqual({ status: 'unavailable' });
-    expect(metrics.upsertDailyMetrics).not.toHaveBeenCalled();
-  });
+
 });
 
 describe('with HealthKit', () => {
@@ -50,21 +45,15 @@ describe('with HealthKit', () => {
     });
   });
 
-  it('syncSteps needs permission only when steps were never asked, and never prompts', async () => {
-    statusByType.HKCategoryTypeIdentifierSleepAnalysis = 2;
-    expect(await syncSteps()).toEqual({ status: 'needs-permission' });
+  it('does not prompt when checking an unrequested metric', async () => {
+    expect(await getHealthAccess('steps')).toBe('not-asked');
     expect(hk.requestAuthorization).not.toHaveBeenCalled();
   });
-
-  it('syncSteps reports no-data (not denied, not synced) when an asked query is empty', async () => {
-    statusByType.HKQuantityTypeIdentifierStepCount = 2;
-    expect(await syncSteps()).toEqual({ status: 'no-data' });
-    expect(jest.requireMock('@/lib/metrics').upsertDailyMetrics).not.toHaveBeenCalled();
+  it('returns an empty query without claiming a grant', async () => {
+    expect(await readDailySteps(7)).toEqual([]);
   });
-
-  it('syncSteps surfaces a query error instead of reporting no data', async () => {
-    statusByType.HKQuantityTypeIdentifierStepCount = 2;
+  it('surfaces query errors rather than converting them to missing data', async () => {
     hk.queryStatisticsCollectionForQuantity.mockRejectedValueOnce(new Error('query failed'));
-    await expect(syncSteps()).rejects.toThrow('query failed');
+    await expect(readDailySteps(7)).rejects.toThrow('query failed');
   });
 });

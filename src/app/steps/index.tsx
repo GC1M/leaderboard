@@ -29,7 +29,7 @@ export default function Steps() {
     }
   }, []);
 
-  const { sync, syncing, result, error: syncError } = useStepSync(load);
+  const { sync, recheck, connected, syncing, result, error: syncError } = useStepSync(load);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount
     void load();
@@ -38,7 +38,7 @@ export default function Steps() {
   const switchToHealth = async (date: string) => {
     try {
       await deleteManualSteps(date);
-      await sync();
+      await recheck();
       await load();
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Couldn't update that day.");
@@ -49,6 +49,8 @@ export default function Steps() {
     ? 'Health sync needs the iOS app build. Enter steps manually below.'
     : syncError
       ? syncError
+      : result?.status === 'not-connected'
+        ? 'Connect this account to Apple Health to import your steps.'
       : result?.status === 'needs-permission'
         ? 'Health access is not set up yet.'
         : result?.status === 'no-data'
@@ -69,7 +71,7 @@ export default function Steps() {
       refreshControl={health ? <RefreshControl refreshing={syncing} onRefresh={refresh} /> : undefined}
     >
       <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: syncError ? t.danger : t.inkSoft }]}>{status}</Text>
-      {(result?.status === 'needs-permission' || result?.status === 'no-data') && (
+      {(result?.status === 'needs-permission' || result?.status === 'no-data' || result?.status === 'not-connected') && (
         <Button
           plain
           label={result.status === 'no-data' ? 'Check Health Access' : 'Set Up Health Access'}
@@ -88,7 +90,7 @@ export default function Steps() {
         <View>
           {[...dates].reverse().map((d) => {
             const row = rows?.find((r) => r.date === d);
-            return <StepRow key={d} date={d} today={today} row={row} onUseHealth={health ? () => switchToHealth(d) : undefined} />;
+            return <StepRow key={d} date={d} today={today} row={row} onUseHealth={health && connected ? () => switchToHealth(d) : undefined} />;
           })}
         </View>
       )}
