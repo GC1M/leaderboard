@@ -132,6 +132,9 @@ select lives_ok($$delete from workout_templates where id = '00000000-0000-0000-0
 select is((select count(*)::int from workout_template_exercises where template_id = '00000000-0000-0000-0000-00000000a601'), 0, 'deleting a template removes its exercises and sets');
 select is((select count(*)::int from workouts) * 10 + (select count(*)::int from workout_sets), 22, 'past sessions survive the deletion, sets included');
 
+-- Back to the schema's own mode: `set constraints all immediate` above would otherwise hide the deferred exercise FK.
+set constraints all deferred;
+
 -- Account deletion cascades through delete_my_account (including her custom exercise, which her templates use).
 select lives_ok($$select delete_my_account()$$, 'she deletes her account');
 reset role;
