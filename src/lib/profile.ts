@@ -1,6 +1,7 @@
 import { deleteHealthJournal } from './health/journal';
 import { secureStorage } from './secure-storage';
 import { supabase } from './supabase';
+import { clearAllDrafts } from './workout-draft';
 
 export const NAME_MAX = 40;
 
@@ -32,5 +33,5 @@ export async function deleteAccount(): Promise<void> {
   const { error } = await supabase.rpc('delete_my_account');
   if (error) throw new Error("Couldn't delete your account. Check your connection and try again.");
   await supabase.auth.signOut({ scope: 'local' });
-  await Promise.allSettled([deleteHealthJournal(uid), secureStorage.removeItem(`health-connection-${uid}`)]);
+  await Promise.allSettled([deleteHealthJournal(uid), secureStorage.removeItem(`health-connection-${uid}`), clearAllDrafts(uid)]);
 }
