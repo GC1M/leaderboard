@@ -13,3 +13,10 @@ export async function uploadHealthChanges(userId: string, deviceId: string, metr
   });
   if (error) throw new Error("Couldn't upload Health changes. Your data is saved on this device; retry sync.");
 }
+
+// Imported steps, sleep, and weight only. Manual entries, groups, and sharing choices stay.
+export async function deleteHealthImports(userId: string): Promise<void> {
+  await assertHealthOwner(userId);
+  const { error } = await supabase.rpc('delete_my_health_imports');
+  if (error) throw new Error("Couldn't delete your imported Health data. Check your connection and try again.");
+}

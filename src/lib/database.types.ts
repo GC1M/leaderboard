@@ -210,6 +210,9 @@ isOneToOne: false
 "delete_my_account":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
+"delete_my_health_imports":
+{ Args: Record<PropertyKey, never>; Returns: undefined
+                           },
 "gen_invite_code":
 { Args: Record<PropertyKey, never>; Returns: string
                            },

@@ -6,9 +6,9 @@ import { secureStorage } from '@/lib/secure-storage';
 import { reconcileHealth } from './changes';
 import { createHealthCoordinator, HEALTH_METRICS, initialHealthState, type HealthConnection, type HealthCoordinator } from './coordinator';
 import { getHealthAccess, requestHealthAccess } from './healthkit';
-import { getHealthDeviceId, healthJournal, resetHealthAnchors } from './journal';
+import { deleteHealthJournal, getHealthDeviceId, healthJournal, resetHealthAnchors } from './journal';
 import { assertHealthOwner } from './owner';
-import { uploadHealthChanges } from './upload';
+import { deleteHealthImports, uploadHealthChanges } from './upload';
 
 export const SYNC_DAYS = 7; // existing My Steps view; import history is 90 days, not seven
 const HealthContext = createContext<HealthCoordinator | null>(null);
@@ -26,6 +26,8 @@ function createAccountSync(userId: string) {
     requestAccess:async()=>{if(await getHealthAccess('steps')==='unavailable')throw new Error('Apple Health requires the native iPhone app build.');await requestHealthAccess();},
     access:getHealthAccess,
     recheck:()=>resetHealthAnchors(userId),
+    // Local journal first: if the server delete then fails, a retry still finds nothing to re-upload.
+    deleteImports:async()=>{await assertHealthOwner(userId);await deleteHealthJournal(userId);await deleteHealthImports(userId);},
     reconcile:async(metric,checkOwner)=>{
       // Resolve once before parallel metric uploads so all use the same installation identity.
       deviceId ??= getHealthDeviceId().catch((e)=>{deviceId=undefined;throw e;});
@@ -63,6 +65,7 @@ export function useHealthSync(){
     connect:()=>controller?.connect() ?? Promise.resolve(),
     disconnect:()=>controller?.disconnect() ?? Promise.resolve(),
     recheck:()=>controller?.recheck() ?? Promise.resolve(),
+    deleteImports:()=>controller?.deleteImports() ?? Promise.resolve(),
   };
 }
 
