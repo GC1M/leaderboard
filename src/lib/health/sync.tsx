@@ -9,8 +9,10 @@ import { createExportQueue, exportWriters, initialExportState, type ExportQueue 
 import { healthExportMapping } from './export-mapping';
 import { getHealthAccess, getHealthWriteAccess, requestHealthAccess, requestHealthWriteAccess, type HealthWriteType } from './healthkit';
 import { deleteImportedJournal, getHealthDeviceId, healthExportStore, healthJournal, resetHealthAnchors } from './journal';
+import './manual-export'; // registers the manual weight/sleep/steps writers
 import { assertHealthOwner } from './owner';
 import { deleteHealthImports, uploadHealthChanges } from './upload';
+import './workout-export'; // registers the app-created workout writer
 
 export const SYNC_DAYS = 7; // existing My Steps view; import history is 90 days, not seven
 const HealthContext = createContext<HealthCoordinator | null>(null);
@@ -103,6 +105,7 @@ export function useHealthExport(){
   return { ...state,
     enqueue:(...args:Parameters<ExportQueue['enqueue']>)=>queue?.enqueue(...args) ?? Promise.resolve(),
     retry:()=>queue?.process() ?? Promise.resolve(),
+    discard:(kind:string)=>queue?.discard(kind) ?? Promise.resolve(),
     allowWrite:async(types:readonly HealthWriteType[])=>{await requestHealthWriteAccess(types);await queue?.process();},
   };
 }

@@ -1,4 +1,4 @@
-import { planSync, validateSteps } from './rules';
+import { planSync, validateSleep, validateSteps, validateWeight } from './rules';
 
 describe('validateSteps', () => {
   it.each([
@@ -49,5 +49,21 @@ describe('planSync merge rule', () => {
   it('overwrites an older healthkit row', () => {
     const out = planSync(health, [{ date: '2026-10-24', value: 5, source: 'healthkit' }]);
     expect(out.rows.map((r) => r.date)).toEqual(['2026-10-24', '2026-10-25']);
+  });
+});
+
+describe('validateWeight and validateSleep', () => {
+  it('converts pounds to kg and rejects bad input', () => {
+    expect(validateWeight('165', 'lb')).toEqual({ ok: true, kg: 74.843 });
+    expect(validateWeight('72,5', 'kg')).toEqual({ ok: true, kg: 72.5 });
+    for (const bad of ['', '0', 'abc', '1000', '-3']) expect(validateWeight(bad, 'kg').ok).toBe(false);
+  });
+  it('needs a past interval of at most 24 hours', () => {
+    const end = new Date(Date.now() - 3600_000);
+    expect(validateSleep(new Date(end.getTime() - 8 * 3600_000), end)).toEqual({ ok: true });
+    expect(validateSleep(end, end).ok).toBe(false);
+    expect(validateSleep(new Date(end.getTime() - 25 * 3600_000), end).ok).toBe(false);
+    expect(validateSleep(new Date(), new Date(Date.now() + 3600_000)).ok).toBe(false);
+    expect(validateSleep(null, end).ok).toBe(false);
   });
 });
