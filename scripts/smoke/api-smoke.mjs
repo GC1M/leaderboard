@@ -175,10 +175,10 @@ async function main() {
 
     ok(await a.client.from('metric_shares').upsert({ group_id: group.id, user_id: a.id, metric: 'workouts' }, { ignoreDuplicates: true }), 'share workouts');
     const rows = ok(await b.client.rpc('group_workouts', range), 'group_workouts after sharing');
-    // A has two workouts started in the window: the original (3600 s) and the one applied from the template (3600 s).
+    // A has two workouts started in the window: the original (3600 s) and the one applied from the template (3000 s).
     eq(rows.length, 1, 'group_workouts rows after sharing');
     eq(Object.keys(rows[0]).sort(), ['total_duration_s', 'user_id', 'week_start', 'workout_count'], 'group_workouts only exposes count and duration');
-    eq([rows[0].user_id, rows[0].workout_count, Number(rows[0].total_duration_s)], [a.id, 2, 7200], 'group_workouts values');
+    eq([rows[0].user_id, rows[0].workout_count, Number(rows[0].total_duration_s)], [a.id, 2, 6600], 'group_workouts values');
     // Peers still cannot read the underlying rows through any other path.
     eq(ok(await b.client.from('workouts').select('id'), 'B reads workouts after A shares').length, 0, 'B can read workouts rows after A shares');
 
