@@ -167,3 +167,38 @@ jobs:
           for c in supabase_auth_Leaderboard supabase_rest_Leaderboard supabase_db_Leaderboard; do
             echo "::group::$c"; docker logs --tail 80 "$c" 2>&1 || true; echo "::endgroup::"
           done
+
+  # Exports the web build against the local stack and loads it in headless Chromium.
+  smoke-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector
+      - name: Export web build against the local stack
+        run: |
+          supabase status -o env > "$RUNNER_TEMP/stack.env"
+          anon=$(sed -n 's/^ANON_KEY="\(.*\)"$/\1/p' "$RUNNER_TEMP/stack.env")
+          [ -n "$anon" ] || { echo "::error::supabase status did not report ANON_KEY"; exit 1; }
+          echo "::add-mask::$anon"
+          EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 EXPO_PUBLIC_SUPABASE_ANON_KEY="$anon" \
+            npx expo export --platform web --output-dir dist
+      - run: npx playwright install --with-deps chromium
+      - name: Web smoke test
+        run: npm run smoke:web
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-smoke-screenshots
+          path: web-smoke-*.png
+          if-no-files-found: ignore
+          retention-days: 14
