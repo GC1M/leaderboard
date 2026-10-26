@@ -1,5 +1,5 @@
 begin;
-select plan(21);
+select plan(31);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000a5', 'alice@x.com'),
@@ -62,7 +62,34 @@ select throws_ok($$insert into workout_exercises (workout_id, exercise_id, posit
 select throws_ok($$insert into workouts (user_id, source, activity_type, started_at, ended_at, timezone)
   values ('00000000-0000-0000-0000-0000000000a5', 'manual', 'run', now(), now(), 'UTC')$$, '42501', null, 'cannot write as someone else');
 
--- Account deletion cascades.
+-- save_manual_workout: atomic create/update.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000a5');
+select lives_ok($$select save_manual_workout(null, jsonb_build_object('activity_type', 'strength', 'started_at', now() - interval '1 hour',
+  'ended_at', now(), 'timezone', 'UTC', 'exercises', jsonb_build_array(jsonb_build_object('exercise_id', (select id from exercises where name = 'Sled Push'),
+  'sets', jsonb_build_array(jsonb_build_object('reps', 10, 'load_kg', 60))))))$$, 'save creates a workout with exercises and sets');
+select lives_ok($$select save_manual_workout('00000000-0000-0000-0000-00000000a501', jsonb_build_object('activity_type', 'strength',
+  'started_at', now() - interval '1 hour', 'ended_at', now(), 'timezone', 'UTC', 'exercises', jsonb_build_array(jsonb_build_object(
+  'exercise_id', (select id from exercises where name = 'Deadlift'), 'sets', jsonb_build_array(jsonb_build_object('reps', 3))))))$$,
+  'save updates a workout');
+select is((select count(*)::int from workout_exercises where workout_id = '00000000-0000-0000-0000-00000000a501'), 1, 'update replaced the exercises');
+select is((select count(*)::int from workout_exercises where id = '00000000-0000-0000-0000-00000000a511'), 0, 'the old exercise row is gone');
+select throws_ok($$select save_manual_workout('00000000-0000-0000-0000-00000000a501', jsonb_build_object('activity_type', 'strength',
+  'started_at', now() - interval '1 hour', 'ended_at', now(), 'timezone', 'UTC', 'exercises', jsonb_build_array(
+  jsonb_build_object('exercise_id', (select id from exercises where name = 'Plank'), 'sets', jsonb_build_array(jsonb_build_object('reps', 1))),
+  jsonb_build_object('exercise_id', (select id from exercises where name = 'Plank'), 'sets', jsonb_build_array(jsonb_build_object())))))$$,
+  '23514', null, 'an invalid set fails the whole save');
+select is((select count(*)::int from workout_exercises we join workout_sets ws on ws.workout_exercise_id = we.id
+  where we.workout_id = '00000000-0000-0000-0000-00000000a501' and ws.reps = 3), 1, 'the failed save left the old exercises and sets intact');
+select throws_ok($$select save_manual_workout('00000000-0000-0000-0000-00000000a502', jsonb_build_object('activity_type', 'running',
+  'started_at', now(), 'ended_at', now(), 'timezone', 'UTC'))$$, 'P0001', 'workout not found', 'an imported workout cannot be saved over');
+select throws_ok($$delete from exercises where name = 'Sled Push'$$, '23503', null, 'a custom exercise used in a workout cannot be deleted');
+select is((select count(*)::int from workout_exercises where exercise_id = (select id from exercises where name = 'Sled Push')), 1,
+  'the workout history is intact after the refused delete');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000b5');
+select throws_ok($$select save_manual_workout('00000000-0000-0000-0000-00000000a501', jsonb_build_object('activity_type', 'strength',
+  'started_at', now(), 'ended_at', now(), 'timezone', 'UTC'))$$, 'P0001', 'workout not found', 'another user cannot save over her workout');
+
+-- Account deletion cascades (including her custom exercise, which her own workout references).
 reset role;
 delete from auth.users where id = '00000000-0000-0000-0000-0000000000a5';
 select is((select count(*)::int from workouts) + (select count(*)::int from workout_exercises) + (select count(*)::int from workout_sets)

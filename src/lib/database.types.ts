@@ -327,6 +327,9 @@ isOneToOne: false
 "remove_member":
 { Args: { "p_group_id": string,"p_user_id": string }; Returns: undefined
                            },
+"save_manual_workout":
+{ Args: { "p_id": string,"p_workout": Json }; Returns: string
+                           },
 "shares_group_with":
 { Args: { "p_user_id": string }; Returns: boolean
                            }

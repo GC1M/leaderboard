@@ -42,7 +42,8 @@ function validate(w: ManualWorkoutInput) {
       if ([s.reps, s.loadKg, s.durationS, s.distanceM].every((v) => v == null)) throw new Error('Each set needs a rep count, load, time, or distance.');
 }
 
-function workoutColumns(w: ManualWorkoutInput) {
+// One atomic RPC call (see save_manual_workout): array order becomes `position`, for exercises and for sets.
+function payload(w: ManualWorkoutInput) {
   return {
     activity_type: w.activityType.trim(),
     started_at: w.startedAt.toISOString(),
@@ -52,31 +53,20 @@ function workoutColumns(w: ManualWorkoutInput) {
     distance_m: w.distanceM ?? null,
     energy_kcal: w.energyKcal ?? null,
     notes: w.notes?.trim() || null,
+    exercises: w.exercises.map((e) => ({
+      exercise_id: e.exerciseId,
+      notes: e.notes?.trim() || null,
+      sets: e.sets.map((s) => ({ reps: s.reps ?? null, load_kg: s.loadKg ?? null, duration_s: s.durationS ?? null, distance_m: s.distanceM ?? null })),
+    })),
   };
 }
 
-// Array order becomes `position`, for exercises and for sets within each exercise.
-async function insertExercises(workoutId: string, exercises: ExerciseEntry[]): Promise<void> {
-  if (exercises.length === 0) return;
-  const { data, error } = await supabase
-    .from('workout_exercises')
-    .insert(exercises.map((e, position) => ({ workout_id: workoutId, exercise_id: e.exerciseId, position, notes: e.notes?.trim() || null })))
-    .select('id, position');
-  if (error) throw new Error(SAVE_MESSAGE);
-  const idByPosition = new Map(data.map((r) => [r.position, r.id]));
-  const sets = exercises.flatMap((e, ei) =>
-    e.sets.map((s, position) => ({
-      workout_exercise_id: idByPosition.get(ei)!,
-      position,
-      reps: s.reps ?? null,
-      load_kg: s.loadKg ?? null,
-      duration_s: s.durationS ?? null,
-      distance_m: s.distanceM ?? null,
-    })),
-  );
-  if (sets.length === 0) return;
-  const { error: setsError } = await supabase.from('workout_sets').insert(sets);
-  if (setsError) throw new Error(SAVE_MESSAGE);
+async function save(id: string | null, input: ManualWorkoutInput): Promise<string> {
+  validate(input);
+  await currentUserId();
+  const { data, error } = await supabase.rpc('save_manual_workout', { p_id: id as string, p_workout: payload(input) });
+  if (error || !data) throw new Error(SAVE_MESSAGE);
+  return data;
 }
 
 // Newest first. Summaries only; use getWorkout for exercises and sets.
@@ -115,33 +105,13 @@ export async function getWorkout(id: string): Promise<WorkoutDetail | null> {
   };
 }
 
-export async function createManualWorkout(input: ManualWorkoutInput): Promise<string> {
-  validate(input);
-  const user_id = await currentUserId();
-  const { data, error } = await supabase
-    .from('workouts')
-    .insert({ user_id, source: 'manual', ...workoutColumns(input) })
-    .select('id')
-    .single();
-  if (error) throw new Error(SAVE_MESSAGE);
-  try {
-    await insertExercises(data.id, input.exercises);
-  } catch (e) {
-    await supabase.from('workouts').delete().eq('id', data.id); // don't leave a half-saved log
-    throw e;
-  }
-  return data.id;
+export function createManualWorkout(input: ManualWorkoutInput): Promise<string> {
+  return save(null, input);
 }
 
-// Replaces the exercises and sets wholesale. Manual workouts only; imported summaries are never edited here.
-// ponytail: not atomic (a failed re-insert loses the old detail); move to an RPC if that bites.
+// Replaces the exercises and sets wholesale, atomically. Manual workouts only; imported summaries are never edited here.
 export async function updateManualWorkout(id: string, input: ManualWorkoutInput): Promise<void> {
-  validate(input);
-  const { data, error } = await supabase.from('workouts').update(workoutColumns(input)).eq('id', id).eq('source', 'manual').select('id');
-  if (error || data.length === 0) throw new Error(SAVE_MESSAGE);
-  const { error: delError } = await supabase.from('workout_exercises').delete().eq('workout_id', id);
-  if (delError) throw new Error(SAVE_MESSAGE);
-  await insertExercises(id, input.exercises);
+  await save(id, input);
 }
 
 // Exercises and sets go with it (cascade).

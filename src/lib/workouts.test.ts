@@ -12,6 +12,7 @@ type Result = { data?: unknown; error?: unknown };
 const results: Record<string, Result> = {};
 const calls: { table: string; op: string; arg?: unknown }[] = [];
 const mockGetUser = jest.fn();
+const mockRpc = jest.fn();
 
 // Every builder method records itself and returns the chain; awaiting the chain resolves the table's canned result.
 function mockChainFor(table: string, op: string) {
@@ -28,6 +29,7 @@ function mockChainFor(table: string, op: string) {
 jest.mock('@/lib/supabase', () => ({
   supabase: {
     auth: { getUser: () => mockGetUser() },
+    rpc: (...a: unknown[]) => mockRpc(...a),
     from: (table: string) => {
       const start = (op: string) => (arg?: unknown) => {
         calls.push({ table, op, arg });
@@ -57,34 +59,29 @@ beforeEach(() => {
 });
 
 describe('createManualWorkout', () => {
-  it('saves a manual workout, then exercises and sets in order, leaving unknown fields null', async () => {
-    results['workouts.insert'] = { data: { id: 'w1' }, error: null };
-    results['workout_exercises.insert'] = { data: [{ id: 'we2', position: 1 }, { id: 'we1', position: 0 }], error: null };
+  it('sends one RPC with ordered exercises and sets, leaving unknown fields null', async () => {
+    mockRpc.mockResolvedValue({ data: 'w1', error: null });
     await expect(createManualWorkout(input)).resolves.toBe('w1');
-    expect(calls[0].arg).toMatchObject({ user_id: 'u1', source: 'manual', activity_type: 'strength', distance_m: null, energy_kcal: null, notes: null });
-    expect(calls[1].arg).toEqual([
-      { workout_id: 'w1', exercise_id: 'ex1', position: 0, notes: null },
-      { workout_id: 'w1', exercise_id: 'ex2', position: 1, notes: null },
-    ]);
-    const sets = calls[2].arg as { workout_exercise_id: string; position: number; reps: number | null; load_kg: number | null }[];
-    expect(sets.map((s) => [s.workout_exercise_id, s.position, s.reps, s.load_kg])).toEqual([
-      ['we1', 0, 5, 100],
-      ['we1', 1, 0, 0],
-      ['we2', 0, null, null],
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    const [name, args] = mockRpc.mock.calls[0];
+    expect(name).toBe('save_manual_workout');
+    expect(args.p_id).toBeNull();
+    expect(args.p_workout).toMatchObject({ activity_type: 'strength', distance_m: null, energy_kcal: null, notes: null });
+    expect(args.p_workout.exercises).toEqual([
+      { exercise_id: 'ex1', notes: null, sets: [{ reps: 5, load_kg: 100, duration_s: null, distance_m: null }, { reps: 0, load_kg: 0, duration_s: null, distance_m: null }] },
+      { exercise_id: 'ex2', notes: null, sets: [{ reps: null, load_kg: null, duration_s: 600, distance_m: 2000 }] },
     ]);
   });
 
   it('rejects an empty set and a backwards time range before hitting the database', async () => {
     await expect(createManualWorkout({ ...input, exercises: [{ exerciseId: 'ex1', sets: [{}] }] })).rejects.toThrow(/Each set/);
     await expect(createManualWorkout({ ...input, endedAt: new Date('2026-10-26T14:00:00Z') })).rejects.toThrow(/cannot end before/);
-    expect(calls).toHaveLength(0);
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  it('removes the workout if its exercises fail to save', async () => {
-    results['workouts.insert'] = { data: { id: 'w1' }, error: null };
-    results['workout_exercises.insert'] = { data: null, error: { code: '23503' } };
+  it('maps a failure to a friendly message', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { code: '23503', message: 'secret' } });
     await expect(createManualWorkout(input)).rejects.toThrow(/Couldn't save/);
-    expect(calls.at(-1)).toMatchObject({ table: 'workouts', op: 'delete' });
   });
 
   it('requires a signed-in user', async () => {
@@ -94,17 +91,15 @@ describe('createManualWorkout', () => {
 });
 
 describe('updateManualWorkout', () => {
-  it('does not touch exercises when the workout is not a manual one of the user', async () => {
-    results['workouts.update'] = { data: [], error: null };
-    await expect(updateManualWorkout('w1', input)).rejects.toThrow(/Couldn't save/);
-    expect(calls.map((c) => c.table + '.' + c.op)).toEqual(['workouts.update']);
+  it('passes the id to the same RPC', async () => {
+    mockRpc.mockResolvedValue({ data: 'w1', error: null });
+    await updateManualWorkout('w1', input);
+    expect(mockRpc).toHaveBeenCalledWith('save_manual_workout', expect.objectContaining({ p_id: 'w1' }));
   });
 
-  it('replaces the exercises and sets', async () => {
-    results['workouts.update'] = { data: [{ id: 'w1' }], error: null };
-    results['workout_exercises.insert'] = { data: [{ id: 'we1', position: 0 }, { id: 'we2', position: 1 }], error: null };
-    await updateManualWorkout('w1', input);
-    expect(calls.map((c) => c.table + '.' + c.op)).toEqual(['workouts.update', 'workout_exercises.delete', 'workout_exercises.insert', 'workout_sets.insert']);
+  it('fails when the workout is not a manual one of the user', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'workout not found' } });
+    await expect(updateManualWorkout('w1', input)).rejects.toThrow(/Couldn't save/);
   });
 });
 

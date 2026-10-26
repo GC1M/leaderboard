@@ -108,3 +108,47 @@ insert into public.exercises (name, category) values
   ('Crunch', 'core'), ('Hanging Leg Raise', 'core'), ('Running', 'cardio'),
   ('Cycling', 'cardio'), ('Rowing Machine', 'cardio'), ('Jump Rope', 'cardio'),
   ('Walking', 'cardio'), ('Stretching', 'mobility');
+
+-- Atomic save of a manual workout with its exercises and sets. Insert when p_id is null, else update and
+-- replace the children. security invoker: RLS still decides what the caller may touch. p_workout shape:
+-- {activity_type, started_at, ended_at, timezone, duration_s?, distance_m?, energy_kcal?, notes?,
+--  exercises: [{exercise_id, notes?, sets: [{reps?, load_kg?, duration_s?, distance_m?}]}]}
+-- Array order becomes position.
+create function public.save_manual_workout(p_id uuid, p_workout jsonb) returns uuid
+language plpgsql security invoker set search_path = '' as $$
+declare v_id uuid; e jsonb; s jsonb; v_we uuid; ei int; si int;
+begin
+  if auth.uid() is null then raise exception 'not authenticated'; end if;
+  if p_id is null then
+    insert into public.workouts (user_id, source, activity_type, started_at, ended_at, timezone, duration_s, distance_m, energy_kcal, notes)
+    values (auth.uid(), 'manual', p_workout->>'activity_type', (p_workout->>'started_at')::timestamptz,
+      (p_workout->>'ended_at')::timestamptz, p_workout->>'timezone', (p_workout->>'duration_s')::numeric,
+      (p_workout->>'distance_m')::numeric, (p_workout->>'energy_kcal')::numeric, p_workout->>'notes')
+    returning id into v_id;
+  else
+    update public.workouts set activity_type = p_workout->>'activity_type',
+      started_at = (p_workout->>'started_at')::timestamptz, ended_at = (p_workout->>'ended_at')::timestamptz,
+      timezone = p_workout->>'timezone', duration_s = (p_workout->>'duration_s')::numeric,
+      distance_m = (p_workout->>'distance_m')::numeric, energy_kcal = (p_workout->>'energy_kcal')::numeric,
+      notes = p_workout->>'notes'
+    where id = p_id and user_id = auth.uid() and source = 'manual'
+    returning id into v_id;
+    if v_id is null then raise exception 'workout not found'; end if;
+    delete from public.workout_exercises where workout_id = v_id;
+  end if;
+  ei := 0;
+  for e in select * from jsonb_array_elements(coalesce(p_workout->'exercises', '[]'::jsonb)) loop
+    insert into public.workout_exercises (workout_id, exercise_id, position, notes)
+    values (v_id, (e->>'exercise_id')::uuid, ei, e->>'notes') returning id into v_we;
+    si := 0;
+    for s in select * from jsonb_array_elements(coalesce(e->'sets', '[]'::jsonb)) loop
+      insert into public.workout_sets (workout_exercise_id, position, reps, load_kg, duration_s, distance_m)
+      values (v_we, si, (s->>'reps')::int, (s->>'load_kg')::numeric, (s->>'duration_s')::numeric, (s->>'distance_m')::numeric);
+      si := si + 1;
+    end loop;
+    ei := ei + 1;
+  end loop;
+  return v_id;
+end $$;
+revoke execute on function public.save_manual_workout(uuid, jsonb) from public, anon;
+grant execute on function public.save_manual_workout(uuid, jsonb) to authenticated;
