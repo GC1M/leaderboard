@@ -37,13 +37,13 @@ describe('with HealthKit', () => {
   it('reports each metric independently and never claims a grant', async () => {
     statusByType.HKQuantityTypeIdentifierStepCount = 2;
     statusByType.HKQuantityTypeIdentifierBodyMass = 0;
-    expect(await getAllHealthAccess()).toEqual({ steps: 'asked', sleep: 'not-asked', weight: 'not-asked' });
+    expect(await getAllHealthAccess()).toEqual({ steps: 'asked', sleep: 'not-asked', weight: 'not-asked', workouts: 'not-asked' });
   });
 
-  it('requests read access to all three types in one sheet', async () => {
+  it('requests read access to every type in one sheet', async () => {
     await requestHealthAccess();
     expect(hk.requestAuthorization).toHaveBeenCalledWith({
-      toRead: ['HKQuantityTypeIdentifierStepCount', 'HKCategoryTypeIdentifierSleepAnalysis', 'HKQuantityTypeIdentifierBodyMass'],
+      toRead: ['HKQuantityTypeIdentifierStepCount', 'HKCategoryTypeIdentifierSleepAnalysis', 'HKQuantityTypeIdentifierBodyMass', 'HKWorkoutTypeIdentifier'],
     });
   });
 
