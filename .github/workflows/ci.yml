@@ -142,3 +142,28 @@ jobs:
           path: gitleaks.json
           if-no-files-found: ignore
           retention-days: 14
+
+  # Drives the real local stack (Postgres, GoTrue, PostgREST, RLS, RPCs) with two users.
+  smoke-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,mailpit
+      - name: API smoke test
+        run: npm run smoke:api
+      - name: Service logs on failure
+        if: failure()
+        run: |
+          docker ps -a --format '{{.Names}}  {{.Status}}'
+          for c in supabase_auth_Leaderboard supabase_rest_Leaderboard supabase_db_Leaderboard; do
+            echo "::group::$c"; docker logs --tail 80 "$c" 2>&1 || true; echo "::endgroup::"
+          done
