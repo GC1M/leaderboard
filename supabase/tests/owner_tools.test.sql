@@ -18,7 +18,7 @@ select join_group((select invite_code from g));
 -- profiles default to UTC, so the member's today is current_date in UTC
 insert into daily_metrics values (auth.uid(), current_date, 'steps', 79000, 'manual', now());
 insert into daily_metrics values (auth.uid(), current_date - 1, 'steps', 5000, 'healthkit', now());
-insert into daily_metrics values (auth.uid(), current_date, 'weight_kg', 90, 'manual', now());
+insert into weight_measurements (user_id, measured_at, kg, source) values (auth.uid(), now(), 90, 'manual');
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000c1');
 insert into daily_metrics values (auth.uid(), current_date, 'steps', 1000, 'manual', now());
 
