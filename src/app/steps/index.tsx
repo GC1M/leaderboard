@@ -2,7 +2,9 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, RefreshControl, Text, View } from 'react-native';
 
-import { Button, ErrorText, Screen, styles } from '@/components/ui';import { ManualEntry } from '@/components/steps/ManualEntry';
+import { BarHistory } from '@/components/history/BarHistory';
+import { Button, ErrorText, Screen, styles } from '@/components/ui';
+import { ManualEntry } from '@/components/steps/ManualEntry';
 import { StepRow } from '@/components/steps/StepRow';
 import { useTheme } from '@/theme';
 import { isHealthAvailable } from '@/lib/health/healthkit';
@@ -78,6 +80,8 @@ export default function Steps() {
           onPress={() => router.push('/steps/permission')}
         />
       )}
+
+      <BarHistory refresh={rows} fetch={getMyRecentSteps} fmt={(v) => `${Math.round(v).toLocaleString()} steps`} noun="steps" />
 
       {rows === null && !loadError ? (
         <ActivityIndicator accessibilityLabel="Loading steps" color={t.accent} />

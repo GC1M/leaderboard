@@ -1,5 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
+import type { SymbolViewProps } from 'expo-symbols';
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { HealthSyncStatus } from '@/components/HealthSyncStatus';
@@ -7,14 +8,22 @@ import { WeekChart } from '@/components/steps/WeekChart';
 import { Button, ErrorText, Icon, Screen, Section, Skeleton, styles as ui } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { listMyGroups, type MyGroup } from '@/lib/groups';
-import { lastNDates, localDateKey } from '@/lib/health/dates';
+import { lastNDates, localDateKey, readingDateLabel } from '@/lib/health/dates';
+import { dateFromKey, formatSleep, formatWeight } from '@/lib/health/format';
 import type { StepRow } from '@/lib/health/rules';
 import { useHealthSync } from '@/lib/health/sync';
 import { formatValue, getLeaderboard, myStanding, type Standing } from '@/lib/leaderboard';
 import { getMyRecentSteps } from '@/lib/metrics';
+import { getMyRecentSleep } from '@/lib/sleep';
+import { getMyLatestWeight } from '@/lib/weight';
+import { useWeightUnit } from '@/lib/weight-unit';
 import { useTheme } from '@/theme';
 
 type Card = MyGroup & { standing: Standing | null };
+// Latest value of a metric: undefined while loading, null when there is none, 'error' when it failed to load.
+type Latest<T> = T | null | undefined | 'error';
+type Sleep = { date: string; value: number };
+type Weight = { kg: number; measuredAt: string };
 
 export default function Summary() {
   const c = useTheme();
@@ -23,6 +32,9 @@ export default function Summary() {
   const health = useHealthSync();
   const me = session?.user.id ?? '';
   const [steps, setSteps] = useState<StepRow[] | null>(null);
+  const [sleep, setSleep] = useState<Latest<Sleep>>();
+  const [weight, setWeight] = useState<Latest<Weight>>();
+  const [unit] = useWeightUnit();
   const [cards, setCards] = useState<Card[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,6 +46,10 @@ export default function Summary() {
       // ponytail: one leaderboard call per group; fine for a handful of groups, add a batched RPC if people join dozens.
       // One group failing (e.g. you were just removed) shouldn't blank the whole summary.
       const boards = await Promise.allSettled(groups.map((g) => getLeaderboard(g.id, 'steps', 'day')));
+      // Sleep and weight fail on their own: an error shows on that card, not on the whole summary.
+      const [sl, wt] = await Promise.allSettled([getMyRecentSleep(me, 30), getMyLatestWeight(me)]);
+      setSleep(sl.status === 'fulfilled' ? (sl.value[sl.value.length - 1] ?? null) : 'error');
+      setWeight(wt.status === 'fulfilled' ? wt.value : 'error');
       setSteps(s);
       setCards(groups.map((g, i) => ({ ...g, standing: boards[i].status === 'fulfilled' ? myStanding(boards[i].value, me) : null })));
       setError(null);
@@ -78,6 +94,23 @@ export default function Summary() {
             {today?.source === 'manual' && <Text style={[ui.caption, { color: c.manual }]}>Manual</Text>}
             <WeekChart dates={dates} rows={steps} />
           </Pressable>
+
+          <MetricCard
+            title="Sleep"
+            icon={{ ios: 'bed.double.fill', android: 'bedtime', web: 'bedtime' }}
+            value={typeof sleep === 'object' && sleep ? formatSleep(sleep.value) : null}
+            when={typeof sleep === 'object' && sleep ? readingDateLabel(dateFromKey(sleep.date)) : null}
+            state={sleep === 'error' ? 'error' : sleep ? 'ok' : 'empty'}
+            onPress={() => router.push('/sleep')}
+          />
+          <MetricCard
+            title="Weight"
+            icon={{ ios: 'scalemass.fill', android: 'monitor_weight', web: 'monitor_weight' }}
+            value={typeof weight === 'object' && weight ? formatWeight(weight.kg, unit) : null}
+            when={typeof weight === 'object' && weight ? readingDateLabel(new Date(weight.measuredAt)) : null}
+            state={weight === 'error' ? 'error' : weight ? 'ok' : 'empty'}
+            onPress={() => router.push('/weight')}
+          />
 
           {cards.length === 0 ? (
             <Section title="Groups" footer="Start a group for your friends, or join with a code someone sent you.">
@@ -128,6 +161,35 @@ export default function Summary() {
         </>
       )}
     </Screen>
+  );
+}
+
+// Latest-value card for sleep and weight. `when` says which day the value is from, so an old reading never reads as today's.
+function MetricCard({ title, icon, value, when, state, onPress }: {
+  title: string;
+  icon: SymbolViewProps['name'];
+  value: string | null;
+  when: string | null;
+  state: 'ok' | 'empty' | 'error';
+  onPress: () => void;
+}) {
+  const c = useTheme();
+  const text = state === 'error' ? "Couldn't load" : (value ?? 'No data');
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}, ${when ? `${when}, ` : ''}${text}. Opens My ${title}.`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, { backgroundColor: c.surface, opacity: pressed ? 0.8 : 1 }]}
+    >
+      <View style={styles.cardHead}>
+        <Icon name={icon} color={c.accent} />
+        <Text style={[ui.bodyStrong, { color: c.accent, flex: 1 }]}>{title}</Text>
+        <Icon name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} color={c.inkSoft} size={14} />
+      </View>
+      {when && <Text style={[ui.caption, { color: c.inkSoft }]}>{when}</Text>}
+      <Text style={[styles.big, { color: state === 'ok' ? c.ink : state === 'error' ? c.danger : c.inkSoft }]}>{text}</Text>
+    </Pressable>
   );
 }
 

@@ -33,6 +33,8 @@ function Routes() {
           <Stack.Screen name="steps/index" />
           <Stack.Screen name="steps/permission" />
           <Stack.Screen name="steps/sources" />
+          <Stack.Screen name="sleep/index" />
+          <Stack.Screen name="weight/index" />
         </Stack.Protected>
         <Stack.Protected guard={gate === 'signed-out'}>
           <Stack.Screen name="sign-in" />
