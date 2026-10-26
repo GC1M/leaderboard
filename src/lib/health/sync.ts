@@ -46,7 +46,7 @@ export function useStepSync(onSynced?: () => void) {
       const r = await syncSteps();
       setResult(r);
       setError(null);
-      if (r.status === 'synced') cb.current?.();
+      if (r.status === 'synced' || r.status === 'no-data') cb.current?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't sync your steps.");
     } finally {

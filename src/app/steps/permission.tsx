@@ -53,9 +53,8 @@ export default function HealthPermission() {
   return (
     <Screen title="Connect Apple Health" back>
       <Text style={[styles.body, { color: t.ink }]}>
-        Leaderboard can read your steps, sleep, and weight from Apple Health. You can allow any of them. It uploads daily step totals, nightly sleep
-        time, and weight readings to your account. Group members see your step totals; your sleep and raw weight stay private. Never your location or
-        workouts.
+        Leaderboard can read your steps, sleep, and weight from Apple Health. You can allow any of them. It uploads daily step totals to your account
+        so your groups can rank them. Never your location or workouts.
       </Text>
       {unavailable ? (
         <Text style={[styles.body, { color: t.inkSoft }]}>
@@ -69,7 +68,8 @@ export default function HealthPermission() {
         </Text>
       ) : null}
       <ErrorText>{error}</ErrorText>
-      {notAsked && <Button label="Allow Health Access" busy={busy} onPress={allow} />}
+      {/* Also shown if the status check failed, so there is always a way to retry. */}
+      {(!access || notAsked) && <Button label="Allow Health Access" busy={busy} onPress={allow} />}
       <Button label="Enter Steps Manually" secondary disabled={busy} onPress={() => router.replace('/steps')} />
       <Button plain label="Using a Garmin, Oura or Other Tracker?" onPress={() => router.push('/steps/sources')} />
     </Screen>
