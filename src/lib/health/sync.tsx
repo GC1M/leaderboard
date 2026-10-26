@@ -5,16 +5,21 @@ import { useAuth } from '@/lib/auth';
 import { secureStorage } from '@/lib/secure-storage';
 import { reconcileHealth } from './changes';
 import { createHealthCoordinator, HEALTH_METRICS, initialHealthState, type HealthConnection, type HealthCoordinator } from './coordinator';
-import { getHealthAccess, requestHealthAccess } from './healthkit';
-import { deleteHealthJournal, getHealthDeviceId, healthJournal, resetHealthAnchors } from './journal';
+import { createExportQueue, exportWriters, initialExportState, type ExportQueue } from './export-queue';
+import { healthExportMapping } from './export-mapping';
+import { getHealthAccess, getHealthWriteAccess, requestHealthAccess, requestHealthWriteAccess, type HealthWriteType } from './healthkit';
+import { deleteImportedJournal, getHealthDeviceId, healthExportStore, healthJournal, resetHealthAnchors } from './journal';
 import { assertHealthOwner } from './owner';
 import { deleteHealthImports, uploadHealthChanges } from './upload';
 
 export const SYNC_DAYS = 7; // existing My Steps view; import history is 90 days, not seven
 const HealthContext = createContext<HealthCoordinator | null>(null);
+const ExportContext = createContext<ExportQueue | null>(null);
 const idle = initialHealthState();
+const idleExport = initialExportState();
 const subscribeIdle = () => () => {};
 const idleSnapshot = () => idle;
+const idleExportSnapshot = () => idleExport;
 
 function createAccountSync(userId: string) {
   const key=`health-connection-${userId}`;
@@ -27,7 +32,7 @@ function createAccountSync(userId: string) {
     access:getHealthAccess,
     recheck:()=>resetHealthAnchors(userId),
     // Local journal first: if the server delete then fails, a retry still finds nothing to re-upload.
-    deleteImports:async()=>{await assertHealthOwner(userId);await deleteHealthJournal(userId);await deleteHealthImports(userId);},
+    deleteImports:async()=>{await assertHealthOwner(userId);await deleteImportedJournal(userId);await deleteHealthImports(userId);},
     reconcile:async(metric,checkOwner)=>{
       // Resolve once before parallel metric uploads so all use the same installation identity.
       deviceId ??= getHealthDeviceId().catch((e)=>{deviceId=undefined;throw e;});
@@ -38,11 +43,32 @@ function createAccountSync(userId: string) {
   });
 }
 
+// Exports to Apple Health run independently of imports and of the connect consent: they need only write
+// permission for the data type, which is requested separately.
+function createAccountExport(userId: string) {
+  let deviceId: Promise<string> | undefined;
+  return createExportQueue({
+    checkAccount:()=>assertHealthOwner(userId),
+    store:healthExportStore(userId),
+    mapping:healthExportMapping(userId,()=>(deviceId??=getHealthDeviceId().catch((e)=>{deviceId=undefined;throw e;}))),
+    writers:exportWriters,
+    access:getHealthWriteAccess,
+  });
+}
+
 export function HealthSyncProvider({children}:{children:ReactNode}) {
   const {session}=useAuth();
   const userId=session?.user.id;
   const controller=useMemo(()=>userId?createAccountSync(userId):null,[userId]);
+  const exporter=useMemo(()=>userId?createAccountExport(userId):null,[userId]);
   const state=useSyncExternalStore(controller?.subscribe ?? subscribeIdle,controller?.getSnapshot ?? idleSnapshot);
+  useEffect(()=>{
+    if(!exporter)return;
+    void exporter.initialize().then(()=>exporter.process());
+    const subscription=AppState.addEventListener('change',(s)=>{if(s==='active')void exporter.process();});
+    // Sign-out or account switch stops this queue; its entries stay in that account's own local store.
+    return()=>{exporter.stop();subscription.remove();};
+  },[exporter]);
   useEffect(()=>{
     if(!controller)return;
     void controller.initialize().then(()=>controller.sync());
@@ -55,7 +81,7 @@ export function HealthSyncProvider({children}:{children:ReactNode}) {
     const timer=setTimeout(()=>{if(AppState.currentState==='active')void controller.sync();},500);
     return()=>clearTimeout(timer);
   },[controller,state]);
-  return <HealthContext.Provider value={controller}>{children}</HealthContext.Provider>;
+  return <HealthContext.Provider value={controller}><ExportContext.Provider value={exporter}>{children}</ExportContext.Provider></HealthContext.Provider>;
 }
 
 export function useHealthSync(){
@@ -66,6 +92,18 @@ export function useHealthSync(){
     disconnect:()=>controller?.disconnect() ?? Promise.resolve(),
     recheck:()=>controller?.recheck() ?? Promise.resolve(),
     deleteImports:()=>controller?.deleteImports() ?? Promise.resolve(),
+  };
+}
+
+// Export queue status for the UI: pending/failed counts and entries with `status` and `reason` ('permission' means
+// the user has not allowed writing that type). `enqueue` is what feature code calls; `allowWrite` shows Apple's sheet.
+export function useHealthExport(){
+  const queue=useContext(ExportContext);
+  const state=useSyncExternalStore(queue?.subscribe ?? subscribeIdle,queue?.getSnapshot ?? idleExportSnapshot);
+  return { ...state,
+    enqueue:(...args:Parameters<ExportQueue['enqueue']>)=>queue?.enqueue(...args) ?? Promise.resolve(),
+    retry:()=>queue?.process() ?? Promise.resolve(),
+    allowWrite:async(types:readonly HealthWriteType[])=>{await requestHealthWriteAccess(types);await queue?.process();},
   };
 }
 

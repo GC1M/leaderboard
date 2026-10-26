@@ -2,6 +2,7 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import type { HealthMetric } from './healthkit';
 import type { HealthJournal, JournalState } from './changes';
+import type { ExportEntry, ExportStore } from './export-queue';
 
 const connections = new Map<string, Promise<import('expo-sqlite').SQLiteDatabase>>();
 export async function getHealthDeviceId(): Promise<string> {
@@ -29,6 +30,7 @@ async function open(userId: string) {
         const cipher = await db.getFirstAsync<{ cipher_version: string }>('PRAGMA cipher_version');
         if (!cipher?.cipher_version) throw new Error('Health journal requires a new iPhone build with SQLCipher.');
         await db.execAsync('CREATE TABLE IF NOT EXISTS health_journal (metric TEXT PRIMARY KEY, state TEXT NOT NULL)');
+        await db.execAsync('CREATE TABLE IF NOT EXISTS health_export_queue (kind TEXT NOT NULL, record_id TEXT NOT NULL, entry TEXT NOT NULL, PRIMARY KEY (kind, record_id))');
         return db;
       } catch (e) { await db.closeAsync(); throw e; }
     })();
@@ -52,6 +54,30 @@ export function healthJournal(userId: string): HealthJournal {
   };
 }
 
+// Queue of app records waiting to be written to Apple Health (#34). Same encrypted per-account database as the
+// journal, so deleteHealthJournal on account deletion removes it too.
+export function healthExportStore(userId: string): ExportStore {
+  return {
+    async list() {
+      const db = await open(userId);
+      const rows = await db.getAllAsync<{ entry: string }>('SELECT entry FROM health_export_queue');
+      return rows.map((r) => JSON.parse(r.entry) as ExportEntry);
+    },
+    async put(entry) {
+      const db = await open(userId);
+      await db.runAsync('INSERT OR REPLACE INTO health_export_queue (kind,record_id,entry) VALUES (?,?,?)', entry.kind, entry.recordId, JSON.stringify(entry));
+    },
+    async remove(kind, recordId) {
+      const db = await open(userId);
+      await db.runAsync('DELETE FROM health_export_queue WHERE kind = ? AND record_id = ?', kind, recordId);
+    },
+    async clear() {
+      const db = await open(userId);
+      await db.runAsync('DELETE FROM health_export_queue');
+    },
+  };
+}
+
 // Re-query visible history without erasing existing samples or inferring deletions. Must be called
 // while the account coordinator is idle; pending uploads are replayed before the fresh query.
 export async function resetHealthAnchors(userId: string): Promise<void> {
@@ -60,6 +86,12 @@ export async function resetHealthAnchors(userId: string): Promise<void> {
     const state = await store.read(metric);
     if (state) await store.write(metric, { ...state, anchor: undefined, resetAfterPending: !!state.pending });
   }
+}
+
+// Stop-and-delete imports (#26): drops imported history but keeps the key, DB and any queued Health exports.
+export async function deleteImportedJournal(userId: string): Promise<void> {
+  const db = await open(userId);
+  await db.runAsync('DELETE FROM health_journal');
 }
 
 // Call after stopping account sync when deleting imported local history/account data (#26).

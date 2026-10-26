@@ -25,17 +25,14 @@ export type Database = {
           Tables: {
             "daily_metrics": {
                   Row: {
-                    "health_device_id": string | null,
-                    "date": string,"metric": string,"source": string,"updated_at": string,"user_id": string,"value": number,"window_end": string | null,"window_start": string | null
+                    "date": string,"health_device_id": string | null,"metric": string,"source": string,"updated_at": string,"user_id": string,"value": number,"window_end": string | null,"window_start": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "health_device_id"?: string | null,
-                    "date": string,"metric": string,"source": string,"updated_at"?: string,"user_id": string,"value": number,"window_end"?: string | null,"window_start"?: string | null
+                    "date": string,"health_device_id"?: string | null,"metric": string,"source": string,"updated_at"?: string,"user_id": string,"value": number,"window_end"?: string | null,"window_start"?: string | null
                   }
                   Update: {
-                    "health_device_id"?: string | null,
-                    "date"?: string,"metric"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string,"value"?: number,"window_end"?: string | null,"window_start"?: string | null
+                    "date"?: string,"health_device_id"?: string | null,"metric"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string,"value"?: number,"window_end"?: string | null,"window_start"?: string | null
                   }
                   Relationships: [
                     {
@@ -112,6 +109,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"health_exports": {
+                  Row: {
+                    "device_id": string,"kind": string,"record_id": string,"sample_uuid": string | null,"sync_version": number,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "device_id": string,"kind": string,"record_id": string,"sample_uuid"?: string | null,"sync_version": number,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "device_id"?: string,"kind"?: string,"record_id"?: string,"sample_uuid"?: string | null,"sync_version"?: number,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "health_exports_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"metric_shares": {
                   Row: {
                     "created_at": string,"group_id": string,"metric": string,"user_id": string
@@ -148,17 +165,14 @@ isOneToOne: false
                   ]
                 },"weight_measurements": {
                   Row: {
-                    "health_device_id": string | null,
-                    "id": string,"kg": number,"measured_at": string,"source": string,"updated_at": string,"user_id": string
+                    "health_device_id": string | null,"id": string,"kg": number,"measured_at": string,"source": string,"updated_at": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "health_device_id"?: string | null,
-                    "id"?: string,"kg": number,"measured_at": string,"source": string,"updated_at"?: string,"user_id": string
+                    "health_device_id"?: string | null,"id"?: string,"kg": number,"measured_at": string,"source": string,"updated_at"?: string,"user_id": string
                   }
                   Update: {
-                    "health_device_id"?: string | null,
-                    "id"?: string,"kg"?: number,"measured_at"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string
+                    "health_device_id"?: string | null,"id"?: string,"kg"?: number,"measured_at"?: string,"source"?: string,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -189,8 +203,10 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "apply_health_changes": { Args: { p_owner: string; p_device: string; p_metric: string; p_daily: Json; p_remove_daily: string[]; p_weight: Json; p_remove_weight: string[] }; Returns: undefined },
-            "create_group":
+            "apply_health_changes":
+{ Args: { "p_daily": Json,"p_device": string,"p_metric": string,"p_owner": string,"p_remove_daily": (string)[],"p_remove_weight": (string)[],"p_weight": Json }; Returns: undefined
+                           },
+"create_group":
 { Args: { "name": string }; Returns: {
               "created_at": string,
 "id": string,
@@ -241,6 +257,9 @@ isOneToOne: false
                            },
 "join_group":
 { Args: { "code": string }; Returns: string
+                           },
+"record_health_export":
+{ Args: { "p_device": string,"p_kind": string,"p_record_id": string,"p_sample_uuid": string,"p_version": number }; Returns: boolean
                            },
 "remove_member":
 { Args: { "p_group_id": string,"p_user_id": string }; Returns: undefined

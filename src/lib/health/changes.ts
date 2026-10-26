@@ -1,4 +1,5 @@
 import { localDateKey, startOfLocalDay } from './dates';
+import { EXCLUDE_OWN_EXPORTS, isOwnExport } from './export-metadata';
 import { HEALTH_TYPES, loadHealthKit, type HealthMetric } from './healthkit';
 import { summarizeSleep } from './sleep';
 import { normalizeWeight, readLatestWeight } from './weight';
@@ -20,7 +21,8 @@ export async function queryChanges(metric: HealthMetric, state: JournalState): P
   const page = metric === 'sleep'
     ? await hk.queryCategorySamplesWithAnchor(HEALTH_TYPES.sleep, options)
     : await hk.queryQuantitySamplesWithAnchor(HEALTH_TYPES[metric], { ...options, unit: metric === 'weight' ? 'kg' : 'count' });
-  const samples = page.samples.map((s): StoredSample => ({
+  // Samples this app exported are never imported back. Filtered here, not in the anchored query, because a query predicate must stay fixed for an anchor.
+  const samples = page.samples.filter((s) => !isOwnExport(s.metadata)).map((s): StoredSample => ({
     id: s.uuid, start: s.startDate.toISOString(), end: s.endDate.toISOString(),
     value: 'value' in s ? s.value : s.quantity,
   }));
@@ -73,7 +75,7 @@ export async function deriveChanges(metric: HealthMetric, previous: readonly Sto
       if (!remaining.has(date)) { changes.removeDaily.push(date); continue; }
       const start = new Date(`${date}T00:00:00`);
       const total = await hk.queryStatisticsForQuantity(HEALTH_TYPES.steps, ['cumulativeSum'], {
-        unit: 'count', filter: { date: { startDate: start, endDate: startOfLocalDay(start, -1) } },
+        unit: 'count', filter: { date: { startDate: start, endDate: startOfLocalDay(start, -1) }, ...EXCLUDE_OWN_EXPORTS },
       });
       // A missing statistic is ambiguous (e.g. access changed); leave the previous total intact.
       const value = total.sumQuantity?.quantity;

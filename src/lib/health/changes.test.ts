@@ -1,4 +1,4 @@
-import { deriveChanges, mergeSamples, reconcileHealth, sampleDates, type ChangePage, type HealthJournal, type JournalState, type StoredSample } from './changes';
+import { queryChanges, deriveChanges, mergeSamples, reconcileHealth, sampleDates, type ChangePage, type HealthJournal, type JournalState, type StoredSample } from './changes';
 import { loadHealthKit } from './healthkit';
 jest.mock('./healthkit',()=>({HEALTH_TYPES:{steps:'steps'},loadHealthKit:jest.fn()}));
 const sample=(id:string,start='2026-10-25T01:00:00',end='2026-10-25T02:00:00',value=1):StoredSample=>({id,start:new Date(start).toISOString(),end:new Date(end).toISOString(),value});
@@ -96,4 +96,13 @@ test('a corrected sample replaces the old value instead of adding to it',async()
 });
 test('invalid changes from Health are rejected rather than stored',()=>{
  expect(()=>mergeSamples([],page([sample('x','2026-10-25T02:00:00','2026-10-25T01:00:00')]))).toThrow('Invalid Health change');
+});
+
+test('the importer ignores samples this app exported, so there is no import/export loop',async()=>{
+ const own={uuid:'own',startDate:new Date('2026-10-25T01:00:00'),endDate:new Date('2026-10-25T01:00:00'),quantity:80,metadata:{LeaderboardRecordId:'weight:r1',HKMetadataKeySyncIdentifier:'leaderboard:weight:r1'}};
+ const other={uuid:'other',startDate:new Date('2026-10-25T02:00:00'),endDate:new Date('2026-10-25T02:00:00'),quantity:81,metadata:{}};
+ const queryQuantitySamplesWithAnchor=jest.fn().mockResolvedValue({samples:[own,other],deletedSamples:[],newAnchor:'a'});
+ (loadHealthKit as jest.Mock).mockReturnValue({queryQuantitySamplesWithAnchor});
+ const result=await queryChanges('weight',{from:'2026-01-01',samples:[]});
+ expect(result.samples.map((s)=>s.id)).toEqual(['other']);
 });
