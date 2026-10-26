@@ -65,3 +65,56 @@ jobs:
           version: 2.122.0
       - run: supabase start
       - run: supabase test db
+
+  # Report-only for now: findings show up in the job summary and as warnings, they do not fail the build.
+  supply-chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks scans the full history
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: npm audit (production dependencies, high and above)
+        continue-on-error: true
+        run: |
+          set +e
+          npm audit --omit=dev --audit-level=high > audit.txt 2>&1
+          code=$?
+          {
+            echo "### npm audit (prod, high+): exit code $code"
+            echo '```'
+            cat audit.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat audit.txt
+          exit $code
+      - name: Secrets scan (gitleaks)
+        continue-on-error: true
+        run: |
+          set +e
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0 \
+            detect --source /repo --redact --no-banner --exit-code 2 \
+            --report-format json --report-path /repo/gitleaks.json
+          code=$?
+          {
+            echo "### gitleaks: exit code $code (0 = clean, 2 = leaks found)"
+            if [ -s gitleaks.json ] && [ "$code" -ne 0 ]; then
+              echo '```'
+              node -e "for (const f of require('./gitleaks.json')) console.log(f.RuleID, f.File + ':' + f.StartLine, f.Commit.slice(0, 7))"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
+      - name: Upload gitleaks report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks.json
+          if-no-files-found: ignore
+          retention-days: 14
