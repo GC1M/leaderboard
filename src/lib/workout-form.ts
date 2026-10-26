@@ -35,7 +35,7 @@ export function defaultDistanceUnit(locale: string | undefined): DistanceUnit {
 export const toKg = (v: number, u: WeightUnit) => (u === 'lb' ? v / displayWeight(1, 'lb') : v);
 export const toMeters = (v: number, u: DistanceUnit) => (u === 'mi' ? v * M_PER_MI : v * 1000);
 const fromKg = (kg: number, u: WeightUnit) => tidy(displayWeight(kg, u));
-const fromMeters = (m: number, u: DistanceUnit) => tidy(u === 'mi' ? m / M_PER_MI : m / 1000);
+export const fromMeters = (m: number, u: DistanceUnit) => tidy(u === 'mi' ? m / M_PER_MI : m / 1000);
 
 const FIELDS: Record<ExerciseCategory, SetField[]> = {
   strength: ['reps', 'load'],

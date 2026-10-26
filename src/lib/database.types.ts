@@ -407,6 +407,11 @@ isOneToOne: false
               "date": string,"source": string,"steps": number,"user_id": string
             }[]
                            },
+"group_workouts":
+{ Args: { "p_from": string,"p_group_id": string,"p_to": string }; Returns: {
+              "total_duration_s": number,"user_id": string,"week_start": string,"workout_count": number
+            }[]
+                           },
 "is_group_member":
 { Args: { "p_group_id": string }; Returns: boolean
                            },

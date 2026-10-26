@@ -5,7 +5,7 @@ import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
 
 import { HealthSyncStatus } from '@/components/HealthSyncStatus';
 import { WeekChart } from '@/components/steps/WeekChart';
-import { Button, ErrorText, Icon, Row, Screen, Section, Skeleton, styles as ui } from '@/components/ui';
+import { Button, ErrorText, Icon, Screen, Section, Skeleton, styles as ui } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { listMyGroups, type MyGroup } from '@/lib/groups';
 import { lastNDates, localDateKey, readingDateLabel } from '@/lib/health/dates';
@@ -17,6 +17,9 @@ import { getMyRecentSteps } from '@/lib/metrics';
 import { getMyRecentSleep } from '@/lib/sleep';
 import { getMyLatestWeight } from '@/lib/weight';
 import { useWeightUnit } from '@/lib/weight-unit';
+import { historyStart, totalsParts, weeklyTotals, type WeekTotals } from '@/lib/workout-history';
+import { defaultDistanceUnit } from '@/lib/workout-form';
+import { listWorkoutsSince } from '@/lib/workouts';
 import { useTheme } from '@/theme';
 
 type Card = MyGroup & { standing: Standing | null };
@@ -34,11 +37,13 @@ export default function Summary() {
   const [steps, setSteps] = useState<StepRow[] | null>(null);
   const [sleep, setSleep] = useState<Latest<Sleep>>();
   const [weight, setWeight] = useState<Latest<Weight>>();
+  const [workouts, setWorkouts] = useState<Latest<WeekTotals>>();
   const [unit] = useWeightUnit();
   const [cards, setCards] = useState<Card[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const dates = lastNDates(7);
+  const distanceUnit = defaultDistanceUnit(Intl.DateTimeFormat().resolvedOptions().locale);
 
   const load = useCallback(async () => {
     try {
@@ -46,10 +51,11 @@ export default function Summary() {
       // ponytail: one leaderboard call per group; fine for a handful of groups, add a batched RPC if people join dozens.
       // One group failing (e.g. you were just removed) shouldn't blank the whole summary.
       const boards = await Promise.allSettled(groups.map((g) => getLeaderboard(g.id, 'steps', 'day')));
-      // Sleep and weight fail on their own: an error shows on that card, not on the whole summary.
-      const [sl, wt] = await Promise.allSettled([getMyRecentSleep(me, 30), getMyLatestWeight(me)]);
+      // Sleep, weight and workouts fail on their own: an error shows on that card, not on the whole summary.
+      const [sl, wt, wo] = await Promise.allSettled([getMyRecentSleep(me, 30), getMyLatestWeight(me), listWorkoutsSince(historyStart(1))]);
       setSleep(sl.status === 'fulfilled' ? (sl.value[sl.value.length - 1] ?? null) : 'error');
       setWeight(wt.status === 'fulfilled' ? wt.value : 'error');
+      setWorkouts(wo.status === 'fulfilled' ? weeklyTotals(wo.value, 1)[0] : 'error');
       setSteps(s);
       setCards(groups.map((g, i) => ({ ...g, standing: boards[i].status === 'fulfilled' ? myStanding(boards[i].value, me) : null })));
       setError(null);
@@ -111,9 +117,15 @@ export default function Summary() {
             state={weight === 'error' ? 'error' : weight ? 'ok' : 'empty'}
             onPress={() => router.push('/weight')}
           />
-          <Section>
-            <Row last icon={{ ios: 'dumbbell.fill', android: 'fitness_center', web: 'fitness_center' }} label="Workouts" onPress={() => router.push('/workouts')} />
-          </Section>
+          <MetricCard
+            title="Workouts"
+            icon={{ ios: 'dumbbell.fill', android: 'fitness_center', web: 'fitness_center' }}
+            value={typeof workouts === 'object' && workouts?.count ? totalsParts(workouts, distanceUnit)[0] : null}
+            when={typeof workouts === 'object' && workouts?.count ? `This week, ${totalsParts(workouts, distanceUnit)[1]}` : 'This week'}
+            empty="None this week"
+            state={workouts === 'error' ? 'error' : typeof workouts === 'object' && workouts?.count ? 'ok' : 'empty'}
+            onPress={() => router.push('/workouts')}
+          />
 
           {cards.length === 0 ? (
             <Section title="Groups" footer="Start a group for your friends, or join with a code someone sent you.">
@@ -168,16 +180,17 @@ export default function Summary() {
 }
 
 // Latest-value card for sleep and weight. `when` says which day the value is from, so an old reading never reads as today's.
-function MetricCard({ title, icon, value, when, state, onPress }: {
+function MetricCard({ title, icon, value, when, state, empty = 'No data', onPress }: {
   title: string;
   icon: SymbolViewProps['name'];
   value: string | null;
   when: string | null;
   state: 'ok' | 'empty' | 'error';
+  empty?: string;
   onPress: () => void;
 }) {
   const c = useTheme();
-  const text = state === 'error' ? "Couldn't load" : (value ?? 'No data');
+  const text = state === 'error' ? "Couldn't load" : (value ?? empty);
   return (
     <Pressable
       accessibilityRole="button"

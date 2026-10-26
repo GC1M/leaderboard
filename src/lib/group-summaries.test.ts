@@ -1,4 +1,4 @@
-import { buildMemberSummaries, sleepText, weightText } from './group-summaries';
+import { buildMemberSummaries, sleepText, weightText, workoutsText } from './group-summaries';
 
 const members = [
   { userId: 'a', name: 'Ann' },
@@ -46,5 +46,35 @@ describe('text', () => {
   it('states without a value', () => {
     expect(sleepText({ state: 'no_data' }, now)).toBe('No data');
     expect(weightText({ state: 'not_shared' }, 'kg', now)).toBe('Not shared');
+  });
+});
+
+describe('workouts', () => {
+  const week = (user_id: string, week_start: string, workout_count: number, total_duration_s: number) => ({ user_id, week_start, workout_count, total_duration_s });
+  const out = buildMemberSummaries(
+    members,
+    { a: ['workouts'], b: ['workouts'], c: ['steps'] },
+    [],
+    [],
+    [week('a', '2026-10-12', 2, 3600), week('a', '2026-10-26', 3, 7800), week('c', '2026-10-26', 1, 1800)],
+  );
+  it('takes the latest week and keeps count and total time', () => {
+    expect(out[0].workouts).toEqual({ state: 'recorded', count: 3, durationS: 7800, weekStart: '2026-10-26' });
+  });
+  it('shared but nothing in the window is no data', () => {
+    expect(out[1].workouts).toEqual({ state: 'no_data' });
+  });
+  it('an unshared member is not shared even if rows were returned', () => {
+    expect(out[2].workouts).toEqual({ state: 'not_shared' });
+  });
+  it('numbers that arrive as strings are converted', () => {
+    const o = buildMemberSummaries(members, { a: ['workouts'] }, [], [], [{ user_id: 'a', week_start: '2026-10-26', workout_count: '2', total_duration_s: '5400.000000' } as never]);
+    expect(o[0].workouts).toEqual({ state: 'recorded', count: 2, durationS: 5400, weekStart: '2026-10-26' });
+  });
+  it('text', () => {
+    expect(workoutsText({ state: 'recorded', count: 3, durationS: 7800, weekStart: '2026-10-26' }, now)).toBe('3 workouts, 2h 10m, this week');
+    expect(workoutsText({ state: 'recorded', count: 1, durationS: 1800, weekStart: '2026-10-12' }, now)).toBe('1 workout, 30m, week of oct 12');
+    expect(workoutsText({ state: 'no_data' }, now)).toBe('No recent workouts');
+    expect(workoutsText({ state: 'not_shared' }, now)).toBe('Not shared');
   });
 });

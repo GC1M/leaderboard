@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { styles as ui } from '@/components/ui';
-import { sleepText, weightText, type MemberSummary } from '@/lib/group-summaries';
+import { sleepText, weightText, workoutsText, type MemberSummary } from '@/lib/group-summaries';
 import type { WeightUnit } from '@/lib/health/format';
 import { useTheme } from '@/theme';
 
@@ -11,17 +11,18 @@ export function MemberSummaries({ items, me, unit }: { items: MemberSummary[]; m
   return (
     <View style={styles.wrap}>
       <Text accessibilityRole="header" style={[ui.bodyStrong, { color: c.ink }]}>
-        Sleep and weight
+        Sleep, weight and workouts
       </Text>
       {items.map((m) => {
         const sleep = `Sleep: ${sleepText(m.sleep)}`;
         const weight = `Weight: ${weightText(m.weight, unit)}`;
+        const workouts = `Workouts: ${workoutsText(m.workouts)}`;
         const name = m.userId === me ? `${m.name}, you` : m.name;
         return (
           <View
             key={m.userId}
             accessible
-            accessibilityLabel={`${name}. ${sleep}. ${weight}`}
+            accessibilityLabel={`${name}. ${sleep}. ${weight}. ${workouts}`}
             style={[styles.row, { borderBottomColor: c.line }]}
           >
             <Text numberOfLines={1} style={[ui.bodyStrong, { color: c.ink }]}>
@@ -29,6 +30,7 @@ export function MemberSummaries({ items, me, unit }: { items: MemberSummary[]; m
             </Text>
             <Text style={[ui.caption, { color: c.inkSoft }]}>{sleep}</Text>
             <Text style={[ui.caption, { color: c.inkSoft }]}>{weight}</Text>
+            <Text style={[ui.caption, { color: c.inkSoft }]}>{workouts}</Text>
           </View>
         );
       })}

@@ -28,6 +28,7 @@ const SHARE_ROWS: { metric: SharedMetric; label: string }[] = [
   { metric: 'steps', label: 'Steps' },
   { metric: 'sleep', label: 'Sleep' },
   { metric: 'weight', label: 'Weight' },
+  { metric: 'workouts', label: 'Workouts' },
 ];
 
 export default function GroupInfo() {
@@ -194,7 +195,7 @@ export default function GroupInfo() {
 
       <Section
         title="What you share with this group"
-        footer="Health access on your iPhone decides what this app can read. These switches decide what this group sees, and you can change them any time. Sleep shares nightly totals only. Weight shares your latest reading and goal progress."
+        footer="Health access on your iPhone decides what this app can read. These switches decide what this group sees, and you can change them any time. Sleep shares nightly totals only. Weight shares your latest reading and goal progress. Workouts share a weekly count and total time only, never exercises, sets or notes."
       >
         {SHARE_ROWS.map(({ metric, label }, i) => {
           const on = shares.includes(metric);
