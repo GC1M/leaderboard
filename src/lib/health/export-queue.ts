@@ -143,6 +143,14 @@ export function createExportQueue(deps: ExportDependencies) {
       return process();
     },
     process,
+    // The user turned exports off for this kind: drop saves that haven't reached Health. Deletes stay so
+    // earlier exports are still cleaned up.
+    async discard(kind: string) {
+      if (flight) await flight;
+      const drop = state.entries.filter((e) => e.kind === kind && e.op === 'save' && e.status !== 'success');
+      for (const e of drop) await deps.store.remove(e.kind, e.recordId);
+      emit(state.entries.filter((e) => !drop.includes(e)));
+    },
     // Account deletion: drop everything queued locally.
     async clear() {
       const token = ++epoch;
