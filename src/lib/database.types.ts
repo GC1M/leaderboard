@@ -292,6 +292,9 @@ isOneToOne: false
             "apply_health_changes":
 { Args: { "p_daily": Json,"p_device": string,"p_metric": string,"p_owner": string,"p_remove_daily": (string)[],"p_remove_weight": (string)[],"p_weight": Json }; Returns: undefined
                            },
+"apply_health_workouts":
+{ Args: { "p_device": string,"p_owner": string,"p_remove": (string)[],"p_workouts": Json }; Returns: undefined
+                           },
 "create_group":
 { Args: { "name": string }; Returns: {
               "created_at": string,

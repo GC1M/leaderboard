@@ -8,8 +8,8 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'What Leaderboard reads from Apple Health',
     body: [
-      'Only what you allow on your iPhone, and only steps, sleep, and weight. It never reads your location, workouts, heart rate, or anything else, and it never writes to Apple Health.',
-      'Steps: a daily total for each day. Sleep: how long you were asleep each night, and when that sleep started and ended. Weight: each reading and when it was taken.',
+      'Only what you allow on your iPhone, and only steps, sleep, weight, and workouts. It never reads your location, heart rate, or anything else, and it never writes to Apple Health.',
+      'Steps: a daily total for each day. Sleep: how long you were asleep each night, and when that sleep started and ended. Weight: each reading and when it was taken. Workouts: the activity type, start and end time, duration, and distance or energy when recorded.',
       'The first import looks back 90 days for steps and sleep, and at all your weight readings. After that, imports run only while the app is open.',
     ],
   },
