@@ -1,4 +1,4 @@
-import { getAllHealthAccess, getHealthAccess, isHealthAvailable, readDailySteps, requestHealthAccess, resetHealthKitCache } from './healthkit';
+import { getAllHealthAccess, getHealthAccess, getHealthWriteAccess, removeExportedSample, requestHealthWriteAccess, isHealthAvailable, readDailySteps, requestHealthAccess, resetHealthKitCache } from './healthkit';
 
 jest.mock('@/lib/metrics', () => ({ getMyRecentSteps: jest.fn(), upsertDailyMetrics: jest.fn() }));
 
@@ -23,6 +23,8 @@ describe('with HealthKit', () => {
     isHealthDataAvailable: () => true,
     getRequestStatusForAuthorization: jest.fn(async ({ toRead }: { toRead: string[] }) => statusByType[toRead[0]] ?? 1),
     requestAuthorization: jest.fn(async () => true),
+    authorizationStatusFor: jest.fn((type: string) => (type === 'HKQuantityTypeIdentifierBodyMass' ? 2 : type === 'HKCategoryTypeIdentifierSleepAnalysis' ? 1 : 0)),
+    deleteObjects: jest.fn(async () => 1),
     queryStatisticsCollectionForQuantity: jest.fn(async (): Promise<unknown[]> => []),
   };
   beforeAll(() => jest.doMock('@kingstinct/react-native-healthkit', () => hk));
@@ -66,5 +68,22 @@ describe('with HealthKit', () => {
       { date: '2026-10-24', value: 8123 },
       { date: '2026-10-26', value: 0 },
     ]);
+  });
+
+  it('requests write access per type, separately from read access', async () => {
+    await requestHealthWriteAccess(['HKQuantityTypeIdentifierBodyMass']);
+    expect(hk.requestAuthorization).toHaveBeenCalledWith({ toShare: ['HKQuantityTypeIdentifierBodyMass'] });
+    expect((hk.requestAuthorization.mock.calls as unknown[][])[0][0]).not.toHaveProperty('toRead');
+  });
+  it('reports write access per type truthfully', () => {
+    expect(getHealthWriteAccess('HKQuantityTypeIdentifierBodyMass')).toBe('granted');
+    expect(getHealthWriteAccess('HKCategoryTypeIdentifierSleepAnalysis')).toBe('denied');
+    expect(getHealthWriteAccess('HKQuantityTypeIdentifierStepCount')).toBe('not-asked');
+  });
+  it('deletes only the sample tagged with this app record id', async () => {
+    await removeExportedSample('HKQuantityTypeIdentifierBodyMass', 'weight', 'r1');
+    expect(hk.deleteObjects).toHaveBeenCalledWith('HKQuantityTypeIdentifierBodyMass', {
+      metadata: { withMetadataKey: 'LeaderboardRecordId', operatorType: 4, value: 'weight:r1' },
+    });
   });
 });
