@@ -4,6 +4,7 @@ import { Alert, AppState, Text, View } from 'react-native';
 
 import { Segmented } from '@/components/history/Segmented';
 import { ExercisePicker } from '@/components/workouts/ExercisePicker';
+import { useWorkoutExport, WorkoutExportOption } from '@/components/workouts/WorkoutExportOption';
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { readingDateLabel } from '@/lib/health/dates';
@@ -42,6 +43,7 @@ export function WorkoutEditor({ id }: { id?: string }) {
   const [tries, setTries] = useState(0);
   const dirty = useRef(false);
   const done = useRef(false);
+  const health = useWorkoutExport(detail?.source ?? 'manual');
 
   useEffect(() => {
     let live = true;
@@ -132,8 +134,10 @@ export function WorkoutEditor({ id }: { id?: string }) {
     setError(null);
     setBusy(true);
     try {
+      let savedId = id;
       if (id) await updateManualWorkout(id, r.input);
-      else await createManualWorkout(r.input);
+      else savedId = await createManualWorkout(r.input);
+      void health.saved(savedId!, r.input);
       await finish();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save your workout.");
@@ -148,6 +152,7 @@ export function WorkoutEditor({ id }: { id?: string }) {
     confirm('Delete this workout?', 'It and its exercises are removed for good.', 'Delete', async () => {
       try {
         await deleteWorkout(id!);
+        void health.deleted(id!);
         await finish();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't delete that workout.");
@@ -206,6 +211,7 @@ export function WorkoutEditor({ id }: { id?: string }) {
       ))}
       <Button secondary label="Add Exercise" onPress={() => setPicking(true)} />
 
+      <WorkoutExportOption id={id} choice={health} />
       <Text style={[styles.caption, { color: c.inkSoft }]}>Only you can see your workouts. Calories are not tracked for manual entries.</Text>
       <ErrorText>{error}</ErrorText>
       <Button label="Save Workout" busy={busy} onPress={save} />
