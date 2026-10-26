@@ -16,6 +16,7 @@ export type CoordinatorDependencies = {
   access: (metric: HealthMetric) => Promise<HealthAccess>;
   reconcile: (metric: HealthMetric, checkOwner: ReconcileOptions['checkOwner']) => Promise<{ hasMore: boolean; knownSamples: number; written: number }>;
   recheck: () => Promise<void>;
+  deleteImports: () => Promise<void>;
 };
 const initialMetric = (): MetricSyncState => ({ status:'idle',lastSuccess:null,knownSamples:0,error:null });
 export const initialHealthState = (): HealthSyncState => ({ ready:false,connected:false,syncing:false,error:null,metrics:{steps:initialMetric(),sleep:initialMetric(),weight:initialMetric()} });
@@ -95,6 +96,15 @@ export function createHealthCoordinator(deps: CoordinatorDependencies) {
     async disconnect(){
       const token=++epoch;emit({connected:false});
       await account(token);await persist({...connection(),connected:false},token);await account(token);
+    },
+    // Stops imports, waits out any upload in flight, then deletes imported data. Imports stay off until the
+    // user reconnects, which starts a fresh history import.
+    async deleteImports(){
+      const token=++epoch;emit({connected:false});
+      await account(token);await persist({connected:false,lastSuccess:{}},token);
+      if(flight)await flight;
+      await account(token);await deps.deleteImports();await account(token);
+      emit({metrics:initialHealthState().metrics});
     },
     async recheck(){
       if(flight)await flight;
