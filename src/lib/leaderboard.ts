@@ -4,11 +4,16 @@ import { supabase } from './supabase';
 export type Metric = 'steps' | 'workout_minutes' | 'weight_kg' | 'screen_min';
 export type Period = 'day' | 'week';
 
+// recorded: value is set and may be 0. no_data: nothing recorded. not_shared: the member doesn't share
+// this metric with the group, so there is no value (and no hint whether data exists).
+export type RowState = 'recorded' | 'no_data' | 'not_shared';
+
 export type LeaderboardRow = {
   userId: string;
   name: string;
-  value: number;
+  value: number | null;
   rank: number;
+  state: RowState;
 };
 
 export async function getLeaderboard(groupId: string, metric: Metric, period: Period): Promise<LeaderboardRow[]> {
@@ -19,12 +24,20 @@ export async function getLeaderboard(groupId: string, metric: Metric, period: Pe
   });
   if (error) throw error;
   // Postgres numeric/bigint can arrive as strings depending on the client path.
-  return data.map((r) => ({ userId: r.user_id, name: r.display_name, value: Number(r.value), rank: Number(r.rank) }));
+  return data.map((r) => ({
+    userId: r.user_id,
+    name: r.display_name,
+    value: r.value === null ? null : Number(r.value),
+    rank: Number(r.rank),
+    state: r.state as RowState,
+  }));
 }
 
-// The RPC returns 0 for members with no data and ranks them last, so value 0 is the signal.
-// ponytail: a real recorded 0 is shown as "no data yet" too; fine for steps. Revisit for screen_min.
-export const hasNoData = (row: Pick<LeaderboardRow, 'value'>) => row.value === 0;
+// No value to show or rank: nothing recorded, or not shared. A recorded 0 is a value.
+export const hasNoData = (row: Pick<LeaderboardRow, 'value'>) => row.value === null;
+
+// Largest recorded value, for lane bars. 0 when nobody has one.
+export const leaderValue = (rows: LeaderboardRow[]) => Math.max(0, ...rows.map((r) => r.value ?? 0));
 
 export function formatValue(metric: Metric, value: number): string {
   const n = Math.round(value);
@@ -68,18 +81,19 @@ export async function getManualDays(groupId: string, period: Period): Promise<Re
 }
 
 // Caption under the name: where the number came from, so manual entries are visible, not hidden.
-export function sourceLabel(period: Period, manualDays: number, noData: boolean): { text: string; manual: boolean } {
-  if (noData) return { text: 'Not synced yet', manual: false };
+export function sourceLabel(period: Period, manualDays: number, state: RowState): { text: string; manual: boolean } {
+  if (state === 'not_shared') return { text: 'Not sharing with this group', manual: false };
+  if (state === 'no_data') return { text: 'No data yet', manual: false };
   if (manualDays === 0) return { text: 'Health', manual: false };
   if (period === 'day') return { text: 'Manual', manual: true };
   return { text: `${manualDays} of 7 days manual`, manual: true };
 }
 
-export type Standing = { rankLabel: string; members: number; value: number; leader: number };
+export type Standing = { rankLabel: string; members: number; value: number | null; leader: number };
 
 // Your place in one group's rows, for the summary cards. null if you're not in the rows.
 export function myStanding(rows: LeaderboardRow[], me: string): Standing | null {
   const i = rows.findIndex((r) => r.userId === me);
   if (i < 0) return null;
-  return { rankLabel: rankLabels(rows)[i], members: rows.length, value: rows[i].value, leader: Math.max(0, ...rows.map((r) => r.value)) };
+  return { rankLabel: rankLabels(rows)[i], members: rows.length, value: rows[i].value, leader: leaderValue(rows) };
 }

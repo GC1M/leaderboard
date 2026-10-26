@@ -78,9 +78,10 @@ insert into daily_metrics (user_id, date, metric, value, source) values (auth.ui
 select is((select count(*)::int from group_steps((select id from g2), current_date - 7, current_date) where user_id = '00000000-0000-0000-0000-0000000000a2'), 0, 'G2 gets no steps');
 select is((select count(*)::int from group_sleep((select id from g2), current_date - 7, current_date)), 0, 'G2 gets no sleep');
 select is((select count(*)::int from group_latest_weight((select id from g2))), 0, 'G2 gets no weight');
-select results_eq($$select value, rank from group_leaderboard((select id from g2), 'steps', 'day') where display_name = 'Alice'$$,
-  $$values (0::numeric, 2::bigint)$$, 'G2 leaderboard hides unshared steps (ranked last)');
-select is((select value from group_leaderboard((select id from g2), 'weight_kg', 'week') where display_name = 'Alice'), 0::numeric, 'G2 leaderboard hides weight progress');
+select results_eq($$select value, rank, state from group_leaderboard((select id from g2), 'steps', 'day') where display_name = 'Alice'$$,
+  $$values (null::numeric, 2::bigint, 'not_shared'::text)$$, 'G2 leaderboard hides unshared steps (ranked last)');
+select results_eq($$select value, state from group_leaderboard((select id from g2), 'weight_kg', 'week') where display_name = 'Alice'$$,
+  $$values (null::numeric, 'not_shared'::text)$$, 'G2 leaderboard hides weight progress');
 
 -- non-member
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000d2');

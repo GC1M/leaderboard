@@ -14,3 +14,14 @@ export function startOfLocalDay(now: Date, daysAgo = 0): Date {
 export function lastNDates(days: number, now: Date = new Date()): string[] {
   return Array.from({ length: days }, (_, i) => localDateKey(startOfLocalDay(now, days - 1 - i)));
 }
+
+// When a reading was taken, in local days: "Today", "Yesterday", or the date. A latest weight from last
+// week must say so, not pass for today's.
+export function readingDateLabel(at: Date, now: Date = new Date()): string {
+  const key = localDateKey(at);
+  if (key === localDateKey(now)) return 'Today';
+  if (key === localDateKey(startOfLocalDay(now, 1))) return 'Yesterday';
+  return at.toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', ...(at.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+  });
+}

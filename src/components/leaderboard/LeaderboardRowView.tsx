@@ -16,8 +16,8 @@ type Props = {
 export function LeaderboardRowView({ row, rankLabel, metric, isYou, leader, source }: Props) {
   const c = useTheme();
   const noData = hasNoData(row);
-  const valueText = noData ? 'No data' : formatValue(metric, row.value);
-  const fill = noData || leader <= 0 ? 0 : Math.min(1, row.value / leader);
+  const valueText = row.value === null ? (row.state === 'not_shared' ? 'Not shared' : 'No data') : formatValue(metric, row.value);
+  const fill = row.value === null || leader <= 0 ? 0 : Math.min(1, row.value / leader);
   const rankColor = noData ? c.inkSoft : (c.medal[row.rank - 1] ?? c.ink);
   return (
     <View

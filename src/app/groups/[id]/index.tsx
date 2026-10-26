@@ -11,6 +11,7 @@ import {
   getLeaderboard,
   getManualDays,
   hasNoData,
+  leaderValue,
   rankLabels,
   sourceLabel,
   type LeaderboardRow,
@@ -75,7 +76,7 @@ export default function GroupDetail() {
 
   const labels = rows ? rankLabels(rows) : [];
   const ranked = rows ? rows.filter((r) => !hasNoData(r)).length : 0;
-  const leader = rows ? Math.max(0, ...rows.map((r) => r.value)) : 0;
+  const leader = rows ? leaderValue(rows) : 0;
   const youIndex = rows ? rows.findIndex((r) => r.userId === me) : -1;
   const you = youIndex >= 0 ? rows![youIndex] : null;
 
@@ -157,7 +158,7 @@ export default function GroupDetail() {
               metric={METRIC}
               isYou={item.userId === me}
               leader={leader}
-              source={sourceLabel(period, manual[item.userId] ?? 0, hasNoData(item))}
+              source={sourceLabel(period, manual[item.userId] ?? 0, item.state)}
             />
           )}
         />
@@ -170,7 +171,7 @@ export default function GroupDetail() {
           style={[styles.youBar, { backgroundColor: c.youTint, borderTopColor: c.line, paddingBottom: insets.bottom + 12 }]}
         >
           <Text style={[ui.bodyStrong, { color: c.ink }]}>
-            You: {hasNoData(you) ? 'no data yet' : `${labels[youIndex]}, ${formatValue(METRIC, you.value)}`}
+            You: {you.value === null ? 'no data yet' : `${labels[youIndex]}, ${formatValue(METRIC, you.value)}`}
           </Text>
         </Pressable>
       )}

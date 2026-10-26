@@ -1,4 +1,4 @@
-import { lastNDates, localDateKey, startOfLocalDay } from './dates';
+import { lastNDates, localDateKey, readingDateLabel, startOfLocalDay } from './dates';
 
 describe('localDateKey', () => {
   it('uses local fields, not UTC', () => {
@@ -35,5 +35,17 @@ describe('startOfLocalDay', () => {
   it('returns local midnight', () => {
     const d = startOfLocalDay(new Date(2026, 9, 25, 17, 30), 2);
     expect([d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()]).toEqual([2026, 9, 23, 0]);
+  });
+});
+
+describe('readingDateLabel', () => {
+  const now = new Date(2026, 9, 26, 9);
+  it('names today and yesterday by local day', () => {
+    expect(readingDateLabel(new Date(2026, 9, 26, 0, 5), now)).toBe('Today');
+    expect(readingDateLabel(new Date(2026, 9, 25, 23, 59), now)).toBe('Yesterday');
+  });
+  it('dates older readings, with the year when it differs', () => {
+    expect(readingDateLabel(new Date(2026, 9, 19, 7), now)).toBe('Oct 19');
+    expect(readingDateLabel(new Date(2025, 11, 31, 7), now)).toBe('Dec 31, 2025');
   });
 });
