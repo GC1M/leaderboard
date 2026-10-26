@@ -13,7 +13,7 @@ export type SyncResult =
   | { status: 'needs-permission' }
   // Asked, but HealthKit returned nothing: steps may be switched off in Health or simply not recorded. Never shown as denied or synced.
   | { status: 'no-data' }
-  | { status: 'synced'; written: number; at: Date };
+  | { status: 'synced'; written: number; skipped: { date: string; value: number }[]; at: Date };
 
 export async function syncSteps(): Promise<SyncResult> {
   const access = await getHealthAccess('steps');
@@ -22,9 +22,9 @@ export async function syncSteps(): Promise<SyncResult> {
   const health = await readDailySteps(SYNC_DAYS);
   if (health.length === 0) return { status: 'no-data' };
   const existing = await getMyRecentSteps(SYNC_DAYS);
-  const rows = planSync(health, existing);
+  const { rows, skipped } = planSync(health, existing);
   await upsertDailyMetrics(rows);
-  return { status: 'synced', written: rows.length, at: new Date() };
+  return { status: 'synced', written: rows.length, skipped, at: new Date() };
 }
 
 // Syncs when the app returns to the foreground and on demand via `sync()` (pull-to-refresh).
