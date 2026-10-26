@@ -15,7 +15,7 @@ const DENIED = 'Health did not allow saving this. Turn it on in Settings, Health
 // asks Health for write access, and only for this type.
 export function useExportChoice(type: ManualType) {
   const { session } = useAuth();
-  const { allowWrite } = useHealthExport();
+  const { allowWrite, discard } = useHealthExport();
   const key = `health-export-${session?.user.id}-${type}`;
   const [on, setOn] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -29,6 +29,8 @@ export function useExportChoice(type: ManualType) {
     if (next) {
       try { await allowWrite([HEALTH_TYPES[type]]); } catch { /* the access check below reports it */ }
       if (getHealthWriteAccess(HEALTH_TYPES[type]) !== 'granted') return setMessage(DENIED);
+    } else {
+      await discard(MANUAL_KINDS[type]);
     }
     setOn(next);
     try { await secureStorage.setItem(key, next ? '1' : '0'); } catch { /* applies until the screen closes */ }

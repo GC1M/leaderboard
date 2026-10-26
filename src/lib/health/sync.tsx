@@ -104,6 +104,7 @@ export function useHealthExport(){
   return { ...state,
     enqueue:(...args:Parameters<ExportQueue['enqueue']>)=>queue?.enqueue(...args) ?? Promise.resolve(),
     retry:()=>queue?.process() ?? Promise.resolve(),
+    discard:(kind:string)=>queue?.discard(kind) ?? Promise.resolve(),
     allowWrite:async(types:readonly HealthWriteType[])=>{await requestHealthWriteAccess(types);await queue?.process();},
   };
 }
