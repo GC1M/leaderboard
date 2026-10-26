@@ -43,6 +43,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"exercises": {
+                  Row: {
+                    "category": string,"id": string,"name": string,"updated_at": string,"user_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "category": string,"id"?: string,"name": string,"updated_at"?: string,"user_id"?: string | null
+                  }
+                  Update: {
+                    "category"?: string,"id"?: string,"name"?: string,"updated_at"?: string,"user_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "exercises_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"goals": {
                   Row: {
                     "end_date": string | null,"id": string,"metric": string,"start_date": string,"start_value": number,"target_value": number,"user_id": string
@@ -183,6 +203,72 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"workout_exercises": {
+                  Row: {
+                    "exercise_id": string,"id": string,"notes": string | null,"position": number,"workout_id": string,"workout_source": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "exercise_id": string,"id"?: string,"notes"?: string | null,"position": number,"workout_id": string,"workout_source"?: string
+                  }
+                  Update: {
+                    "exercise_id"?: string,"id"?: string,"notes"?: string | null,"position"?: number,"workout_id"?: string,"workout_source"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "workout_exercises_exercise_id_fkey"
+      columns: ["exercise_id"]
+isOneToOne: false
+      referencedRelation: "exercises"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "workout_exercises_workout_id_workout_source_fkey"
+      columns: ["workout_id","workout_source"]
+isOneToOne: false
+      referencedRelation: "workouts"
+      referencedColumns: ["id","source"]
+    }
+                  ]
+                },"workout_sets": {
+                  Row: {
+                    "distance_m": number | null,"duration_s": number | null,"id": string,"load_kg": number | null,"position": number,"reps": number | null,"workout_exercise_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "distance_m"?: number | null,"duration_s"?: number | null,"id"?: string,"load_kg"?: number | null,"position": number,"reps"?: number | null,"workout_exercise_id": string
+                  }
+                  Update: {
+                    "distance_m"?: number | null,"duration_s"?: number | null,"id"?: string,"load_kg"?: number | null,"position"?: number,"reps"?: number | null,"workout_exercise_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "workout_sets_workout_exercise_id_fkey"
+      columns: ["workout_exercise_id"]
+isOneToOne: false
+      referencedRelation: "workout_exercises"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"workouts": {
+                  Row: {
+                    "activity_type": string,"distance_m": number | null,"duration_s": number | null,"ended_at": string,"energy_kcal": number | null,"health_device_id": string | null,"health_uuid": string | null,"id": string,"notes": string | null,"source": string,"started_at": string,"timezone": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "activity_type": string,"distance_m"?: number | null,"duration_s"?: number | null,"ended_at": string,"energy_kcal"?: number | null,"health_device_id"?: string | null,"health_uuid"?: string | null,"id"?: string,"notes"?: string | null,"source": string,"started_at": string,"timezone": string,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "activity_type"?: string,"distance_m"?: number | null,"duration_s"?: number | null,"ended_at"?: string,"energy_kcal"?: number | null,"health_device_id"?: string | null,"health_uuid"?: string | null,"id"?: string,"notes"?: string | null,"source"?: string,"started_at"?: string,"timezone"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "workouts_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -263,6 +349,9 @@ isOneToOne: false
                            },
 "remove_member":
 { Args: { "p_group_id": string,"p_user_id": string }; Returns: undefined
+                           },
+"save_manual_workout":
+{ Args: { "p_id": string,"p_workout": Json }; Returns: string
                            },
 "shares_group_with":
 { Args: { "p_user_id": string }; Returns: boolean
