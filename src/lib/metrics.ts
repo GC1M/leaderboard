@@ -1,10 +1,11 @@
 import { lastNDates } from '@/lib/health/dates';
-import { MAX_STEPS, type StepRow } from '@/lib/health/rules';
+import { MAX_MANUAL_STEPS, type StepRow } from '@/lib/health/rules';
 import { supabase } from '@/lib/supabase';
 
 export type MetricRow = StepRow & { metric?: 'steps' };
 
 const CAP_MESSAGE = "Steps can't be more than 80,000 in a day.";
+const INVALID_MESSAGE = 'Steps must be a whole number of 0 or more.';
 const GENERIC_MESSAGE = "Couldn't save your steps. Check your connection and try again.";
 
 async function currentUserId(): Promise<string> {
@@ -17,7 +18,8 @@ async function currentUserId(): Promise<string> {
 export async function upsertDailyMetrics(rows: MetricRow[]): Promise<void> {
   if (rows.length === 0) return;
   for (const r of rows) {
-    if (!Number.isInteger(r.value) || r.value < 0 || r.value > MAX_STEPS) throw new Error(CAP_MESSAGE);
+    if (!Number.isInteger(r.value) || r.value < 0) throw new Error(INVALID_MESSAGE);
+    if (r.source === 'manual' && r.value > MAX_MANUAL_STEPS) throw new Error(CAP_MESSAGE);
   }
   const user_id = await currentUserId();
   const { error } = await supabase
