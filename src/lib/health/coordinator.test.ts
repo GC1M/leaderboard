@@ -59,3 +59,9 @@ test('a pending metadata write cannot restore consent after disconnect',async()=
  const calls=(deps.save as jest.Mock).mock.calls;
  expect(calls[calls.length-1][0].connected).toBe(false);
 });
+test('retry after a failed sync recovers the metric and clears its error',async()=>{
+ const {c,deps}=setup();await c.initialize();
+ (deps.reconcile as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+ await c.sync();expect(c.getSnapshot().metrics.steps.status).toBe('error');
+ await c.sync();expect(c.getSnapshot().metrics.steps).toMatchObject({status:'synced',error:null});
+});

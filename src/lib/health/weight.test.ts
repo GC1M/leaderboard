@@ -30,3 +30,14 @@ test('no reading stays empty, query failures propagate', async () => {
  queryQuantitySamples.mockRejectedValue(new Error('read failed'));
  await expect(readWeightHistory(7)).rejects.toThrow('read failed');
 });
+test('window read returns kg readings in order and appends an older latest reading', async () => {
+ const now=new Date('2026-10-25T12:00:00Z');
+ const a=sample('a','2026-10-24T08:00:00Z',81), b=sample('b','2026-10-25T08:00:00Z',80.5), future=sample('f','2026-10-26T08:00:00Z',70);
+ const old=sample('old','2020-01-01T12:00:00Z',90);
+ const queryQuantitySamples=jest.fn().mockResolvedValueOnce([b,a,future]).mockResolvedValueOnce([old]).mockResolvedValueOnce([old]);
+ (loadHealthKit as jest.Mock).mockReturnValue({ queryQuantitySamples });
+ expect((await readWeightHistory(7,now)).map((r)=>[r.sampleId,r.kg])).toEqual([['old',90],['a',81],['b',80.5]]);
+});
+test('unsupported units are rejected, not guessed', () => {
+ expect(()=>normalizeWeight([sample('x','2026-10-25T08:00:00Z',12,'st')])).toThrow('Invalid weight');
+});

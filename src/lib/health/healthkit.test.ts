@@ -56,4 +56,15 @@ describe('with HealthKit', () => {
     hk.queryStatisticsCollectionForQuantity.mockRejectedValueOnce(new Error('query failed'));
     await expect(readDailySteps(7)).rejects.toThrow('query failed');
   });
+  it('maps buckets to local days and omits days with no samples instead of reporting zero', async () => {
+    hk.queryStatisticsCollectionForQuantity.mockResolvedValueOnce([
+      { startDate: new Date(2026, 9, 24), sumQuantity: { quantity: 8123 } },
+      { startDate: new Date(2026, 9, 25) },
+      { startDate: new Date(2026, 9, 26), sumQuantity: { quantity: 0 } },
+    ]);
+    expect(await readDailySteps(3, new Date(2026, 9, 26, 12))).toEqual([
+      { date: '2026-10-24', value: 8123 },
+      { date: '2026-10-26', value: 0 },
+    ]);
+  });
 });
