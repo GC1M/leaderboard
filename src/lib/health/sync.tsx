@@ -12,6 +12,7 @@ import { deleteImportedJournal, getHealthDeviceId, healthExportStore, healthJour
 import './manual-export'; // registers the manual weight/sleep/steps writers
 import { assertHealthOwner } from './owner';
 import { deleteHealthImports, uploadHealthChanges } from './upload';
+import './workout-export'; // registers the app-created workout writer
 
 export const SYNC_DAYS = 7; // existing My Steps view; import history is 90 days, not seven
 const HealthContext = createContext<HealthCoordinator | null>(null);
