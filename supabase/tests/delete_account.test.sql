@@ -1,5 +1,5 @@
 begin;
-select plan(10);
+select plan(12);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000d1', 'leaver@x.com'),
@@ -23,6 +23,10 @@ insert into daily_metrics (user_id, date, metric, value, source, window_start, w
 insert into weight_measurements (user_id, measured_at, kg, source) values (auth.uid(), now(), 80, 'healthkit');
 insert into goals (user_id, metric, start_value, target_value, start_date) values (auth.uid(), 'weight_kg', 82, 78, current_date);
 insert into metric_shares (group_id, user_id, metric) values ((select id from kept), auth.uid(), 'weight');
+insert into exercises (user_id, name, category) values (auth.uid(), 'My Lift', 'strength');
+select save_manual_workout(null, jsonb_build_object('activity_type', 'strength', 'started_at', now() - interval '1 hour',
+  'ended_at', now(), 'timezone', 'UTC', 'exercises', jsonb_build_array(jsonb_build_object(
+  'exercise_id', (select id from exercises where name = 'My Lift'), 'sets', jsonb_build_array(jsonb_build_object('reps', 5))))));
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000e1');
 select join_group((select invite_code from gone));
 
@@ -36,6 +40,8 @@ select is((select count(*)::int from daily_metrics where user_id = '00000000-000
 select is((select count(*)::int from weight_measurements where user_id = '00000000-0000-0000-0000-0000000000d1'), 0, 'weight readings are gone');
 select is((select count(*)::int from goals where user_id = '00000000-0000-0000-0000-0000000000d1'), 0, 'goals are gone');
 select is((select count(*)::int from metric_shares where user_id = '00000000-0000-0000-0000-0000000000d1'), 0, 'sharing settings are gone');
+select is((select count(*)::int from workouts where user_id = '00000000-0000-0000-0000-0000000000d1'), 0, 'workouts are gone');
+select is((select count(*)::int from exercises where user_id = '00000000-0000-0000-0000-0000000000d1'), 0, 'custom exercises are gone');
 select is((select count(*)::int from groups where id = (select id from gone)), 0, 'owned group is gone');
 select is((select count(*)::int from group_members where group_id = (select id from kept)), 1, 'membership elsewhere is gone, the other owner stays');
 
