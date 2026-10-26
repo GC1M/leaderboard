@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { Screen, styles } from '@/components/ui';
 import { useTheme } from '@/theme';
 
-// Keep in step with what the app actually stores and shares. Reachable signed in or out.
+// Keep in step with what the app actually stores and shares.
 const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'What Leaderboard reads from Apple Health',
