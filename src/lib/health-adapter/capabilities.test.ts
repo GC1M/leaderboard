@@ -21,13 +21,17 @@ describe.each([IOS_MATRIX, ANDROID_MATRIX])('$platform matrix', (matrix: Platfor
 });
 
 describe('iOS entries match the existing Apple Health behavior', () => {
-  it('reads exactly the metrics the app imports today', () => {
-    const imported = Object.keys(HEALTH_TYPES).sort();
+  // The app imports workouts (src/lib/health/workouts.ts) but the adapter has no readWorkouts yet. Listing the gap here keeps
+  // the check strict: a newly imported metric fails this test until it is wired or added here on purpose.
+  const IMPORTED_BUT_NOT_WIRED = ['workouts'];
+  it('reads exactly the imported metrics the adapter wires', () => {
+    const imported = Object.keys(HEALTH_TYPES).filter((t) => !IMPORTED_BUT_NOT_WIRED.includes(t)).sort();
     const read = HEALTH_DATA_TYPES.filter((t) => IOS_MATRIX.entries[t].implemented.read).sort();
     expect(read).toEqual(imported);
     expect(imported).toEqual(['sleep', 'steps', 'weight']);
+    expect(Object.keys(HEALTH_TYPES).sort()).toEqual([...imported, ...IMPORTED_BUT_NOT_WIRED].sort());
   });
-  it('allows writing every imported metric and ships no writer yet (export infrastructure only)', () => {
+  it('allows writing every imported metric but wires no writer through the adapter (the export queue writes directly)', () => {
     for (const metric of Object.keys(HEALTH_TYPES) as (keyof typeof HEALTH_TYPES)[]) {
       expect(IOS_MATRIX.entries[metric].write).toBe(true);
       expect(IOS_MATRIX.entries[metric].implemented.write).toBe(false);

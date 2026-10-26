@@ -24,10 +24,10 @@ Design for keeping Apple HealthKit code isolated and planning Android (Health Co
 
 | Type | iOS read | iOS write | Android read | Android write |
 | --- | --- | --- | --- | --- |
-| Steps | App: yes | Platform yes (U vs Apple docs); App: no writer yet | Platform yes (`READ_STEPS`); App: no | Platform yes (`WRITE_STEPS`); App: no |
-| Sleep | App: yes | Platform yes (U); App: no writer yet | Platform yes (`READ_SLEEP`, one session record with optional stages); App: no | Platform yes (`WRITE_SLEEP`); App: no |
-| Weight | App: yes | Platform yes (write permission path exercised in `healthkit.test.ts`); App: no writer yet | Platform yes (`READ_WEIGHT`); App: no | Platform yes (`WRITE_WEIGHT`); App: no |
-| Workouts | Platform yes (U); App: not yet (open PR #80) | Platform yes (U); App: not yet (open PR #82 area) | Platform yes (`READ_EXERCISE`, routes need `READ_EXERCISE_ROUTE`); App: no | Platform yes (`WRITE_EXERCISE`, `WRITE_EXERCISE_ROUTE`); App: no |
+| Steps | App: yes | Platform yes (U vs Apple docs); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_STEPS`); App: no | Platform yes (`WRITE_STEPS`); App: no |
+| Sleep | App: yes | Platform yes (U); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_SLEEP`, one session record with optional stages); App: no | Platform yes (`WRITE_SLEEP`); App: no |
+| Weight | App: yes | Platform yes (write permission path exercised in `healthkit.test.ts`); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_WEIGHT`); App: no | Platform yes (`WRITE_WEIGHT`); App: no |
+| Workouts | Platform yes (U); App: imported (#80), not wired through the adapter | Platform yes (U); App: exported (#35), not wired through the adapter | Platform yes (`READ_EXERCISE`, routes need `READ_EXERCISE_ROUTE`); App: no | Platform yes (`WRITE_EXERCISE`, `WRITE_EXERCISE_ROUTE`); App: no |
 | Nutrition | Platform yes (U); App: no | Platform yes (U); App: no | Platform yes (`READ_NUTRITION`); App: no | Platform yes (`WRITE_NUTRITION`); App: no |
 | Water | Platform yes (U); App: no | Platform yes (U); App: no | Platform yes (`READ_HYDRATION`, a separate record type from nutrition); App: no | Platform yes (`WRITE_HYDRATION`); App: no |
 
@@ -83,10 +83,10 @@ Unverified (recorded as such in the matrix or here, not guessed): exact rate-lim
 
 ## Deferred: needs edits to files other open PRs touch
 
-Kept out of this change on purpose (open PRs #80 workout import, #81 manual Health export, #82 manual workout logging touch these):
+Kept out of this change on purpose (workout import #80, manual Health export #81 and workout logging #82 have since merged):
 
 - Routing existing screens and the sync coordinator through `HealthAdapter` instead of importing `src/lib/health/*` directly (`sync.tsx`, `coordinator.ts`, `healthkit.ts`, `changes.ts`, screens under `src/app` and `src/components`). The adapter exists; adoption is a follow-up.
 - Neutral server naming: `daily_metrics.source` and `workouts.source` use `'healthkit'`, and `workouts.health_uuid` / `health_device_id` are Apple-shaped, in `supabase/migrations` and `src/lib/database.types.ts` and the `StepRow` type in `rules.ts`. Android rows need a neutral source value (for example `'health'`) via a migration plus regenerated types.
 - `requestHealthAccess()` in `healthkit.ts` always requests all three read types in one sheet. The iOS wrapper calls the native request directly for per-type read access; once PR #81 settles, `healthkit.ts` could expose a per-metric version and the wrapper should use it.
-- Wiring iOS writes and workout reads through the adapter: the wrapper reports `not-implemented` until `registerExportWriter` writers (#81, #82) and workout import (#80) land, then the iOS matrix `implemented` flags and wrapper methods should be updated together (`ios.test.ts` and `capabilities.test.ts` pin the current state and will fail to remind you).
+- Wiring iOS writes and workout reads through the adapter: the wrapper reports `not-implemented` for writes (the `registerExportWriter` writers from #81 and #35 are called directly) and workout reads (#80 imports through `src/lib/health/workouts.ts`); when they are routed through the adapter the iOS matrix `implemented` flags and wrapper methods should be updated together (`ios.test.ts` and `capabilities.test.ts` pin the current state and will fail to remind you).
 - Wrapping the journal-based change feed (`changes.ts`) as `readChanges`.

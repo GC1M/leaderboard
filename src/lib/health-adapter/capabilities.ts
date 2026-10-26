@@ -36,7 +36,7 @@ export const IOS_MATRIX: PlatformMatrix = {
     steps: ios(true, true, { read: true, write: false }, ['write'], 'Read as statistics per local day so overlapping sources are not double counted. Imports start ~90 days back by app choice.'),
     sleep: ios(true, true, { read: true, write: false }, ['write'], 'Read as asleep intervals and summarized by our own session rule. Imports start ~90 days back by app choice.'),
     weight: ios(true, true, { read: true, write: false }, [], 'Imported without a lower date bound.'),
-    workouts: ios(true, true, { read: false, write: false }, ['read', 'write'], 'Not wired yet.'),
+    workouts: ios(true, true, { read: false, write: false }, ['read', 'write'], 'The app imports and exports workouts through src/lib/health directly; not wired through the adapter yet.'),
     nutrition: ios(true, true, { read: false, write: false }, ['read', 'write'], 'Not wired yet.'),
     water: ios(true, true, { read: false, write: false }, ['read', 'write'], 'Not wired yet.'),
   },
