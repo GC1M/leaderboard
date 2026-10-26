@@ -82,6 +82,20 @@ export async function listWorkouts(limit = 50): Promise<Workout[]> {
   return data as Workout[];
 }
 
+// Everything that started on or after `from`, newest first, for weekly history. Summaries only.
+export async function listWorkoutsSince(from: Date): Promise<Workout[]> {
+  const user_id = await currentUserId();
+  const { data, error } = await supabase
+    .from('workouts')
+    .select('*')
+    .eq('user_id', user_id)
+    .gte('started_at', from.toISOString())
+    .order('started_at', { ascending: false })
+    .limit(1000);
+  if (error) throw new Error(LOAD_MESSAGE);
+  return data as Workout[];
+}
+
 export async function getWorkout(id: string): Promise<WorkoutDetail | null> {
   const { data, error } = await supabase
     .from('workouts')

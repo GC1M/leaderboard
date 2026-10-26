@@ -2,15 +2,16 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 
+import { WeeklyHistory } from '@/components/workouts/WeeklyHistory';
+import { WorkoutRow } from '@/components/workouts/WorkoutRow';
 import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { readingDateLabel } from '@/lib/health/dates';
 import { listDrafts } from '@/lib/workout-draft';
-import { defaultDistanceUnit, workoutSummary } from '@/lib/workout-form';
-import { listWorkouts, type Workout } from '@/lib/workouts';
+import { defaultDistanceUnit } from '@/lib/workout-form';
+import { listWorkouts, listWorkoutsSince, type Workout } from '@/lib/workouts';
 import { useTheme } from '@/theme';
 
-// Newest first, summaries only. Imported Health workouts open read-only.
+// Weekly history, then sessions newest first (summaries only). Each opens a read-only detail; manual ones can be edited there.
 export default function Workouts() {
   const c = useTheme();
   const router = useRouter();
@@ -18,10 +19,12 @@ export default function Workouts() {
   const [rows, setRows] = useState<Workout[] | null>(null);
   const [drafts, setDrafts] = useState<(string | null)[]>([]); // null: unsaved new workout, string: unsaved edit of that id
   const [error, setError] = useState<string | null>(null);
+  const [loads, setLoads] = useState(0); // bumps on every focus so the history refetches too
   const unit = defaultDistanceUnit(Intl.DateTimeFormat().resolvedOptions().locale);
 
   const load = useCallback(() => {
     setError(null);
+    setLoads((n) => n + 1);
     listWorkouts().then(setRows, (e) => setError(e instanceof Error ? e.message : "Couldn't load your workouts."));
     void listDrafts(uid).then(setDrafts);
   }, [uid]);
@@ -34,10 +37,12 @@ export default function Workouts() {
       {drafts.length > 0 && (
         <Section>
           {drafts.map((d, i) => (
-            <Row key={d ?? 'new'} action last={i === drafts.length - 1} label={d === null ? 'Resume unfinished workout' : 'Resume unfinished edit'} onPress={() => router.push(d === null ? '/workouts/new' : `/workouts/${d}`)} />
+            <Row key={d ?? 'new'} action last={i === drafts.length - 1} label={d === null ? 'Resume unfinished workout' : 'Resume unfinished edit'} onPress={() => router.push(d === null ? '/workouts/new' : `/workouts/${d}/edit`)} />
           ))}
         </Section>
       )}
+      <WeeklyHistory fetch={listWorkoutsSince} unit={unit} refresh={loads} />
+      <Text accessibilityRole="header" style={[styles.heading, { color: c.ink }]}>Sessions</Text>
       {error ? (
         <View>
           <ErrorText>{error}</ErrorText>
@@ -50,13 +55,7 @@ export default function Workouts() {
       ) : (
         <Section>
           {rows.map((w, i) => (
-            <Row
-              key={w.id}
-              label={`${w.activity_type}, ${readingDateLabel(new Date(w.started_at))}`}
-              value={workoutSummary(w, unit)}
-              last={i === rows.length - 1}
-              onPress={() => router.push(`/workouts/${w.id}`)}
-            />
+            <WorkoutRow key={w.id} w={w} unit={unit} last={i === rows.length - 1} onPress={() => router.push(`/workouts/${w.id}`)} />
           ))}
         </Section>
       )}

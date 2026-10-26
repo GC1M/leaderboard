@@ -3,6 +3,7 @@ import {
   deleteGroup,
   deleteMemberManualSteps,
   friendlyError,
+  getGroupWorkouts,
   getMyShares,
   inviteLink,
   isValidCode,
@@ -161,4 +162,29 @@ test('setShare inserts my row to share and deletes it to stop', async () => {
   expect(match).toHaveBeenCalledWith({ group_id: 'g', user_id: 'me', metric: 'weight' });
   upsert.mockResolvedValue({ data: null, error: { message: 'permission denied' } });
   await expect(setShare('g', 'sleep', true)).rejects.toThrow(/sign in/);
+});
+
+test('workouts can be shared and unshared like any metric', async () => {
+  getSession.mockResolvedValue({ data: { session: { user: { id: 'me' } } } });
+  const upsert = jest.fn().mockResolvedValue({ data: null, error: null });
+  const match = jest.fn().mockResolvedValue({ data: null, error: null });
+  from.mockReturnValue({ upsert, delete: () => ({ match }) });
+  await setShare('g', 'workouts', true);
+  expect(upsert).toHaveBeenCalledWith({ group_id: 'g', user_id: 'me', metric: 'workouts' }, { ignoreDuplicates: true });
+  await setShare('g', 'workouts', false);
+  expect(match).toHaveBeenCalledWith({ group_id: 'g', user_id: 'me', metric: 'workouts' });
+});
+
+test('getGroupWorkouts asks for whole weeks through tomorrow, and rethrows errors untouched', async () => {
+  jest.useFakeTimers().setSystemTime(new Date(2026, 9, 28, 12)); // Wednesday
+  try {
+    rpc.mockResolvedValue({ data: [{ user_id: 'a', week_start: '2026-10-26', workout_count: 2, total_duration_s: 5400 }], error: null });
+    await expect(getGroupWorkouts('g', 4)).resolves.toHaveLength(1);
+    expect(rpc).toHaveBeenCalledWith('group_workouts', { p_group_id: 'g', p_from: '2026-10-05', p_to: '2026-10-29' });
+    const err = { message: 'not a member of this group' };
+    rpc.mockResolvedValue({ data: null, error: err });
+    await expect(getGroupWorkouts('g')).rejects.toBe(err);
+  } finally {
+    jest.useRealTimers();
+  }
 });

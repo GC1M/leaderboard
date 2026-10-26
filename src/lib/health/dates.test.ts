@@ -1,4 +1,4 @@
-import { formatLocalDateTime, lastNDates, parseLocalDateTime, localDateKey, readingDateLabel, startOfLocalDay } from './dates';
+import { formatLocalDateTime, lastNDates, parseLocalDateTime, localDateKey, readingDateLabel, startOfLocalDay, weekStartKey } from './dates';
 
 describe('localDateKey', () => {
   it('uses local fields, not UTC', () => {
@@ -57,5 +57,19 @@ describe('local date-time text', () => {
     expect(parseLocalDateTime('2026-10-25 07:05')).toEqual(d);
     expect(parseLocalDateTime('2026-02-30 07:05')).toBeNull();
     expect(parseLocalDateTime('tomorrow')).toBeNull();
+  });
+});
+
+describe('weekStartKey', () => {
+  it('is the Monday of the local week, Sunday included', () => {
+    expect(weekStartKey(new Date(2026, 9, 26, 12))).toBe('2026-10-26'); // Monday
+    expect(weekStartKey(new Date(2026, 9, 25, 23, 59))).toBe('2026-10-19'); // Sunday
+    expect(weekStartKey(new Date(2026, 9, 28))).toBe('2026-10-26');
+  });
+  it('steps back whole weeks across month, year and DST changes', () => {
+    expect(weekStartKey(new Date(2026, 9, 26), 1)).toBe('2026-10-19');
+    expect(weekStartKey(new Date(2026, 0, 1), 0)).toBe('2025-12-29');
+    expect(weekStartKey(new Date(2026, 2, 9), 1)).toBe('2026-03-02');
+    expect(weekStartKey(new Date(2026, 10, 2), 1)).toBe('2026-10-26');
   });
 });
