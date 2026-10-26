@@ -10,6 +10,7 @@ import {
   deleteMemberManualSteps,
   getMyShares,
   inviteLink,
+  isNotMember,
   leaveGroup,
   listMembers,
   removeMember,
@@ -56,10 +57,16 @@ export default function GroupInfo() {
       setMembers(m);
       setShares(s);
       setError(null);
-    } catch {
+    } catch (e) {
+      if (isNotMember(e)) {
+        // Removed or left elsewhere: nothing here to show any more.
+        router.dismissAll();
+        router.navigate('/groups');
+        return;
+      }
       setError("Couldn't load this group. Check your connection and try again.");
     }
-  }, [id]);
+  }, [id, router]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount

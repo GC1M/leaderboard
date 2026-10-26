@@ -5,7 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, ErrorText, Skeleton, styles as ui } from '@/components/ui';
 import { LeaderboardRowView } from '@/components/leaderboard/LeaderboardRowView';
+import { MemberSummaries } from '@/components/leaderboard/MemberSummaries';
 import { useAuth } from '@/lib/auth';
+import { buildMemberSummaries, type MemberSummary } from '@/lib/group-summaries';
+import { getGroupShares, getGroupSleep, getGroupWeights, isNotMember, listMembers } from '@/lib/groups';
+import { useWeightUnit } from '@/lib/weight-unit';
 import {
   formatValue,
   getLeaderboard,
@@ -42,8 +46,11 @@ export default function GroupDetail() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [manual, setManual] = useState<Record<string, number>>({});
+  const [summaries, setSummaries] = useState<MemberSummary[] | null>(null);
+  const [unit] = useWeightUnit();
   const [visible, setVisible] = useState<string[] | null>(null);
   const list = useRef<FlatList<LeaderboardRow>>(null);
+  const focused = useRef(false);
   const me = session?.user.id;
 
   const load = useCallback(
@@ -55,16 +62,38 @@ export default function GroupDetail() {
           setRows(r);
           setError(null);
           // Source captions are extra; a failure here shouldn't hide the board.
-          return getManualDays(id, period).then(setManual, () => setManual({}));
+          return Promise.all([
+            getManualDays(id, period).then(setManual, () => setManual({})),
+            // Same for the sleep and weight summaries, except that losing access must leave the screen.
+            Promise.all([listMembers(id), getGroupShares(id), getGroupSleep(id), getGroupWeights(id)]).then(
+              ([m, sh, sl, w]) => setSummaries(buildMemberSummaries(m, sh, sl, w)),
+              (e) => {
+                if (isNotMember(e)) throw e;
+                setSummaries(null);
+              },
+            ),
+          ]);
         })
-        .catch(() => setError("Couldn't load the leaderboard. Pull down to try again.")),
-    [id, period],
+        .catch((e) => {
+          // Removed or left: don't keep showing the group's data.
+          // Only while on screen: from underneath Group Info it would replace that route instead. The next focus redirects.
+          if (isNotMember(e)) {
+            if (focused.current) router.replace('/groups');
+            return;
+          }
+          setError("Couldn't load the leaderboard. Pull down to try again.");
+        }),
+    [id, period, router],
   );
 
   // Also reloads when coming back from group info, which can rename the group or remove members.
   useFocusEffect(
     useCallback(() => {
+      focused.current = true;
       load();
+      return () => {
+        focused.current = false;
+      };
     }, [load]),
   );
 
@@ -145,11 +174,14 @@ export default function GroupDetail() {
           ListHeaderComponent={error ? <ErrorText>{error}</ErrorText> : undefined}
           ListEmptyComponent={<Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>No members yet.</Text>}
           ListFooterComponent={
-            rows.length > 0 && ranked === 0 ? (
-              <Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>
-                No steps recorded {period === 'day' ? 'today' : 'this week'} yet.
-              </Text>
-            ) : undefined
+            <>
+              {rows.length > 0 && ranked === 0 ? (
+                <Text style={[ui.body, styles.empty, { color: c.inkSoft }]}>
+                  No steps recorded {period === 'day' ? 'today' : 'this week'} yet.
+                </Text>
+              ) : null}
+              {summaries && <MemberSummaries items={summaries} me={me} unit={unit} />}
+            </>
           }
           renderItem={({ item, index }) => (
             <LeaderboardRowView

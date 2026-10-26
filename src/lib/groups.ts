@@ -1,3 +1,4 @@
+import { lastNDates, localDateKey, startOfLocalDay } from './health/dates';
 import { supabase } from './supabase';
 
 // Mirrors gen_invite_code(): no I, O, 0, 1.
@@ -141,4 +142,35 @@ export async function setShare(groupId: string, metric: SharedMetric, on: boolea
       ? supabase.from('metric_shares').upsert(row, { ignoreDuplicates: true })
       : supabase.from('metric_shares').delete().match(row),
   );
+}
+
+/** Who shares what with this group (members can read this to tell "not shared" from "no data"). */
+export async function getGroupShares(groupId: string): Promise<Record<string, SharedMetric[]>> {
+  const rows = await friendly(supabase.from('metric_shares').select('user_id, metric').eq('group_id', groupId));
+  const out: Record<string, SharedMetric[]> = {};
+  for (const r of rows) (out[r.user_id] ??= []).push(r.metric as SharedMetric);
+  return out;
+}
+
+// Raw rows: the server only returns members who share. A "not a member" error is left as is for isNotMember.
+export async function getGroupSleep(groupId: string, days = 7) {
+  // Through tomorrow: a member in a timezone ahead of yours can already have tonight's sleep dated tomorrow.
+  const now = new Date();
+  const { data, error } = await supabase.rpc('group_sleep', {
+    p_group_id: groupId, p_from: lastNDates(days, now)[0], p_to: localDateKey(startOfLocalDay(now, -1)),
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function getGroupWeights(groupId: string) {
+  const { data, error } = await supabase.rpc('group_latest_weight', { p_group_id: groupId });
+  if (error) throw error;
+  return data;
+}
+
+/** True when the caller isn't (or is no longer) in the group, so the screen should be left. */
+export function isNotMember(e: unknown): boolean {
+  const o = (typeof e === 'object' && e ? e : {}) as { message?: unknown; code?: unknown };
+  return String(o.message ?? '').includes('not a member of this group') || o.code === 'PGRST116';
 }
