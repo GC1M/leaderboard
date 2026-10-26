@@ -10,9 +10,6 @@
 -- Sync metadata: `updated_at` is when the server last received the value, never the measurement time.
 
 alter table public.daily_metrics
-  drop constraint daily_metrics_metric_check,
-  add constraint daily_metrics_metric_check
-    check (metric in ('steps', 'sleep_min', 'workout_minutes', 'screen_min')),
   add column window_start timestamptz,
   add column window_end timestamptz,
   add constraint daily_metrics_window_check
@@ -60,6 +57,12 @@ from public.daily_metrics dm
 join public.profiles p on p.id = dm.user_id
 where dm.metric = 'weight_kg' and dm.value > 0;
 delete from public.daily_metrics where metric = 'weight_kg';
+
+-- Only after the move: adding the check validates existing rows, and weight_kg rows would fail it.
+alter table public.daily_metrics
+  drop constraint daily_metrics_metric_check,
+  add constraint daily_metrics_metric_check
+    check (metric in ('steps', 'sleep_min', 'workout_minutes', 'screen_min'));
 
 -- Same as before except weight progress reads weight_measurements, dated in the member's timezone.
 create or replace function public.group_leaderboard(p_group_id uuid, p_metric text, p_period text)

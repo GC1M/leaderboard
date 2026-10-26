@@ -44,7 +44,7 @@ const config: ExpoConfig = {
       '@kingstinct/react-native-healthkit',
       {
         NSHealthShareUsageDescription:
-          'Leaderboard reads your daily step count from Apple Health so your friends see a score they can trust. Only daily totals are uploaded, never your location or workouts.',
+          'Leaderboard reads the steps, sleep, and weight you allow from Apple Health. It uploads daily step totals to your account so your groups can rank them. Never your location or workouts.',
         NSHealthUpdateUsageDescription: false,
         background: false,
       },

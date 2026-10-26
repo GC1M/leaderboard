@@ -3,7 +3,7 @@ import { AppState } from 'react-native';
 
 import { getMyRecentSteps, upsertDailyMetrics } from '@/lib/metrics';
 
-import { isHealthAvailable, needsStepsPermission, readDailySteps } from './healthkit';
+import { getHealthAccess, readDailySteps } from './healthkit';
 import { planSync } from './rules';
 
 export const SYNC_DAYS = 7;
@@ -11,15 +11,20 @@ export const SYNC_DAYS = 7;
 export type SyncResult =
   | { status: 'unavailable' }
   | { status: 'needs-permission' }
-  | { status: 'synced'; written: number; at: Date };
+  // Asked, but HealthKit returned nothing: steps may be switched off in Health or simply not recorded. Never shown as denied or synced.
+  | { status: 'no-data' }
+  | { status: 'synced'; written: number; skipped: { date: string; value: number }[]; at: Date };
 
 export async function syncSteps(): Promise<SyncResult> {
-  if (!isHealthAvailable()) return { status: 'unavailable' };
-  if (await needsStepsPermission()) return { status: 'needs-permission' };
-  const [health, existing] = await Promise.all([readDailySteps(SYNC_DAYS), getMyRecentSteps(SYNC_DAYS)]);
-  const rows = planSync(health, existing);
+  const access = await getHealthAccess('steps');
+  if (access === 'unavailable') return { status: 'unavailable' };
+  if (access === 'not-asked') return { status: 'needs-permission' };
+  const health = await readDailySteps(SYNC_DAYS);
+  if (health.length === 0) return { status: 'no-data' };
+  const existing = await getMyRecentSteps(SYNC_DAYS);
+  const { rows, skipped } = planSync(health, existing);
   await upsertDailyMetrics(rows);
-  return { status: 'synced', written: rows.length, at: new Date() };
+  return { status: 'synced', written: rows.length, skipped, at: new Date() };
 }
 
 // Syncs when the app returns to the foreground and on demand via `sync()` (pull-to-refresh).
@@ -41,7 +46,7 @@ export function useStepSync(onSynced?: () => void) {
       const r = await syncSteps();
       setResult(r);
       setError(null);
-      if (r.status === 'synced') cb.current?.();
+      if (r.status === 'synced' || r.status === 'no-data') cb.current?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't sync your steps.");
     } finally {
