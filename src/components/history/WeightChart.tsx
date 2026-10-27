@@ -27,9 +27,10 @@ export function WeightChart({ readings, days, to, unit }: {
   return (
     <View accessible accessibilityRole="image" accessibilityLabel={summary} style={{ gap: 8 }}>
       <View style={styles.plot}>
-        <View style={styles.scale}>
+        {/* One distinct value sits mid-plot, so it gets one centered label instead of the same label at both ends. */}
+        <View style={[styles.scale, max === min && { justifyContent: 'center' }]}>
           <Text style={[ui.caption, { color: c.inkSoft }]}>{points.length ? formatWeight(max, unit) : ''}</Text>
-          <Text style={[ui.caption, { color: c.inkSoft }]}>{points.length ? formatWeight(min, unit) : ''}</Text>
+          {max !== min && <Text style={[ui.caption, { color: c.inkSoft }]}>{points.length ? formatWeight(min, unit) : ''}</Text>}
         </View>
         <View style={[styles.area, { borderColor: c.line }]}>
           {points.map((p, i) => (

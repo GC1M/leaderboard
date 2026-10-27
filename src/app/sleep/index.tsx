@@ -4,6 +4,7 @@ import { Text, View } from 'react-native';
 import { BarHistory } from '@/components/history/BarHistory';
 import { ExportOption, useExportChoice } from '@/components/health/ExportOption';
 import { Button, Field, Screen, styles, useLargeText } from '@/components/ui';
+import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { formatLocalDateTime, parseLocalDateTime } from '@/lib/health/dates';
 import { formatSleep } from '@/lib/health/format';
@@ -82,6 +83,9 @@ export default function Sleep() {
     }
   };
 
+  const confirmRemove = (date: string) =>
+    alert('Delete this sleep entry?', "It's removed for good.", [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => void remove(date) }]);
+
   // At accessibility sizes "YYYY-MM-DD HH:mm" is wider than the screen, so let it wrap onto two lines; Return still submits, never adds a newline.
   const dateTimeWrap = large ? { multiline: true, submitBehavior: 'blurAndSubmit' as const } : {};
 
@@ -99,9 +103,9 @@ export default function Sleep() {
         {manual.map((d) => (
           <View key={d.date} style={{ gap: 4 }}>
             <Text style={[styles.body, { color: c.ink }]}>{`${d.date}: ${formatSleep(d.value)}`}</Text>
-            <View style={{ flexDirection: 'row' }}>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
               <Button plain label="Edit" onPress={() => { setEditing(d.date); setTimes({ bed: formatLocalDateTime(new Date(d.windowStart)), wake: formatLocalDateTime(new Date(d.windowEnd)) }); setError(null); }} />
-              <Button plain danger label="Delete" onPress={() => void remove(d.date)} />
+              <Button plain danger label="Delete" onPress={() => confirmRemove(d.date)} />
             </View>
           </View>
         ))}
