@@ -27,13 +27,17 @@ export default function JoinGroup() {
       <Field
         label="Invite code"
         code
+        maxLength={8}
         autoFocus
         autoCapitalize="characters"
         autoCorrect={false}
         returnKeyType="done"
         value={code}
         // Limit after normalizing so a pasted "K74M-Q29X" still fits.
-        onChangeText={(t) => setCode(normalizeCode(t).slice(0, 8))}
+        onChangeText={(t) => {
+          setCode(normalizeCode(t).slice(0, 8));
+          setError(null);
+        }}
         onSubmitEditing={submit}
         placeholder="K74MQ29X"
         helper="8 characters, no I, O, 0 or 1. Paste works too. Joining shares your steps with the group; sleep and weight stay private unless you turn them on in Group Info."
