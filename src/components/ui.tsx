@@ -53,7 +53,8 @@ export function Screen({
         </Pressable>
       )}
       {/* Number pads have no return key, so dragging the list dismisses the keyboard. "automatic" lets iOS
-          inset the content for the native tab bar (React Native defaults to "never"). */}
+          inset the content for the native tab bar (React Native defaults to "never"). The content must not
+          flexGrow to fill the frame, or that inset makes even short screens scroll. */}
       <ScrollView
         contentContainerStyle={[styles.content, Platform.OS === 'web' && styles.webWidth]}
         contentInsetAdjustmentBehavior="automatic"
@@ -293,7 +294,7 @@ export function ErrorText({ children }: { children?: string | null }) {
 export const styles = StyleSheet.create({
   back: { minHeight: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingHorizontal: 12 },
   webWidth: { width: '100%', maxWidth: 640, alignSelf: 'center' },
-  content: { flexGrow: 1, padding: 16, gap: 16 },
+  content: { padding: 16, gap: 16 },
   // Apple's text styles: large title, title 3, body, headline, footnote.
   title: { fontSize: 34, lineHeight: 41, fontWeight: '700' },
   heading: { fontSize: 20, lineHeight: 25, fontWeight: '600' },

@@ -1,5 +1,6 @@
 import { act } from 'react';
 import { createRoot } from 'test-renderer';
+import { StyleSheet } from 'react-native';
 
 const mockOtp = jest.fn();
 const mockVerify = jest.fn();
@@ -134,4 +135,6 @@ test('the shared Screen scroll view dismisses number pads on drag and clears the
   expect(scroll.props.keyboardDismissMode).toBe('interactive');
   expect(scroll.props.contentInsetAdjustmentBehavior).toBe('automatic');
   expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+  // A content container stretched to the frame plus the automatic inset would make short screens scroll.
+  expect(StyleSheet.flatten(scroll.props.contentContainerStyle).flexGrow).toBeUndefined();
 });
