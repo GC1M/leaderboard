@@ -177,5 +177,5 @@ export default function SignIn() {
 const local = StyleSheet.create({
   providers: { gap: 12, marginTop: 8 },
   apple: { height: 48 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 16 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16 },
 });

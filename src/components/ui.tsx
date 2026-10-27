@@ -57,7 +57,8 @@ export function Screen({
         keyboardShouldPersistTaps="handled"
         refreshControl={refreshControl}
       >
-        <Text accessibilityRole="header" style={[styles.title, { color: c.ink }]}>
+        {/* Capped so one long word like "Leaderboard" still fits a line at the largest text sizes instead of breaking mid-word. */}
+        <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.title, { color: c.ink }]}>
           {title}
         </Text>
         {children}
@@ -171,7 +172,7 @@ export function Field({
                     },
                   ]}
                 >
-                  <Text style={[styles.code, { color: c.ink, letterSpacing: 0 }]}>{value[i] ?? ''}</Text>
+                  <Text maxFontSizeMultiplier={1.5} style={[styles.code, { color: c.ink, letterSpacing: 0 }]}>{value[i] ?? ''}</Text>
                 </View>
               );
             })}
@@ -307,5 +308,6 @@ export const styles = StyleSheet.create({
   code: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: 4, fontVariant: ['tabular-nums'] },
   codeRow: { flexDirection: 'row', gap: 8 },
   codeBox: { flex: 1, maxWidth: 56, aspectRatio: 0.85, alignItems: 'center', justifyContent: 'center' },
-  codeInput: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0 },
+  // Transparent colors, not opacity 0: iOS drops near-invisible views from VoiceOver and hit testing.
+  codeInput: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, color: 'transparent', backgroundColor: 'transparent', borderColor: 'transparent' },
 });
