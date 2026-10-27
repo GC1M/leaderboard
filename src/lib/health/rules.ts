@@ -1,4 +1,4 @@
-import { kgFromDisplay } from './weight';
+import { displayWeight, kgFromDisplay } from './weight';
 
 // Manual entry only. Health totals are measurements and are never capped.
 export const MAX_MANUAL_STEPS = 80000;
@@ -32,12 +32,14 @@ export function planSync(health: { date: string; value: number }[], existing: St
   return plan;
 }
 
-// Manual weight: a positive number in the display unit. The DB accepts kg above 0 and below 1000.
+// Manual weight: a positive number in the display unit, at most 450 kg (992 lb). The DB accepts kg above 0 and below 1000.
+export const MAX_MANUAL_KG = 450;
 export type WeightValidation = { ok: true; kg: number } | { ok: false; message: string };
 export function validateWeight(input: string, unit: 'kg' | 'lb'): WeightValidation {
   const value = Number(input.trim().replace(',', '.'));
   const kg = Math.round(kgFromDisplay(value, unit) * 1000) / 1000;
-  if (!/^\d+([.,]\d+)?$/.test(input.trim()) || !(kg > 0 && kg < 1000)) return { ok: false, message: `Enter your weight in ${unit}.` };
+  if (!/^\d+([.,]\d+)?$/.test(input.trim()) || !(kg > 0)) return { ok: false, message: `Enter your weight in ${unit}.` };
+  if (kg > MAX_MANUAL_KG) return { ok: false, message: `Weight can't be more than ${Math.floor(displayWeight(MAX_MANUAL_KG, unit))} ${unit}.` };
   return { ok: true, kg };
 }
 
