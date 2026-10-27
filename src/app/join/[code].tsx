@@ -1,11 +1,11 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Text } from 'react-native';
 
 import { Button, ErrorText, Screen, styles } from '@/components/ui';
 import { useTheme } from '@/theme';
 import { useAuth } from '@/lib/auth';
-import { isValidCode, joinGroup, normalizeCode } from '@/lib/groups';
+import { isValidCode, joinGroup, normalizeCode, pendingInvite } from '@/lib/groups';
 
 // Deep link landing for leaderboard://join/<CODE>. Never auto-joins.
 // The group name isn't readable before joining (RLS), so we confirm with the code only.
@@ -17,6 +17,9 @@ export default function JoinByLink() {
   const code = normalizeCode(String(params.code ?? ''));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!loading && !session && isValidCode(code)) pendingInvite.code = code;
+  }, [loading, session, code]);
 
   const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
