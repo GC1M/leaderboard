@@ -9,10 +9,10 @@ function load(os: string) {
 
 beforeEach(() => {
   mockAlert.mockClear();
-  (globalThis as { window?: unknown }).window = { confirm: jest.fn(), alert: jest.fn() };
+  (globalThis as { window?: unknown }).window = { confirm: jest.fn(), alert: jest.fn(), prompt: jest.fn() };
 });
 
-const win = () => (globalThis as unknown as { window: { confirm: jest.Mock; alert: jest.Mock } }).window;
+const win = () => (globalThis as unknown as { window: { confirm: jest.Mock; alert: jest.Mock; prompt: jest.Mock } }).window;
 
 test('native uses the system alert', () => {
   const buttons = [{ text: 'OK' }];
@@ -36,11 +36,20 @@ test('web runs nothing when declined', () => {
   expect(go).not.toHaveBeenCalled();
 });
 
-test('web offers several actions in turn and runs the first accepted', () => {
+test('web lists several actions and runs the chosen one', () => {
   const a = jest.fn(), b = jest.fn();
-  win().confirm.mockReturnValueOnce(false).mockReturnValueOnce(true);
+  win().prompt.mockReturnValue(' 2 ');
   load('web')('Bob', undefined, [{ text: 'Delete Steps', onPress: a }, { text: 'Remove', onPress: b }, { text: 'Cancel', style: 'cancel' }]);
-  expect(win().confirm).toHaveBeenLastCalledWith('Bob\n\nRemove?');
+  expect(win().prompt).toHaveBeenCalledWith('Bob\n\nEnter a number:\n1. Delete Steps\n2. Remove');
   expect(a).not.toHaveBeenCalled();
   expect(b).toHaveBeenCalled();
+});
+
+test('web runs nothing when the list is dismissed or the number is invalid', () => {
+  const a = jest.fn();
+  for (const answer of [null, '', '0', '3', 'x']) {
+    win().prompt.mockReturnValue(answer);
+    load('web')('Bob', undefined, [{ text: 'A', onPress: a }, { text: 'B', onPress: a }]);
+  }
+  expect(a).not.toHaveBeenCalled();
 });
