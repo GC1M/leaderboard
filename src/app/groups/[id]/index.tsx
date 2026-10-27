@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, ErrorText, Skeleton, styles as ui } from '@/components/ui';
@@ -8,7 +8,7 @@ import { LeaderboardRowView } from '@/components/leaderboard/LeaderboardRowView'
 import { MemberSummaries } from '@/components/leaderboard/MemberSummaries';
 import { useAuth } from '@/lib/auth';
 import { buildMemberSummaries, type MemberSummary } from '@/lib/group-summaries';
-import { getGroupShares, getGroupSleep, getGroupWeights, getGroupWorkouts, isNotMember, listMembers } from '@/lib/groups';
+import { getGroupShares, getGroupSleep, getGroupWeights, getGroupWorkouts, isNotMember, isValidGroupId, listMembers } from '@/lib/groups';
 import { useWeightUnit } from '@/lib/weight-unit';
 import {
   formatValue,
@@ -55,9 +55,13 @@ export default function GroupDetail() {
 
   const load = useCallback(
     () =>
-      Promise.all([supabase.from('groups').select('name').eq('id', id).single(), getLeaderboard(id, METRIC, period)])
+      Promise.resolve().then(() => {
+        if (!isValidGroupId(id)) throw new Error('not a member of this group');
+        return Promise.all([supabase.from('groups').select('name').eq('id', id).maybeSingle(), getLeaderboard(id, METRIC, period)]);
+      })
         .then(([g, r]) => {
           if (g.error) throw g.error;
+          if (!g.data) throw new Error('not a member of this group');
           setGroup(g.data);
           setRows(r);
           setError(null);
@@ -78,7 +82,12 @@ export default function GroupDetail() {
           // Removed or left: don't keep showing the group's data.
           // Only while on screen: from underneath Group Info it would replace that route instead. The next focus redirects.
           if (isNotMember(e)) {
-            if (focused.current) router.replace('/groups');
+            if (focused.current) {
+              setGroup(null);
+              setRows(null);
+              setSummaries(null);
+              router.replace({ pathname: '/groups', params: { notice: 'unavailable' } });
+            }
             return;
           }
           setError("Couldn't load the leaderboard. Pull down to try again.");
@@ -116,7 +125,7 @@ export default function GroupDetail() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>
+    <View style={[{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }, Platform.OS === 'web' && ui.webWidth]}>
       <View style={styles.header}>
         <Button plain label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
         <Button plain label="Group Info" onPress={() => router.push(`/groups/${id}/info`)} />

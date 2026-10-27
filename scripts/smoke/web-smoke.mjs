@@ -71,6 +71,42 @@ try {
     });
   }
 
+  // Deterministic UI regression: real router/auth client, synthetic auth responses, no real account or email.
+  await visit(browser, base, 'invite survives sign-in and unavailable groups explain why', async (page) => {
+    const user = { id: '12345678-1234-1234-1234-123456789abc', aud: 'authenticated', role: 'authenticated', email: 'invite@example.com', user_metadata: {}, app_metadata: {}, created_at: new Date().toISOString() };
+    await page.route(/\/auth\/v1\//, (route) => {
+      const path = new URL(route.request().url()).pathname;
+      const body = path.endsWith('/verify') ? { access_token: 'ui-test-access-token', refresh_token: 'ui-test-refresh-token', token_type: 'bearer', expires_in: 3600, user } : path.endsWith('/user') ? user : {};
+      return route.fulfill({ json: body });
+    });
+    await page.route(/\/rest\/v1\//, (route) => route.fulfill({ json: [] }));
+  }, async (page) => {
+    let joins = 0;
+    page.on('request', (req) => { if (req.url().includes('/rpc/join_group')) joins++; });
+    await page.goto(`${base}/join/ABCD2345`);
+    await page.getByPlaceholder('you@example.com').fill('invite@example.com');
+    await page.getByText('Send Me a Code', { exact: true }).click();
+    await page.getByLabel('6-digit code', { exact: true }).fill('123456');
+    await page.getByText('Join with code ABCD 2345?', { exact: true }).waitFor();
+    if (joins) throw new Error('Invite joined without confirmation');
+    await page.getByText('Not Now', { exact: true }).click();
+    await page.getByRole('tab', { name: 'Summary', exact: true }).waitFor();
+    // Also exercises an invalid UUID without a backend 400 and a useful, dismissible notice.
+    await page.goto(`${base}/groups/not-a-uuid`);
+    await page.getByText('This group is unavailable.', { exact: false }).waitFor();
+    await page.getByText('Dismiss Notice', { exact: true }).click();
+    await page.getByText('This group is unavailable.', { exact: false }).waitFor({ state: 'hidden' });
+    await page.getByRole('tab', { name: 'Profile', exact: true }).click();
+    await page.getByText('Sign Out', { exact: true }).click();
+    await page.getByText('Sign out?', { exact: true }).waitFor();
+    await page.getByText('Cancel', { exact: true }).click();
+    await page.getByRole('tab', { name: 'Profile', exact: true }).waitFor();
+    await page.goto(`${base}/this-page-does-not-exist`);
+    await page.getByText('Page Not Found', { exact: true }).waitFor();
+    await page.getByText('Go Home', { exact: true }).click();
+    await page.getByRole('tab', { name: 'Summary', exact: true }).waitFor();
+  });
+
   // Backend unreachable: requests to Supabase fail at the network level.
   await visit(browser, base, 'failed network calls do not blank the app', (page) => page.route(/\/(auth|rest)\/v1\//, (route) => route.abort('connectionrefused')), async (page) => {
     await page.getByPlaceholder('you@example.com').fill('offline@example.com');

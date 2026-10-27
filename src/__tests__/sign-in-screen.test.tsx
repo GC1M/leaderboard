@@ -116,3 +116,14 @@ test('code step: one box per digit, verifies on the 6th, strips spaces from a pa
     jest.useRealTimers();
   }
 });
+
+
+test('explains disabled send and rejects incomplete email addresses', async () => {
+  const { text, type } = await setup();
+  expect(text()).toContain('Enter your email address to receive a sign-in code.');
+  await type('friend@');
+  expect(text()).toContain('Enter a valid email address, such as you@example.com.');
+  expect(mockOtp).not.toHaveBeenCalled();
+  await type('friend@example.com');
+  expect(text()).not.toContain('Enter a valid email address');
+});
