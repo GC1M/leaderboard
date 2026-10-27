@@ -22,7 +22,9 @@ export type ImportPreview = {
   unitsInFile: boolean;
 };
 
-export const UNKNOWN_FILE = `This file isn't a workout export Leaderboard can read. Export a CSV from ${FORMATS.map((f) => f.label).join(', ')} and try again.`;
+const labels = FORMATS.map((f) => f.label);
+export const APP_NAMES = `${labels.slice(0, -1).join(', ')} or ${labels[labels.length - 1]}`;
+export const UNKNOWN_FILE = `This file isn't a workout export Leaderboard can read. Export a CSV from ${APP_NAMES} and try again.`;
 
 // Throws with a message for the screen when the file isn't a known export or holds no usable workouts.
 export function previewImport(text: string, units: Units): ImportPreview {

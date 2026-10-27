@@ -9,7 +9,7 @@ import { Button, ErrorText, Row, Screen, Section, styles } from '@/components/ui
 import type { WeightUnit } from '@/lib/health/format';
 import { useWeightUnit } from '@/lib/weight-unit';
 import { defaultDistanceUnit, type DistanceUnit } from '@/lib/workout-form';
-import { FORMATS, importWorkouts, newExercises, previewImport } from '@/lib/workout-import';
+import { APP_NAMES, importWorkouts, newExercises, previewImport } from '@/lib/workout-import';
 import { listExercises } from '@/lib/workouts';
 import { useTheme } from '@/theme';
 
@@ -35,8 +35,13 @@ export default function ImportWorkouts() {
   useEffect(() => {
     listExercises().then((es) => setKnown(es.map((e) => e.name)), () => {});
   }, []);
+  // A file shared while this screen is already open replaces whatever it showed, including a finished import.
   useEffect(() => {
-    if (file) new File(file).text().then(setText, () => setError(READ_ERROR));
+    if (!file) return;
+    new File(file).text().then(
+      (t) => { setDone(null); setError(null); setText(t); },
+      () => { setDone(null); setText(null); setError(READ_ERROR); },
+    );
   }, [file]);
 
   const units = { weight: weight ?? appWeight, distance };
@@ -83,7 +88,7 @@ export default function ImportWorkouts() {
     return (
       <Screen title="Import Workouts" back>
         <Text accessibilityLiveRegion="polite" style={[styles.body, { color: c.ink }]}>
-          {done.added === 1 ? 'Imported 1 workout.' : `Imported ${done.added} workouts.`}
+          {done.added === 0 ? 'No new workouts in this file.' : done.added === 1 ? 'Imported 1 workout.' : `Imported ${done.added} workouts.`}
           {done.existing ? ` ${done.existing} ${done.existing === 1 ? 'was' : 'were'} already here and stayed as they are.` : ''}
         </Text>
         <Button label="Done" onPress={() => router.replace('/workouts')} />
@@ -95,7 +100,7 @@ export default function ImportWorkouts() {
     <Screen title="Import Workouts" back>
       {!preview && (
         <Text style={[styles.body, { color: c.inkSoft }]}>
-          Bring in your history from {FORMATS.map((f) => f.label).join(', ')}. Export a CSV in that app, then share it to Leaderboard or choose it here.
+          Bring in your history from {APP_NAMES}. Export a CSV in that app, then share it to Leaderboard or choose it here.
           You&apos;ll see what&apos;s in it before anything is saved.
         </Text>
       )}
