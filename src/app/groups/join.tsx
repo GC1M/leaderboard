@@ -26,8 +26,7 @@ export default function JoinGroup() {
     <Screen title="Join a Group" back>
       <Field
         label="Invite code"
-        code
-        maxLength={8}
+        code={8}
         autoFocus
         autoCapitalize="characters"
         autoCorrect={false}

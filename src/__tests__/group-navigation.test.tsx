@@ -110,6 +110,7 @@ test('join shows all 8 invite code characters and clears a stale error on edit',
   const input = () => c.queryAll((n: any) => n.props.onChangeText)[0];
   await act(async () => input().props.onChangeText('ABCD2346'));
   expect(JSON.stringify(c)).toContain('"6"'); // 8th box
+  expect(input().props.maxLength).toBeUndefined(); // a native maxLength would cut a pasted "ABCD-2346" before normalizing
   await act(async () => input().props.onSubmitEditing());
   expect(JSON.stringify(c)).toContain("That code doesn't match a group");
   await act(async () => input().props.onChangeText('ABCD234'));
