@@ -2,8 +2,9 @@ import { act } from 'react';
 import { createRoot } from 'test-renderer';
 
 const mockOtp = jest.fn();
+const mockVerify = jest.fn();
 jest.mock('@/lib/supabase', () => ({
-  supabase: { auth: { signInWithOtp: (...a: unknown[]) => mockOtp(...a) } },
+  supabase: { auth: { signInWithOtp: (...a: unknown[]) => mockOtp(...a), verifyOtp: (...a: unknown[]) => mockVerify(...a) } },
 }));
 jest.mock('expo-apple-authentication', () => {
   const { Text } = jest.requireActual('react-native');
@@ -49,6 +50,7 @@ jest.setTimeout(30000); // first render cold-loads react-native, slow on CI
 
 beforeEach(() => {
   mockOtp.mockReset().mockResolvedValue({ error: null });
+  mockVerify.mockReset().mockResolvedValue({ error: null });
 });
 
 test('renders without the Google module, keeps Apple and email', async () => {
@@ -94,4 +96,23 @@ test('rate limits get their own message', async () => {
   await type('a@b.co');
   await press('Send Me a Code');
   expect(text()).toContain('Too many tries. Wait a minute, then request a new code.');
+});
+
+test('code step: one box per digit, verifies on the 6th, strips spaces from a pasted code', async () => {
+  jest.useFakeTimers(); // the 30s resend cooldown would outlive the test
+  try {
+    const { text, type, press } = await setup();
+    await type('a@b.co');
+    await press('Send Me a Code');
+    await type('12');
+    expect(text()).toContain('"1"');
+    expect(text()).toContain('"2"');
+    expect(mockVerify).not.toHaveBeenCalled();
+    await type('1');
+    expect(text()).not.toContain('"2"');
+    await type('123 456\n');
+    expect(mockVerify).toHaveBeenCalledWith({ email: 'a@b.co', token: '123456', type: 'email' });
+  } finally {
+    jest.useRealTimers();
+  }
 });
