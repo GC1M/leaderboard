@@ -52,8 +52,12 @@ export function Screen({
           <Text style={[styles.body, { color: c.accent }]}>Back</Text>
         </Pressable>
       )}
+      {/* Number pads have no return key, so dragging the list dismisses the keyboard. "automatic" lets iOS
+          inset the content for the native tab bar (React Native defaults to "never"). */}
       <ScrollView
         contentContainerStyle={[styles.content, Platform.OS === 'web' && styles.webWidth]}
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         keyboardShouldPersistTaps="handled"
         refreshControl={refreshControl}
       >
