@@ -79,7 +79,9 @@ try {
       const body = path.endsWith('/verify') ? { access_token: 'ui-test-access-token', refresh_token: 'ui-test-refresh-token', token_type: 'bearer', expires_in: 3600, user } : path.endsWith('/user') ? user : {};
       return route.fulfill({ json: body });
     });
-    await page.route(/\/rest\/v1\//, (route) => route.fulfill({ json: [] }));
+    await page.route(/\/rest\/v1\//, (route) => route.fulfill({
+      json: new URL(route.request().url()).pathname.endsWith('/profiles') ? { display_name: 'Test Player', timezone: 'UTC' } : [],
+    }));
   }, async (page) => {
     let joins = 0;
     page.on('request', (req) => { if (req.url().includes('/rpc/join_group')) joins++; });
