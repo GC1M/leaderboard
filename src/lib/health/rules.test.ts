@@ -57,6 +57,10 @@ describe('validateWeight and validateSleep', () => {
     expect(validateWeight('165', 'lb')).toEqual({ ok: true, kg: 74.843 });
     expect(validateWeight('72,5', 'kg')).toEqual({ ok: true, kg: 72.5 });
     for (const bad of ['', '0', 'abc', '1000', '-3']) expect(validateWeight(bad, 'kg').ok).toBe(false);
+    expect(validateWeight('450', 'kg')).toEqual({ ok: true, kg: 450 });
+    expect(validateWeight('992', 'lb').ok).toBe(true);
+    expect(validateWeight('451', 'kg')).toEqual({ ok: false, message: "Weight can't be more than 450 kg." });
+    expect(validateWeight('2000', 'lb')).toEqual({ ok: false, message: "Weight can't be more than 992 lb." });
   });
   it('needs a past interval of at most 24 hours', () => {
     const end = new Date(Date.now() - 3600_000);

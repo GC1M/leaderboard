@@ -13,6 +13,7 @@ import {
   Text,
   TextInput,
   type TextInputProps,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,14 +47,19 @@ export function Screen({
           accessibilityRole="button"
           accessibilityLabel="Back"
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          style={styles.back}
+          style={[styles.back, Platform.OS === 'web' && styles.webWidth]}
         >
           <Icon name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} color={c.accent} size={20} />
           <Text style={[styles.body, { color: c.accent }]}>Back</Text>
         </Pressable>
       )}
+      {/* Number pads have no return key, so dragging the list dismisses the keyboard. "automatic" lets iOS
+          inset the content for the native tab bar (React Native defaults to "never"). The content must not
+          flexGrow to fill the frame, or that inset makes even short screens scroll. */}
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, Platform.OS === 'web' && styles.webWidth]}
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         keyboardShouldPersistTaps="handled"
         refreshControl={refreshControl}
       >
@@ -116,14 +122,15 @@ export function Field({
   error,
   code,
   ...input
-}: TextInputProps & { label: string; helper?: string; error?: string | null; code?: boolean }) {
+}: TextInputProps & { label: string; helper?: string; error?: string | null; code?: boolean | number }) {
   const c = useTheme();
   const [focused, setFocused] = useState(false);
   const field = (
     <TextInput
       accessibilityLabel={label}
-      placeholderTextColor={c.inkSoft}
-      caretHidden={code}
+      // The code input's text is transparent over the boxes, so its placeholder must be too.
+      placeholderTextColor={code ? 'transparent' : c.inkSoft}
+      caretHidden={!!code}
       {...input}
       onFocus={(e) => {
         setFocused(true);
@@ -143,11 +150,12 @@ export function Field({
           borderWidth: focused || error ? 2 : 1,
           padding: focused || error ? 11 : 12,
         },
-        code && styles.codeInput,
+        !!code && styles.codeInput,
       ]}
     />
   );
-  const length = input.maxLength ?? 6;
+  // `code` alone is the 6-digit sign-in code; a number sets the box count without a maxLength that would cut a paste.
+  const length = typeof code === 'number' ? code : 6;
   const value = input.value ?? '';
   return (
     <View style={{ gap: 8 }}>
@@ -225,6 +233,11 @@ export function Section({ title, footer, children }: { title?: string; footer?: 
   );
 }
 
+// iOS accessibility text sizes (AX1 and up) start around 1.6x; below that the default layouts still fit.
+export function useLargeText() {
+  return useWindowDimensions().fontScale >= 1.5;
+}
+
 // One row in a Section. Tappable rows get a chevron unless they act in place (`danger`, `action`).
 export function Row({
   label,
@@ -247,6 +260,8 @@ export function Row({
 }) {
   const c = useTheme();
   const color = danger ? c.danger : action ? c.accent : c.ink;
+  // At accessibility sizes the label wraps and the value stacks under it instead of both truncating.
+  const large = useLargeText();
   return (
     <Pressable
       disabled={!onPress || disabled}
@@ -257,13 +272,13 @@ export function Row({
       style={({ pressed }) => [styles.row, { opacity: disabled ? 0.5 : pressed ? 0.6 : 1 }]}
     >
       {icon && <Icon name={icon} color={danger ? c.danger : c.accent} size={20} />}
-      <View style={[styles.rowBody, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line }]}>
-        <Text numberOfLines={1} style={[styles.body, { color, flexShrink: 1 }]}>
+      <View style={[styles.rowBody, large && styles.rowStacked, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line }]}>
+        <Text numberOfLines={large ? undefined : 1} style={[styles.body, { color, flexShrink: 1 }]}>
           {label}
         </Text>
         <View style={styles.rowEnd}>
           {value ? (
-            <Text numberOfLines={1} style={[styles.body, { color: c.inkSoft }]}>
+            <Text numberOfLines={large ? undefined : 1} style={[styles.body, { color: c.inkSoft }, large && { flexShrink: 1 }]}>
               {value}
             </Text>
           ) : null}
@@ -288,7 +303,8 @@ export function ErrorText({ children }: { children?: string | null }) {
 
 export const styles = StyleSheet.create({
   back: { minHeight: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingHorizontal: 12 },
-  content: { flexGrow: 1, padding: 16, gap: 16 },
+  webWidth: { width: '100%', maxWidth: 640, alignSelf: 'center' },
+  content: { padding: 16, gap: 16 },
   // Apple's text styles: large title, title 3, body, headline, footnote.
   title: { fontSize: 34, lineHeight: 41, fontWeight: '700' },
   heading: { fontSize: 20, lineHeight: 25, fontWeight: '600' },
@@ -302,6 +318,7 @@ export const styles = StyleSheet.create({
   sectionText: { paddingHorizontal: 16 },
   row: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 16 },
   rowBody: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingRight: 16, paddingVertical: 11 },
+  rowStacked: { flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' },
   rowEnd: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   skeleton: { height: 64, borderRadius: 8, opacity: 0.6 },
   code: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: 4, fontVariant: ['tabular-nums'] },

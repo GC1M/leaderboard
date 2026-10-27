@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import { AccessibilityInfo, Keyboard, Platform } from 'react-native';
 
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton } from '@/components/ui';
 import { alert } from '@/lib/alert';
@@ -15,6 +15,7 @@ export default function Profile() {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameSaved, setNameSaved] = useState(false);
 
   useEffect(() => {
     getDisplayName().then(
@@ -36,6 +37,16 @@ export default function Profile() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const saveName = () => {
+    Keyboard.dismiss();
+    void run(async () => {
+      setSaved(await updateDisplayName(name));
+      setNameSaved(true);
+      AccessibilityInfo.announceForAccessibility('Name saved');
+      setTimeout(() => setNameSaved(false), 2000);
+    });
   };
 
   const confirmSignOut = () =>
@@ -75,14 +86,14 @@ export default function Profile() {
         <>
           <Field
             label="Your name"
-            helper="Friends see this name on leaderboards."
+            helper={nameSaved ? 'Saved' : 'Friends see this name on leaderboards.'}
             maxLength={NAME_MAX}
             autoComplete="name"
             textContentType="name"
             value={name}
             onChangeText={setName}
           />
-          {changed && <Button label="Save Name" busy={busy} onPress={() => run(async () => setSaved(await updateDisplayName(name)))} />}
+          {changed && <Button label="Save Name" busy={busy} onPress={saveName} />}
         </>
       )}
       <ErrorText>{error}</ErrorText>
