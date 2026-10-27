@@ -5,7 +5,7 @@ import { AppState, Text, View } from 'react-native';
 import { Segmented } from '@/components/history/Segmented';
 import { ExercisePicker } from '@/components/workouts/ExercisePicker';
 import { useWorkoutExport, WorkoutExportOption } from '@/components/workouts/WorkoutExportOption';
-import { Button, ErrorText, Field, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
+import { Button, ErrorText, Field, Row, Screen, Section, Skeleton, styles, useLargeText } from '@/components/ui';
 import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { localDateKey, readingDateLabel } from '@/lib/health/dates';
@@ -37,6 +37,7 @@ export function WorkoutEditor({ id, templateId, day }: { id?: string; templateId
   const c = useTheme();
   const router = useRouter();
   const uid = useAuth().session?.user.id ?? '';
+  const large = useLargeText();
   const [form, setForm] = useState<WorkoutForm | null>(null);
   const [detail, setDetail] = useState<WorkoutDetail | null>(null);
   const [pending, setPending] = useState<Draft | null>(null);
@@ -195,11 +196,12 @@ export function WorkoutEditor({ id, templateId, day }: { id?: string; templateId
   return (
     <Screen title={id ? 'Edit Workout' : 'New Workout'} back>
       <Field label="Activity" value={form.activityType} onChangeText={(v) => edit((x) => ({ ...x, activityType: v }))} placeholder="Strength, Running, Yoga" autoCapitalize="words" />
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <View style={{ flex: 1 }}>
+      {/* Side by side, a date is wider than half the screen at accessibility sizes, so stack them there. */}
+      <View style={{ flexDirection: large ? 'column' : 'row', gap: 12 }}>
+        <View style={{ flex: large ? undefined : 1 }}>
           <Field label="Date" value={form.date} onChangeText={(v) => edit((x) => ({ ...x, date: v }))} placeholder="2026-10-26" keyboardType="numbers-and-punctuation" autoCorrect={false} />
         </View>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: large ? undefined : 1 }}>
           <Field label="Start time" value={form.time} onChangeText={(v) => edit((x) => ({ ...x, time: v }))} placeholder="18:30" keyboardType="numbers-and-punctuation" autoCorrect={false} />
         </View>
       </View>

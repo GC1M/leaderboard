@@ -21,7 +21,7 @@ export function WeightChart({ readings, days, to, unit }: {
   const inRange = readings.filter((r) => Date.parse(r.measuredAt) >= from.getTime() && Date.parse(r.measuredAt) <= to.getTime());
   const last = inRange[inRange.length - 1];
   const summary = points.length
-    ? `Last ${days} days: ${points.length} ${points.length === 1 ? 'reading' : 'readings'} from ${formatWeight(min, unit)} to ${formatWeight(max, unit)}. Latest ${formatWeight(last!.kg, unit)}, ${readingDateLabel(new Date(last!.measuredAt), to)}`
+    ? `Last ${days} days: ${points.length} ${points.length === 1 ? 'reading' : 'readings'}${formatWeight(min, unit) === formatWeight(max, unit) ? `, ${formatWeight(min, unit)}` : ` from ${formatWeight(min, unit)} to ${formatWeight(max, unit)}`}. Latest ${formatWeight(last!.kg, unit)}, ${readingDateLabel(new Date(last!.measuredAt), to)}`
     : `Last ${days} days: no readings`;
   const edge = from.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   return (

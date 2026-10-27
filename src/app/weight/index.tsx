@@ -4,7 +4,7 @@ import { Text, View } from 'react-native';
 import { Segmented } from '@/components/history/Segmented';
 import { WeightChart } from '@/components/history/WeightChart';
 import { ExportOption, useExportChoice } from '@/components/health/ExportOption';
-import { Button, ErrorText, Field, Screen, Skeleton, styles } from '@/components/ui';
+import { Button, ErrorText, Field, Screen, Skeleton, styles, useLargeText } from '@/components/ui';
 import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { formatLocalDateTime, parseLocalDateTime, readingDateLabel, startOfLocalDay } from '@/lib/health/dates';
@@ -22,6 +22,7 @@ type Result = { days: number; rows?: Reading[]; latest?: Reading | null; error?:
 
 export default function Weight() {
   const c = useTheme();
+  const large = useLargeText();
   const { session } = useAuth();
   const me = session?.user.id ?? '';
   const [unit, setUnit] = useWeightUnit();
@@ -87,6 +88,9 @@ export default function Weight() {
   const confirmRemove = (id: string) =>
     alert('Delete this weight reading?', "It's removed for good.", [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => void remove(id) }]);
 
+  // At accessibility sizes "YYYY-MM-DD HH:mm" is wider than the screen, so let it wrap onto two lines; Return still submits, never adds a newline.
+  const dateTimeWrap = large ? { multiline: true, submitBehavior: 'blurAndSubmit' as const } : {};
+
   return (
     <Screen title="My Weight" back>
       <Segmented
@@ -124,7 +128,7 @@ export default function Weight() {
       <View style={{ gap: 12 }}>
         <Text style={[styles.heading, { color: c.ink }]}>{editing ? 'Edit weight' : 'Add weight'}</Text>
         <Field label={`Weight (${unit})`} value={text} onChangeText={(v) => { setText(v); setFormError(null); setWhenError(null); }} keyboardType="decimal-pad" placeholder={unit === 'lb' ? '165.0' : '75.0'} error={formError} />
-        <Field label="When" value={when} onChangeText={(v) => { setWhen(v); setFormError(null); setWhenError(null); }} placeholder="YYYY-MM-DD HH:mm" autoCapitalize="none" autoCorrect={false} error={whenError} />
+        <Field label="When" value={when} onChangeText={(v) => { setWhen(v); setFormError(null); setWhenError(null); }} placeholder="YYYY-MM-DD HH:mm" autoCapitalize="none" autoCorrect={false} error={whenError} {...dateTimeWrap} />
         <ExportOption type="weight" choice={choice} note="Saved as a body mass sample at that time." />
         <Button label={editing ? 'Save Changes' : 'Save Weight'} busy={busy} disabled={text.trim() === ''} onPress={() => void save()} />
         {editing && <Button plain label="Cancel Edit" onPress={reset} />}
