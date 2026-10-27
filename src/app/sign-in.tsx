@@ -126,9 +126,10 @@ export default function SignIn() {
             keyboardType="number-pad"
             textContentType="oneTimeCode"
             autoComplete="one-time-code"
-            maxLength={6}
             value={code}
-            onChangeText={(t) => {
+            onChangeText={(raw) => {
+              // No maxLength: it would cut a pasted "123 456" to "123 45" before the spaces are stripped.
+              const t = raw.replace(/\D/g, '').slice(0, 6);
               setCode(t);
               if (t.length === 6 && !busy) verify(t);
             }}

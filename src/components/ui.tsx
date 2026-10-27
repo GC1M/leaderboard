@@ -119,33 +119,68 @@ export function Field({
 }: TextInputProps & { label: string; helper?: string; error?: string | null; code?: boolean }) {
   const c = useTheme();
   const [focused, setFocused] = useState(false);
+  const field = (
+    <TextInput
+      accessibilityLabel={label}
+      placeholderTextColor={c.inkSoft}
+      caretHidden={code}
+      {...input}
+      onFocus={(e) => {
+        setFocused(true);
+        input.onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        setFocused(false);
+        input.onBlur?.(e);
+      }}
+      style={[
+        styles.body,
+        styles.input,
+        {
+          color: c.ink,
+          backgroundColor: c.surface,
+          borderColor: error ? c.danger : focused ? c.accent : c.border,
+          borderWidth: focused || error ? 2 : 1,
+          padding: focused || error ? 11 : 12,
+        },
+        code && styles.codeInput,
+      ]}
+    />
+  );
+  const length = input.maxLength ?? 6;
+  const value = input.value ?? '';
   return (
     <View style={{ gap: 8 }}>
       <Text style={[styles.bodyStrong, { color: c.ink }]}>{label}</Text>
-      <TextInput
-        accessibilityLabel={label}
-        placeholderTextColor={c.inkSoft}
-        {...input}
-        onFocus={(e) => {
-          setFocused(true);
-          input.onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          input.onBlur?.(e);
-        }}
-        style={[
-          code ? styles.code : styles.body,
-          styles.input,
-          {
-            color: c.ink,
-            backgroundColor: c.surface,
-            borderColor: error ? c.danger : focused ? c.accent : c.border,
-            borderWidth: focused || error ? 2 : 1,
-            padding: focused || error ? 11 : 12,
-          },
-        ]}
-      />
+      {code ? (
+        // One box per digit, drawn from a single invisible input on top so paste, OTP autofill and screen readers still work.
+        <View>
+          <View style={styles.codeRow} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {Array.from({ length }, (_, i) => {
+              const active = focused && i === Math.min(value.length, length - 1);
+              return (
+                <View
+                  key={i}
+                  style={[
+                    styles.input,
+                    styles.codeBox,
+                    {
+                      backgroundColor: c.surface,
+                      borderColor: error ? c.danger : active ? c.accent : c.border,
+                      borderWidth: active || error ? 2 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.code, { color: c.ink, letterSpacing: 0 }]}>{value[i] ?? ''}</Text>
+                </View>
+              );
+            })}
+          </View>
+          {field}
+        </View>
+      ) : (
+        field
+      )}
       {error ? <ErrorText>{error}</ErrorText> : helper ? <Text style={[styles.caption, { color: c.inkSoft }]}>{helper}</Text> : null}
     </View>
   );
@@ -270,4 +305,7 @@ export const styles = StyleSheet.create({
   rowEnd: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   skeleton: { height: 64, borderRadius: 8, opacity: 0.6 },
   code: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: 4, fontVariant: ['tabular-nums'] },
+  codeRow: { flexDirection: 'row', gap: 8 },
+  codeBox: { flex: 1, maxWidth: 56, aspectRatio: 0.85, alignItems: 'center', justifyContent: 'center' },
+  codeInput: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0 },
 });
