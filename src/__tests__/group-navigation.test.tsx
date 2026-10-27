@@ -1,7 +1,9 @@
 import { act } from 'react';
+import { AccessibilityInfo, Keyboard } from 'react-native';
 import { createRoot } from 'test-renderer';
 
 import GroupInfo from '@/app/groups/[id]/info';
+import JoinGroup from '@/app/groups/join';
 import JoinByLink from '@/app/join/[code]';
 
 const mockRouter = { replace: jest.fn(), canDismiss: jest.fn(), dismissAll: jest.fn(), canGoBack: jest.fn() };
@@ -12,6 +14,7 @@ const mockJoin = jest.fn();
 const mockDelete = jest.fn();
 const mockAlert = jest.fn();
 const mockMembers = jest.fn();
+const mockRename = jest.fn();
 jest.mock('expo-router', () => ({
   useSegments: () => [],
   useLocalSearchParams: () => mockParams,
@@ -30,6 +33,7 @@ jest.mock('@/lib/groups', () => ({
   listMembers: () => mockMembers(),
   getMyShares: () => Promise.resolve(['steps']),
   deleteGroup: (...args: unknown[]) => mockDelete(...args),
+  renameGroup: (...args: unknown[]) => mockRename(...args),
 }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -97,4 +101,34 @@ test.each([false, true])('delete from Group Info checks whether a dismissible st
   expect(mockDelete).toHaveBeenCalledWith(mockParams.id);
   expect(mockRouter.dismissAll).toHaveBeenCalledTimes(canDismiss ? 1 : 0);
   expect(mockRouter.replace).toHaveBeenCalledWith('/groups');
+});
+
+test('join shows all 8 invite code characters and clears a stale error on edit', async () => {
+  mockJoin.mockRejectedValue(new Error("That code doesn't match a group"));
+  const r = await render(<JoinGroup />);
+  const c = r.container as any;
+  const input = () => c.queryAll((n: any) => n.props.onChangeText)[0];
+  await act(async () => input().props.onChangeText('ABCD2346'));
+  expect(JSON.stringify(c)).toContain('"6"'); // 8th box
+  expect(input().props.maxLength).toBeUndefined(); // a native maxLength would cut a pasted "ABCD-2346" before normalizing
+  await act(async () => input().props.onSubmitEditing());
+  expect(JSON.stringify(c)).toContain("That code doesn't match a group");
+  await act(async () => input().props.onChangeText('ABCD234'));
+  expect(JSON.stringify(c)).not.toContain("That code doesn't match a group");
+});
+
+test('Done on the group name field saves the rename, dismisses the keyboard and confirms', async () => {
+  const dismiss = jest.spyOn(Keyboard, 'dismiss');
+  const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+  mockRename.mockResolvedValue(undefined);
+  const r = await render(<GroupInfo />);
+  const c = r.container as any;
+  const input = () => c.queryAll((n: any) => n.props.onSubmitEditing)[0];
+  await act(async () => input().props.onChangeText('Family 2'));
+  await act(async () => input().props.onSubmitEditing());
+  expect(mockRename).toHaveBeenCalledWith(mockParams.id, 'Family 2');
+  expect(dismiss).toHaveBeenCalled();
+  expect(announce).toHaveBeenCalledWith('Group name saved');
+  expect(JSON.stringify(c)).toContain('"Saved"');
+  act(() => r.unmount()); // the 2s "Saved" timer must not outlive the test
 });

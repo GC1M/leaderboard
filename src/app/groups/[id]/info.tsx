@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Share, Text, View } from 'react-native';
+import { AccessibilityInfo, Keyboard, Share, Text, View } from 'react-native';
 
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { alert } from '@/lib/alert';
@@ -46,6 +46,7 @@ export default function GroupInfo() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [nameSaved, setNameSaved] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -111,6 +112,18 @@ export default function GroupInfo() {
   const code = group.invite_code;
   const renamed = name.trim() !== group.name && name.trim().length > 0;
 
+  // Done on the keyboard saves too, so an edit is never silently dropped.
+  const saveName = () => {
+    if (!renamed || busy) return;
+    Keyboard.dismiss();
+    void act(async () => {
+      await renameGroup(id, name);
+      setNameSaved(true);
+      AccessibilityInfo.announceForAccessibility('Group name saved');
+      setTimeout(() => setNameSaved(false), 2000);
+    });
+  };
+
   const memberOptions = (m: Member) =>
     alert(m.name, undefined, [
       {
@@ -163,8 +176,8 @@ export default function GroupInfo() {
 
       {owner ? (
         <>
-          <Field label="Group name" maxLength={60} value={name} onChangeText={setName} returnKeyType="done" helper={`${name.length}/60`} />
-          {renamed && <Button label="Save Name" busy={busy} onPress={() => act(() => renameGroup(id, name))} />}
+          <Field label="Group name" maxLength={60} value={name} onChangeText={setName} returnKeyType="done" onSubmitEditing={saveName} helper={nameSaved ? 'Saved' : `${name.length}/60`} />
+          {renamed && <Button label="Save Name" busy={busy} onPress={saveName} />}
         </>
       ) : (
         <Text style={[styles.heading, { color: c.ink }]}>{group.name}</Text>

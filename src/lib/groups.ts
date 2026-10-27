@@ -15,6 +15,9 @@ export function isValidCode(code: string): boolean {
   return CODE_RE.test(code);
 }
 
+// Native drops the sign-in route's query params when the auth guard flips, so join/[code] also parks the invite here.
+export const pendingInvite = { code: '' };
+
 export function inviteLink(code: string): string {
   return `leaderboard://join/${code}`;
 }

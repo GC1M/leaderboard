@@ -53,8 +53,13 @@ export function Screen({
           <Text style={[styles.body, { color: c.accent }]}>Back</Text>
         </Pressable>
       )}
+      {/* Number pads have no return key, so dragging the list dismisses the keyboard. "automatic" lets iOS
+          inset the content for the native tab bar (React Native defaults to "never"). The content must not
+          flexGrow to fill the frame, or that inset makes even short screens scroll. */}
       <ScrollView
         contentContainerStyle={[styles.content, Platform.OS === 'web' && styles.webWidth]}
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         keyboardShouldPersistTaps="handled"
         refreshControl={refreshControl}
       >
@@ -117,14 +122,15 @@ export function Field({
   error,
   code,
   ...input
-}: TextInputProps & { label: string; helper?: string; error?: string | null; code?: boolean }) {
+}: TextInputProps & { label: string; helper?: string; error?: string | null; code?: boolean | number }) {
   const c = useTheme();
   const [focused, setFocused] = useState(false);
   const field = (
     <TextInput
       accessibilityLabel={label}
-      placeholderTextColor={c.inkSoft}
-      caretHidden={code}
+      // The code input's text is transparent over the boxes, so its placeholder must be too.
+      placeholderTextColor={code ? 'transparent' : c.inkSoft}
+      caretHidden={!!code}
       {...input}
       onFocus={(e) => {
         setFocused(true);
@@ -144,11 +150,12 @@ export function Field({
           borderWidth: focused || error ? 2 : 1,
           padding: focused || error ? 11 : 12,
         },
-        code && styles.codeInput,
+        !!code && styles.codeInput,
       ]}
     />
   );
-  const length = input.maxLength ?? 6;
+  // `code` alone is the 6-digit sign-in code; a number sets the box count without a maxLength that would cut a paste.
+  const length = typeof code === 'number' ? code : 6;
   const value = input.value ?? '';
   return (
     <View style={{ gap: 8 }}>
@@ -297,7 +304,7 @@ export function ErrorText({ children }: { children?: string | null }) {
 export const styles = StyleSheet.create({
   back: { minHeight: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingHorizontal: 12 },
   webWidth: { width: '100%', maxWidth: 640, alignSelf: 'center' },
-  content: { flexGrow: 1, padding: 16, gap: 16 },
+  content: { padding: 16, gap: 16 },
   // Apple's text styles: large title, title 3, body, headline, footnote.
   title: { fontSize: 34, lineHeight: 41, fontWeight: '700' },
   heading: { fontSize: 20, lineHeight: 25, fontWeight: '600' },
