@@ -1,11 +1,12 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Text, View } from 'react-native';
+import { AppState, Text, View } from 'react-native';
 
 import { Segmented } from '@/components/history/Segmented';
 import { ExercisePicker } from '@/components/workouts/ExercisePicker';
 import { useWorkoutExport, WorkoutExportOption } from '@/components/workouts/WorkoutExportOption';
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
+import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { localDateKey, readingDateLabel } from '@/lib/health/dates';
 import { loadWeightUnit, saveWeightUnit } from '@/lib/weight-unit';
@@ -157,7 +158,7 @@ export function WorkoutEditor({ id, templateId, day }: { id?: string; templateId
   };
 
   const confirm = (title: string, message: string, action: string, run: () => Promise<void>) =>
-    Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: action, style: 'destructive', onPress: () => void run() }]);
+    alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: action, style: 'destructive', onPress: () => void run() }]);
 
   // Keeps what is on screen as a template named after the activity, then opens it to rename or refine.
   const saveAsTemplate = async () => {

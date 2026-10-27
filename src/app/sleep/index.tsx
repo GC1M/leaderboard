@@ -14,9 +14,11 @@ import { useHealthExport, useHealthSync } from '@/lib/health/sync';
 import { deleteManualSleep, getMyManualSleep, getMyRecentSleep, saveManualSleep } from '@/lib/sleep';
 import { useTheme } from '@/theme';
 
+// Last night: fell asleep at 23:00, woke up at 07:00 (the previous night when it isn't 07:00 yet).
 const defaultTimes = () => {
-  const wake = new Date(); wake.setMinutes(0, 0, 0);
-  const bed = new Date(wake.getTime() - 8 * 3600 * 1000);
+  const wake = new Date(); wake.setHours(7, 0, 0, 0);
+  if (wake > new Date()) wake.setDate(wake.getDate() - 1);
+  const bed = new Date(wake); bed.setDate(bed.getDate() - 1); bed.setHours(23);
   return { bed: formatLocalDateTime(bed), wake: formatLocalDateTime(wake) };
 };
 

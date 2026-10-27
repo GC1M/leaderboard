@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton } from '@/components/ui';
+import { alert } from '@/lib/alert';
 import { useHealthSync } from '@/lib/health/sync';
 import { NAME_MAX, deleteAccount, getDisplayName, updateDisplayName } from '@/lib/profile';
 import { supabase } from '@/lib/supabase';
@@ -38,13 +39,13 @@ export default function Profile() {
   };
 
   const confirmSignOut = () =>
-    Alert.alert('Sign out?', 'Your groups and steps stay saved.', [
+    alert('Sign out?', 'Your groups and steps stay saved.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: () => supabase.auth.signOut() },
     ]);
 
   const confirmDeleteImports = () =>
-    Alert.alert(
+    alert(
       'Delete imported Health data?',
       "This stops Health imports and deletes the steps, sleep, and weight Leaderboard imported from Apple Health, here and in your groups. Manual entries stay. Nothing is uploaded again until you reconnect Apple Health. Your data in the Health app isn't touched.",
       [
@@ -54,7 +55,7 @@ export default function Profile() {
     );
 
   const confirmDelete = () =>
-    Alert.alert(
+    alert(
       'Delete your account?',
       "This deletes your profile, your steps, sleep and weight, your sharing choices and your memberships. Groups you own are deleted for everyone in them. This can't be undone.",
       [
