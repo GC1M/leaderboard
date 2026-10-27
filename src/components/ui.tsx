@@ -125,7 +125,7 @@ export function Field({
       accessibilityLabel={label}
       // The code input's text is transparent over the boxes, so its placeholder must be too.
       placeholderTextColor={code ? 'transparent' : c.inkSoft}
-      caretHidden={code}
+      caretHidden={!!code}
       {...input}
       onFocus={(e) => {
         setFocused(true);
