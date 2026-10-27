@@ -102,9 +102,19 @@ test('rate limits get their own message', async () => {
 test('code step: one box per digit, verifies on the 6th, strips spaces from a pasted code', async () => {
   jest.useFakeTimers(); // the 30s resend cooldown would outlive the test
   try {
-    const { text, type, press } = await setup();
+    const { c, text, type, press } = await setup();
     await type('a@b.co');
     await press('Send Me a Code');
+    // iOS hides opacity 0 views from VoiceOver, so the input over the boxes must stay opaque but transparent.
+    const input = c.queryAll((n: any) => n.props.accessibilityLabel === '6-digit code' && n.props.onChangeText)[0];
+    const style = StyleSheet.flatten(input.props.style);
+    expect(style.opacity ?? 1).toBe(1);
+    expect(style.color).toBe('transparent');
+    expect(input.props.caretHidden).toBe(true);
+    expect(input.props.placeholderTextColor).toBe('transparent');
+    // The resend and change links wrap at large text sizes instead of pushing one off-screen.
+    const row = c.queryAll((n: any) => StyleSheet.flatten(n.props.style)?.flexWrap === 'wrap' && JSON.stringify(n).includes('Change Email'));
+    expect(row.length).toBeGreaterThan(0);
     await type('12');
     expect(text()).toContain('"1"');
     expect(text()).toContain('"2"');

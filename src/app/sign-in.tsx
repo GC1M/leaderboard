@@ -7,6 +7,7 @@ import { Button, Field, Screen, styles } from '@/components/ui';
 import { normalizePhone } from '@/lib/phone';
 import {
   appleAvailable,
+  friendly,
   googleAvailable,
   sendEmailCode,
   sendPhoneCode,
@@ -18,10 +19,6 @@ import {
 import { useTheme } from '@/theme';
 
 const RESEND_SECONDS = 30;
-
-// Plain messages instead of raw provider errors. Rate limits get their own, since "try again" would be wrong advice.
-const friendly = (e: unknown, fallback: string) =>
-  (e as { status?: number })?.status === 429 ? 'Too many tries. Wait a minute, then request a new code.' : fallback;
 
 export default function SignIn() {
   const c = useTheme();
@@ -181,5 +178,5 @@ export default function SignIn() {
 const local = StyleSheet.create({
   providers: { gap: 12, marginTop: 8 },
   apple: { height: 48 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 16 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16 },
 });
