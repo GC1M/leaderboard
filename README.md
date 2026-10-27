@@ -120,6 +120,14 @@ Run on a signed physical-device build with real Health data, after the Phase 1 c
 - [ ] Next import does not add the exported workout back as a second session
 - [ ] Manual weight, sleep and steps export with the right values and source; steps are not added on top of an already synced daily total
 
+**Import from other apps** (issue #120)
+- [ ] Export a CSV from Strong, Hevy, Fitbod and JEFIT; share it to Leaderboard from the share sheet, and also pick it with Import from Another App: both open the preview
+- [ ] The preview shows the app, workout count, date range and set count; files without units ask for kg/lb and km/mi; new exercise names and skipped rows are listed
+- [ ] After import every workout, exercise and set is there in order, warm-up/drop/failure sets are noted on the exercise, and the source reads as the app's name
+- [ ] Importing the same file again, or a newer export that overlaps it, adds nothing; an imported workout you edited keeps the edit
+- [ ] A session the app also wrote to Apple Health is counted once (the detailed one) in history, weekly totals and group totals
+- [ ] An unrelated CSV is rejected with a clear message and saves nothing; imported workouts are private until shared and start with "Also save to Apple Health" off
+
 **Sharing and privacy**
 - [ ] Group Info: Workouts is off by default and after joining; turning it on shows only weekly count and total time to group members; turning it off removes it immediately
 - [ ] Leaving or being removed from a group stops sharing; rejoining does not turn it back on

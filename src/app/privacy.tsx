@@ -25,7 +25,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
     title: 'What is stored on our server',
     body: [
       'Your account: the name you choose, the email, phone number, or Apple or Google account you sign in with, and your time zone (so days line up with your local calendar).',
-      'Your groups, and the steps, sleep, and weight above, plus anything you enter by hand. Workouts you log or import, with your exercises, sets, and notes, and your workout templates, are stored for you only. Each day records whether it came from Apple Health or manual entry.',
+      'Your groups, and the steps, sleep, and weight above, plus anything you enter by hand. Workouts you log or import, with your exercises, sets, and notes, and your workout templates, are stored for you only. A workout file you import from another app (Strong, Hevy, Fitbod, or JEFIT) is read on your phone; only the workouts in it are saved, never the file. Each day records whether it came from Apple Health or manual entry.',
       'The data is stored in a Supabase database. It is not sold, not used for advertising, and not shared with anyone else.',
     ],
   },
