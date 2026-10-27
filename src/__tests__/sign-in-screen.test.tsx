@@ -1,6 +1,6 @@
 import { act } from 'react';
-import { createRoot } from 'test-renderer';
 import { StyleSheet } from 'react-native';
+import { createRoot } from 'test-renderer';
 
 const mockOtp = jest.fn();
 const mockVerify = jest.fn();
