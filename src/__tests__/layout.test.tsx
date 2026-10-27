@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'test-renderer';
 
 import RootLayout from '@/app/_layout';
+import JoinByLink from '@/app/join/[code]';
 
 const mockAuth = jest.fn();
 const mockReplace = jest.fn();
@@ -14,6 +15,8 @@ jest.mock('@/lib/auth', () => ({
 }));
 jest.mock('@/components/WebDialogHost', () => ({ WebDialogHost: () => null }));
 jest.mock('@/lib/supabase', () => ({ watchAppStateForAuthRefresh: () => () => {} }));
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn().mockResolvedValue(true),
   hideAsync: jest.fn().mockResolvedValue(true),
@@ -29,7 +32,7 @@ jest.mock('expo-router', () => {
       return null;
     },
   });
-  return { Stack, useRouter: () => ({ replace: mockReplace }), useGlobalSearchParams: () => mockParams, useSegments: () => mockSegments };
+  return { Stack, Redirect: () => null, useRouter: () => ({ replace: mockReplace }), useGlobalSearchParams: () => mockParams, useLocalSearchParams: () => mockParams, useSegments: () => mockSegments };
 });
 
 const render = async () => {
@@ -65,6 +68,26 @@ test('signed-out invite survives the auth guard and resumes its confirmation aft
   expect(mockReplace).toHaveBeenCalledWith('/join/ABCD2345');
   mockReplace.mockClear();
   mockSegments = ['join', '[code]'];
+  await act(async () => r.render(<RootLayout />));
+  expect(mockReplace).not.toHaveBeenCalled();
+  await act(async () => r.unmount());
+});
+
+test('native: the invite resumes once after sign-in even though the guard flip dropped the code param', async () => {
+  mockParams = { code: 'abcd-2345' };
+  mockSegments = ['join', '[code]'];
+  mockReplace.mockClear();
+  mockAuth.mockReturnValue({ session: null, loading: false });
+  const r = createRoot();
+  await act(async () => r.render(<JoinByLink />));
+  await act(async () => r.render(<RootLayout />));
+  mockParams = {};
+  mockSegments = ['(tabs)'];
+  mockAuth.mockReturnValue({ session: { user: { id: 'user' } }, loading: false });
+  await act(async () => r.render(<RootLayout />));
+  expect(mockReplace).toHaveBeenCalledWith('/join/ABCD2345');
+  mockReplace.mockClear();
+  mockSegments = ['groups'];
   await act(async () => r.render(<RootLayout />));
   expect(mockReplace).not.toHaveBeenCalled();
   await act(async () => r.unmount());

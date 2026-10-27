@@ -3,7 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
-import { isValidCode, normalizeCode } from '@/lib/groups';
+import { isValidCode, normalizeCode, pendingInvite } from '@/lib/groups';
 import { WebDialogHost } from '@/components/WebDialogHost';
 import { authGate } from '@/lib/auth-gate';
 import { HealthSyncProvider } from '@/lib/health/sync';
@@ -23,10 +23,12 @@ function Routes() {
   const invite = normalizeCode(typeof code === 'string' ? code : '');
   // Protected routes keep query parameters when auth changes. Resume only our validated invite route,
   // never an arbitrary return URL, and still let the user confirm joining on that screen.
+  // Native loses the query param, so fall back to the invite join/[code] parked, and resume it only once.
   useEffect(() => {
-    if (gate === 'signed-in' && isValidCode(invite) && segments[0] !== 'join') {
-      router.replace(`/join/${invite}`);
-    }
+    if (gate !== 'signed-in') return;
+    const next = isValidCode(invite) ? invite : pendingInvite.code;
+    pendingInvite.code = '';
+    if (isValidCode(next) && segments[0] !== 'join') router.replace(`/join/${next}`);
   }, [gate, invite, router, segments]);
   useEffect(() => {
     if (gate !== 'loading') SplashScreen.hideAsync().catch(() => {});
