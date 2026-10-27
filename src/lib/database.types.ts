@@ -317,14 +317,14 @@ isOneToOne: false
                   ]
                 },"workouts": {
                   Row: {
-                    "activity_type": string,"distance_m": number | null,"duration_s": number | null,"ended_at": string,"energy_kcal": number | null,"health_device_id": string | null,"health_uuid": string | null,"id": string,"notes": string | null,"source": string,"started_at": string,"timezone": string,"updated_at": string,"user_id": string
+                    "activity_type": string,"distance_m": number | null,"duration_s": number | null,"ended_at": string,"energy_kcal": number | null,"health_device_id": string | null,"health_uuid": string | null,"id": string,"notes": string | null,"source": string,"source_app": string | null,"source_key": string | null,"started_at": string,"timezone": string,"updated_at": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "activity_type": string,"distance_m"?: number | null,"duration_s"?: number | null,"ended_at": string,"energy_kcal"?: number | null,"health_device_id"?: string | null,"health_uuid"?: string | null,"id"?: string,"notes"?: string | null,"source": string,"started_at": string,"timezone": string,"updated_at"?: string,"user_id": string
+                    "activity_type": string,"distance_m"?: number | null,"duration_s"?: number | null,"ended_at": string,"energy_kcal"?: number | null,"health_device_id"?: string | null,"health_uuid"?: string | null,"id"?: string,"notes"?: string | null,"source": string,"source_app"?: string | null,"source_key"?: string | null,"started_at": string,"timezone": string,"updated_at"?: string,"user_id": string
                   }
                   Update: {
-                    "activity_type"?: string,"distance_m"?: number | null,"duration_s"?: number | null,"ended_at"?: string,"energy_kcal"?: number | null,"health_device_id"?: string | null,"health_uuid"?: string | null,"id"?: string,"notes"?: string | null,"source"?: string,"started_at"?: string,"timezone"?: string,"updated_at"?: string,"user_id"?: string
+                    "activity_type"?: string,"distance_m"?: number | null,"duration_s"?: number | null,"ended_at"?: string,"energy_kcal"?: number | null,"health_device_id"?: string | null,"health_uuid"?: string | null,"id"?: string,"notes"?: string | null,"source"?: string,"source_app"?: string | null,"source_key"?: string | null,"started_at"?: string,"timezone"?: string,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -411,6 +411,9 @@ isOneToOne: false
 { Args: { "p_from": string,"p_group_id": string,"p_to": string }; Returns: {
               "total_duration_s": number,"user_id": string,"week_start": string,"workout_count": number
             }[]
+                           },
+"import_workouts":
+{ Args: { "p_app": string,"p_workouts": Json }; Returns: number
                            },
 "is_group_member":
 { Args: { "p_group_id": string }; Returns: boolean

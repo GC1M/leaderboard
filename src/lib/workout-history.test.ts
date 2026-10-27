@@ -12,7 +12,7 @@ function w(over: Partial<Workout> & { at: Date; minutes?: number }): Workout {
   return {
     id: `w${++n}`, user_id: 'u', source: 'manual', activity_type: 'Strength', started_at: at.toISOString(),
     ended_at: new Date(at.getTime() + minutes * 60000).toISOString(), timezone: 'UTC', duration_s: minutes * 60,
-    distance_m: null, energy_kcal: null, notes: null, health_uuid: null, health_device_id: null, updated_at: at.toISOString(), ...rest,
+    distance_m: null, energy_kcal: null, notes: null, health_uuid: null, health_device_id: null, source_app: null, source_key: null, updated_at: at.toISOString(), ...rest,
   };
 }
 
@@ -87,8 +87,10 @@ describe('labels', () => {
     expect(weeksSummary(weeklyTotals([], 4, now), now)).toBe('Last 4 weeks: no workouts recorded');
   });
   it('labels sources', () => {
-    expect(sourceLabel('healthkit')).toBe('Apple Health');
-    expect(sourceLabel('manual')).toBe('Manual');
+    expect(sourceLabel({ source: 'healthkit', source_app: null })).toBe('Apple Health');
+    expect(sourceLabel({ source: 'manual', source_app: null })).toBe('Manual');
+    expect(sourceLabel({ source: 'import', source_app: 'strong' })).toBe('Strong');
+    expect(sourceLabel({ source: 'import', source_app: 'jefit' })).toBe('JEFIT');
   });
   it('starts history at the Monday of the oldest week', () => {
     const d = historyStart(4, now);

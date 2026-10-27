@@ -78,7 +78,7 @@ describe('segmented control', () => {
 });
 
 describe('workouts weekly total', () => {
-  const week = { weekStart: '2026-10-26', count: 3, durationS: 7200, distanceM: null, distanceCount: 0, energyKcal: null, energyCount: 0, imported: 0, manual: 3 };
+  const week = { weekStart: '2026-10-26', count: 3, durationS: 7200, distanceM: null, distanceCount: 0, energyKcal: null, energyCount: 0, imported: 0, manual: 3, fromApps: 0 };
   test('caps the big total so it cannot break mid-word', async () => {
     const c = await render(<WeeklyHistoryView totals={[week]} unit="km" />);
     expect(texts(c, '3 workouts')[0].props.maxFontSizeMultiplier).toBe(1.5);

@@ -20,7 +20,7 @@ async function render(el: React.ReactElement) {
 
 const now = new Date(2026, 9, 26, 12);
 const week = (weekStart: string, over: Partial<WeekTotals> = {}): WeekTotals => ({
-  weekStart, count: 0, durationS: 0, distanceM: null, distanceCount: 0, energyKcal: null, energyCount: 0, imported: 0, manual: 0, ...over,
+  weekStart, count: 0, durationS: 0, distanceM: null, distanceCount: 0, energyKcal: null, energyCount: 0, imported: 0, manual: 0, fromApps: 0, ...over,
 });
 
 describe('WeeklyHistoryView', () => {
@@ -53,7 +53,7 @@ describe('WeeklyHistoryView', () => {
 const base: Workout = {
   id: 'w1', user_id: 'u', source: 'healthkit', activity_type: 'Running', started_at: new Date(2026, 9, 26, 7).toISOString(),
   ended_at: new Date(2026, 9, 26, 7, 30).toISOString(), timezone: 'UTC', duration_s: 1800, distance_m: null, energy_kcal: null,
-  notes: null, health_uuid: 'h', health_device_id: 'd', updated_at: '',
+  notes: null, health_uuid: 'h', health_device_id: 'd', source_app: null, source_key: null, updated_at: '',
 };
 
 describe('WorkoutRow', () => {

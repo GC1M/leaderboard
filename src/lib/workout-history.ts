@@ -19,12 +19,15 @@ export type WeekTotals = {
   distanceCount: number;
   energyKcal: number | null;
   energyCount: number;
-  imported: number;
+  imported: number; // from Apple Health
   manual: number;
+  fromApps: number; // imported from another app's export
 };
 
 const SOURCE_LABELS = { healthkit: 'Apple Health', manual: 'Manual' } as const;
-export const sourceLabel = (source: Workout['source']) => SOURCE_LABELS[source];
+const APP_LABELS: Record<string, string> = { strong: 'Strong', hevy: 'Hevy', fitbod: 'Fitbod', jefit: 'JEFIT' };
+export const sourceLabel = (w: Pick<Workout, 'source' | 'source_app'>) =>
+  w.source === 'import' ? (APP_LABELS[w.source_app ?? ''] ?? 'Imported') : SOURCE_LABELS[w.source];
 
 // Recorded duration, else end minus start (both are always present).
 export function workoutSeconds(w: Pick<Workout, 'duration_s' | 'started_at' | 'ended_at'>): number {
@@ -32,7 +35,7 @@ export function workoutSeconds(w: Pick<Workout, 'duration_s' | 'started_at' | 'e
 }
 
 const emptyWeek = (weekStart: string): WeekTotals => ({
-  weekStart, count: 0, durationS: 0, distanceM: null, distanceCount: 0, energyKcal: null, energyCount: 0, imported: 0, manual: 0,
+  weekStart, count: 0, durationS: 0, distanceM: null, distanceCount: 0, energyKcal: null, energyCount: 0, imported: 0, manual: 0, fromApps: 0,
 });
 
 // One entry per week, oldest first, ending with the week of `now`. Weeks without workouts are kept (count 0) so
@@ -54,6 +57,7 @@ export function weeklyTotals(workouts: readonly Workout[], weeks: number, now: D
       t.energyCount++;
     }
     if (w.source === 'manual') t.manual++;
+    else if (w.source === 'import') t.fromApps++;
     else t.imported++;
   }
   return out;

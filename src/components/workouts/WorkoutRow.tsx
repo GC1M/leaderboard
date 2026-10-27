@@ -12,7 +12,7 @@ import { useTheme } from '@/theme';
 export function WorkoutRow({ w, unit, last, onPress, now }: { w: Workout; unit: DistanceUnit; last?: boolean; onPress: () => void; now?: Date }) {
   const c = useTheme();
   const when = readingDateLabel(new Date(w.started_at), now);
-  const source = sourceLabel(w.source);
+  const source = sourceLabel(w);
   const summary = workoutSummary(w, unit);
   return (
     <Pressable
@@ -26,7 +26,7 @@ export function WorkoutRow({ w, unit, last, onPress, now }: { w: Workout; unit: 
         <Text style={[ui.caption, { color: c.inkSoft }]}>
           {when}
           {' · '}
-          <Text style={{ color: w.source === 'manual' ? c.manual : c.inkSoft }}>{source}</Text>
+          <Text style={{ color: w.source !== 'healthkit' ? c.manual : c.inkSoft }}>{source}</Text>
         </Text>
       </View>
       <Text style={[ui.body, { color: c.inkSoft, flexShrink: 1, textAlign: 'right' }]}>{summary}</Text>

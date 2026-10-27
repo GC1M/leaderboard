@@ -22,11 +22,13 @@ export function WorkoutDetailView({ w, weightUnit, distanceUnit, now }: { w: Wor
         footer={
           imported
             ? "Imported from Apple Health. Change it in Health, and it updates here after the next import. Exercises and sets aren't part of an import."
-            : "Logged in this app. Calories aren't tracked for manual workouts."
+            : w.source === 'import'
+              ? `Imported from a ${sourceLabel(w)} export. Edits stay here: importing the file again won't change this workout.`
+              : "Logged in this app. Calories aren't tracked for manual workouts."
         }
       >
         <Row label="Date" value={`${readingDateLabel(start, now)}, ${time}`} />
-        <Row label="Source" value={sourceLabel(w.source)} />
+        <Row label="Source" value={sourceLabel(w)} />
         <Row label="Duration" value={formatSleep(workoutSeconds(w) / 60)} />
         <Row label="Distance" value={w.distance_m != null ? `${fromMeters(Number(w.distance_m), distanceUnit)} ${distanceUnit}` : NOT_RECORDED} />
         <Row label="Calories" value={w.energy_kcal != null ? `${Math.round(Number(w.energy_kcal))} kcal` : NOT_RECORDED} last />
