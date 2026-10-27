@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useLargeText } from '@/components/ui';
 import { formatValue, hasNoData, type LeaderboardRow, type Metric } from '@/lib/leaderboard';
 import { useTheme } from '@/theme';
 
@@ -15,6 +16,8 @@ type Props = {
 // Race-board row: heavy rank numeral, name, score, and a lane bar filled relative to the leader.
 export function LeaderboardRowView({ row, rankLabel, metric, isYou, leader, source }: Props) {
   const c = useTheme();
+  // Names wrap at accessibility sizes instead of truncating to a few letters.
+  const large = useLargeText();
   const noData = hasNoData(row);
   const valueText = row.value === null ? (row.state === 'not_shared' ? 'Not shared' : 'No data') : formatValue(metric, row.value);
   const fill = row.value === null || leader <= 0 ? 0 : Math.min(1, row.value / leader);
@@ -31,7 +34,7 @@ export function LeaderboardRowView({ row, rankLabel, metric, isYou, leader, sour
         </Text>
         <View style={styles.main}>
           <View style={styles.name}>
-            <Text numberOfLines={1} style={[styles.nameText, { color: c.ink }]}>
+            <Text numberOfLines={large ? undefined : 1} style={[styles.nameText, { color: c.ink }]}>
               {row.name}
             </Text>
             {isYou && <Text style={[styles.tag, { color: c.accent }]}>You</Text>}

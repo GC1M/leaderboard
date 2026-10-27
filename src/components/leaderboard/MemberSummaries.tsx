@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { styles as ui } from '@/components/ui';
+import { styles as ui, useLargeText } from '@/components/ui';
 import { sleepText, weightText, workoutsText, type MemberSummary } from '@/lib/group-summaries';
 import type { WeightUnit } from '@/lib/health/format';
 import { useTheme } from '@/theme';
@@ -8,6 +8,7 @@ import { useTheme } from '@/theme';
 // Plain latest values, no ranking: sleep and weight are not competitions.
 export function MemberSummaries({ items, me, unit }: { items: MemberSummary[]; me?: string; unit: WeightUnit }) {
   const c = useTheme();
+  const large = useLargeText();
   return (
     <View style={styles.wrap}>
       <Text accessibilityRole="header" style={[ui.bodyStrong, { color: c.ink }]}>
@@ -25,7 +26,7 @@ export function MemberSummaries({ items, me, unit }: { items: MemberSummary[]; m
             accessibilityLabel={`${name}. ${sleep}. ${weight}. ${workouts}`}
             style={[styles.row, { borderBottomColor: c.line }]}
           >
-            <Text numberOfLines={1} style={[ui.bodyStrong, { color: c.ink }]}>
+            <Text numberOfLines={large ? undefined : 1} style={[ui.bodyStrong, { color: c.ink }]}>
               {name}
             </Text>
             <Text style={[ui.caption, { color: c.inkSoft }]}>{sleep}</Text>
