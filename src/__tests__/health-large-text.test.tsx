@@ -3,18 +3,27 @@ import { StyleSheet } from 'react-native';
 import { createRoot } from 'test-renderer';
 
 import Sleep from '@/app/sleep';
+import Weight from '@/app/weight';
+import { WeightChart } from '@/components/history/WeightChart';
 import { Segmented } from '@/components/history/Segmented';
 import { StepRow } from '@/components/steps/StepRow';
 import { WeeklyHistoryView } from '@/components/workouts/WeeklyHistory';
+import { WorkoutEditor } from '@/components/workouts/WorkoutEditor';
 
 let mockFontScale = 1;
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
   default: () => ({ width: 390, height: 844, scale: 3, fontScale: mockFontScale }),
 }));
+jest.mock('expo-router', () => ({ ...jest.requireActual('expo-router'), useFocusEffect: jest.fn() }));
 jest.mock('@/lib/auth', () => ({ useAuth: () => ({ session: { user: { id: 'me' } }, loading: false }) }));
 jest.mock('@/lib/health/sync', () => ({ useHealthExport: () => ({ entries: [] }), useHealthSync: () => ({}) }));
 jest.mock('@/lib/sleep', () => ({ getMyManualSleep: () => Promise.resolve([]), getMyRecentSleep: () => Promise.resolve([]) }));
+jest.mock('@/lib/weight', () => ({ getMyWeightHistory: () => Promise.resolve([]), getMyLatestWeight: () => Promise.resolve(null) }));
+jest.mock('@/lib/weight-unit', () => ({ useWeightUnit: () => ['kg', jest.fn()], loadWeightUnit: () => Promise.resolve('kg'), saveWeightUnit: jest.fn() }));
+jest.mock('@/lib/workouts', () => ({ listExercises: () => Promise.resolve([]) }));
+jest.mock('@/lib/workout-templates', () => ({}));
+jest.mock('@/lib/workout-draft', () => ({ loadDraft: () => Promise.resolve(null), saveDraft: jest.fn(), clearDraft: jest.fn() }));
 jest.mock('@/components/history/BarHistory', () => ({ BarHistory: () => null }));
 jest.mock('@/components/health/ExportOption', () => ({ ExportOption: () => null, useExportChoice: () => ({}) }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -98,5 +107,50 @@ describe('sleep entry', () => {
       expect(f.props.multiline).toBe(true);
       expect(f.props.submitBehavior).toBe('blurAndSubmit');
     });
+  });
+});
+
+describe('weight entry', () => {
+  const when = (c: any) => c.queryAll((n: any) => n.props.accessibilityLabel === 'When' && typeof n.type === 'string')[0];
+
+  test('"When" stays single line at default size', async () => {
+    expect(when(await render(<Weight />)).props.multiline).toBeFalsy();
+  });
+
+  test('"When" wraps at accessibility sizes so the time stays visible', async () => {
+    mockFontScale = 3.1;
+    const f = when(await render(<Weight />));
+    expect(f.props.multiline).toBe(true);
+    expect(f.props.submitBehavior).toBe('blurAndSubmit');
+  });
+});
+
+describe('weight chart summary', () => {
+  const to = new Date(2026, 9, 27, 12);
+  const summary = async (kgs: number[]) => {
+    const readings = kgs.map((kg, i) => ({ kg, measuredAt: new Date(2026, 9, 27 - i, 8).toISOString() }));
+    const c = await render(<WeightChart readings={readings} days={30} to={to} unit="kg" />);
+    return c.queryAll((n: any) => n.props.accessibilityRole === 'image')[0].props.accessibilityLabel as string;
+  };
+
+  test('one reading names its value once', async () => {
+    expect(await summary([75])).toContain('1 reading, 75.0 kg.');
+  });
+
+  test('several readings give the range', async () => {
+    expect(await summary([75, 76])).toContain('2 readings from 75.0 kg to 76.0 kg.');
+  });
+});
+
+describe('workout date and time', () => {
+  const row = (c: any) => c.queryAll((n: any) => n.type === 'View' && n.queryAll((m: any) => m.props.accessibilityLabel === 'Start time' && typeof m.type === 'string').length && n.queryAll((m: any) => m.props.accessibilityLabel === 'Date' && typeof m.type === 'string').length).at(-1);
+
+  test('sit side by side at default size', async () => {
+    expect(style(row(await render(<WorkoutEditor />))).flexDirection).toBe('row');
+  });
+
+  test('stack at accessibility sizes', async () => {
+    mockFontScale = 3.1;
+    expect(style(row(await render(<WorkoutEditor />))).flexDirection).toBe('column');
   });
 });
