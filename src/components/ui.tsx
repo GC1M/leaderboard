@@ -13,6 +13,7 @@ import {
   Text,
   TextInput,
   type TextInputProps,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -232,6 +233,11 @@ export function Section({ title, footer, children }: { title?: string; footer?: 
   );
 }
 
+// iOS accessibility text sizes (AX1 and up) start around 1.6x; below that the default layouts still fit.
+export function useLargeText() {
+  return useWindowDimensions().fontScale >= 1.5;
+}
+
 // One row in a Section. Tappable rows get a chevron unless they act in place (`danger`, `action`).
 export function Row({
   label,
@@ -254,6 +260,8 @@ export function Row({
 }) {
   const c = useTheme();
   const color = danger ? c.danger : action ? c.accent : c.ink;
+  // At accessibility sizes the label wraps and the value stacks under it instead of both truncating.
+  const large = useLargeText();
   return (
     <Pressable
       disabled={!onPress || disabled}
@@ -264,13 +272,13 @@ export function Row({
       style={({ pressed }) => [styles.row, { opacity: disabled ? 0.5 : pressed ? 0.6 : 1 }]}
     >
       {icon && <Icon name={icon} color={danger ? c.danger : c.accent} size={20} />}
-      <View style={[styles.rowBody, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line }]}>
-        <Text numberOfLines={1} style={[styles.body, { color, flexShrink: 1 }]}>
+      <View style={[styles.rowBody, large && styles.rowStacked, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line }]}>
+        <Text numberOfLines={large ? undefined : 1} style={[styles.body, { color, flexShrink: 1 }]}>
           {label}
         </Text>
         <View style={styles.rowEnd}>
           {value ? (
-            <Text numberOfLines={1} style={[styles.body, { color: c.inkSoft }]}>
+            <Text numberOfLines={large ? undefined : 1} style={[styles.body, { color: c.inkSoft }, large && { flexShrink: 1 }]}>
               {value}
             </Text>
           ) : null}
@@ -310,6 +318,7 @@ export const styles = StyleSheet.create({
   sectionText: { paddingHorizontal: 16 },
   row: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 16 },
   rowBody: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingRight: 16, paddingVertical: 11 },
+  rowStacked: { flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' },
   rowEnd: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   skeleton: { height: 64, borderRadius: 8, opacity: 0.6 },
   code: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: 4, fontVariant: ['tabular-nums'] },
