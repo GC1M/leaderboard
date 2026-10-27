@@ -66,7 +66,7 @@ export function WeeklyHistoryView({ totals, unit, now = new Date() }: { totals: 
     <View style={{ gap: 12 }}>
       <View accessible accessibilityLabel={`This week: ${parts.length ? parts.join(', ') : 'no workouts yet'}`} style={{ gap: 4 }}>
         <Text style={[ui.caption, { color: c.inkSoft }]}>This week</Text>
-        <Text style={[styles.big, { color: parts.length ? c.ink : c.inkSoft }]}>{parts.length ? parts.slice(0, 2).join(', ') : 'No workouts yet'}</Text>
+        <Text maxFontSizeMultiplier={1.5} style={[styles.big, { color: parts.length ? c.ink : c.inkSoft }]}>{parts.length ? parts.slice(0, 2).join(', ') : 'No workouts yet'}</Text>
         {parts.slice(2).map((p) => (
           <Text key={p} style={[ui.caption, { color: c.inkSoft }]}>{p}</Text>
         ))}
@@ -116,6 +116,6 @@ const styles = StyleSheet.create({
   chart: { flexDirection: 'row', height: 120 },
   track: { flex: 1, justifyContent: 'flex-end' },
   gap: { height: 8, borderWidth: 1, borderStyle: 'dashed' },
-  axis: { flexDirection: 'row', justifyContent: 'space-between' },
+  axis: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 12 },
   week: { paddingHorizontal: 16, paddingVertical: 12, gap: 2 },
 });

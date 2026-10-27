@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { StepRow as Row } from '@/lib/health/rules';
 
+import { useLargeText } from '@/components/ui';
 import { useTheme } from '@/theme';
 
 const dayLabel = (date: string, today: string) => {
@@ -12,11 +13,12 @@ const dayLabel = (date: string, today: string) => {
 
 export function StepRow({ date, today, row, onUseHealth }: { date: string; today: string; row?: Row; onUseHealth?: () => void }) {
   const t = useTheme();
+  const large = useLargeText();
   const label = dayLabel(date, today);
   const source = row?.source === 'manual' ? 'Manual' : 'Health';
   const a11y = row ? `${label}, ${row.value.toLocaleString()} steps, ${source}` : `${label}, no data`;
   return (
-    <View accessible={!onUseHealth || row?.source !== 'manual'} accessibilityLabel={a11y} style={[styles.row, { borderBottomColor: t.line }]}>
+    <View accessible={!onUseHealth || row?.source !== 'manual'} accessibilityLabel={a11y} style={[styles.row, large && styles.stacked, { borderBottomColor: t.line }]}>
       <View style={styles.main}>
         <Text style={[styles.day, { color: t.ink }]}>{label}</Text>
         {row && <Text style={[styles.tag, { color: row.source === 'manual' ? t.manual : t.inkSoft }]}>{source}</Text>}
@@ -33,6 +35,7 @@ export function StepRow({ date, today, row, onUseHealth }: { date: string; today
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 64, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  stacked: { flexDirection: 'column', alignItems: 'flex-start' },
   main: { flexShrink: 1 },
   day: { fontSize: 16, fontWeight: '600' },
   link: { minHeight: 44, justifyContent: 'center' },

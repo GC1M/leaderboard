@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { styles as ui } from '@/components/ui';
+import { styles as ui, useLargeText } from '@/components/ui';
 import { useTheme } from '@/theme';
 
 // Small segmented control: 7/30/90 days, kg/lb.
@@ -11,8 +11,9 @@ export function Segmented<T extends string | number>({ options, value, onChange,
   label: string;
 }) {
   const c = useTheme();
+  const large = useLargeText();
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel={label} style={[styles.row, { backgroundColor: c.lane }]}>
+    <View accessibilityRole="radiogroup" accessibilityLabel={label} style={[styles.row, large && styles.wrap, { backgroundColor: c.lane }]}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -22,7 +23,7 @@ export function Segmented<T extends string | number>({ options, value, onChange,
             accessibilityLabel={o.a11y ?? o.label}
             accessibilityState={{ selected: on }}
             onPress={() => onChange(o.value)}
-            style={[styles.option, on && { backgroundColor: c.surface }]}
+            style={[styles.option, large ? styles.wrapOption : styles.equal, on && { backgroundColor: c.surface }]}
           >
             <Text style={[ui.bodyStrong, { color: on ? c.accent : c.ink }]}>{o.label}</Text>
           </Pressable>
@@ -34,5 +35,10 @@ export function Segmented<T extends string | number>({ options, value, onChange,
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', borderRadius: 10, padding: 2 },
-  option: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  // At accessibility sizes the labels outgrow equal parts, so options size to their text and wrap.
+  wrap: { flexWrap: 'wrap' },
+  // `flex: 1` forces a zero basis even with flexBasis 'auto' on top, so it's only applied at default sizes.
+  wrapOption: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', paddingHorizontal: 12 },
+  equal: { flex: 1 },
+  option: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
 });

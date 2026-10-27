@@ -96,7 +96,7 @@ export default function Summary() {
               <Icon name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} color={c.inkSoft} size={14} />
             </View>
             <Text style={[ui.caption, { color: c.inkSoft }]}>Today</Text>
-            <Text style={[styles.big, { color: today ? c.ink : c.inkSoft }]}>{today ? today.value.toLocaleString() : 'No data'}</Text>
+            <Text maxFontSizeMultiplier={1.5} style={[styles.big, { color: today ? c.ink : c.inkSoft }]}>{today ? today.value.toLocaleString() : 'No data'}</Text>
             {today?.source === 'manual' && <Text style={[ui.caption, { color: c.manual }]}>Manual</Text>}
             <WeekChart dates={dates} rows={steps} />
           </Pressable>
@@ -204,7 +204,7 @@ function MetricCard({ title, icon, value, when, state, empty = 'No data', onPres
         <Icon name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} color={c.inkSoft} size={14} />
       </View>
       {when && <Text style={[ui.caption, { color: c.inkSoft }]}>{when}</Text>}
-      <Text style={[styles.big, { color: state === 'ok' ? c.ink : state === 'error' ? c.danger : c.inkSoft }]}>{text}</Text>
+      <Text maxFontSizeMultiplier={1.5} style={[styles.big, { color: state === 'ok' ? c.ink : state === 'error' ? c.danger : c.inkSoft }]}>{text}</Text>
     </Pressable>
   );
 }
