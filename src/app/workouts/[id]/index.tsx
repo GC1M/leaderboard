@@ -7,7 +7,7 @@ import { useWeightUnit } from '@/lib/weight-unit';
 import { defaultDistanceUnit } from '@/lib/workout-form';
 import { getWorkout, type WorkoutDetail } from '@/lib/workouts';
 
-// Read-only session detail. Manual workouts offer Edit; imported ones are changed in Health.
+// Read-only session detail. Manual and file-imported workouts offer Edit; Health ones are changed in Health.
 export default function WorkoutDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -36,7 +36,7 @@ export default function WorkoutDetailScreen() {
       ) : (
         <>
           <WorkoutDetailView w={w} weightUnit={unit} distanceUnit={distanceUnit} />
-          {w.source === 'manual' && <Button label="Edit Workout" onPress={() => router.replace(`/workouts/${w.id}/edit`)} />}
+          {w.source !== 'healthkit' && <Button label="Edit Workout" onPress={() => router.replace(`/workouts/${w.id}/edit`)} />}
         </>
       )}
     </Screen>

@@ -31,7 +31,7 @@ export function templateToForm(
   const at = now.toISOString();
   const shell: WorkoutDetail = {
     id: t.id, user_id: t.user_id, source: 'manual', activity_type: t.activity_type, started_at: at, ended_at: at, timezone: '',
-    duration_s: t.duration_s, distance_m: null, energy_kcal: null, notes: t.notes, health_uuid: null, health_device_id: null, updated_at: t.updated_at,
+    duration_s: t.duration_s, distance_m: null, energy_kcal: null, notes: t.notes, health_uuid: null, health_device_id: null, source_app: null, source_key: null, updated_at: t.updated_at,
     exercises: t.exercises.map((e) => ({
       id: e.id, exerciseId: e.exerciseId, name: e.name, notes: e.notes,
       sets: e.sets.map(({ template_exercise_id, ...s }) => ({ ...s, workout_exercise_id: template_exercise_id })),

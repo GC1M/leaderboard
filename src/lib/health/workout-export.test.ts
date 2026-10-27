@@ -45,6 +45,7 @@ describe('payload', () => {
 
   it('only app-created workouts are exportable, never imported Health workouts', () => {
     expect(canExportWorkout('manual')).toBe(true);
+    expect(canExportWorkout('import')).toBe(true);
     expect(canExportWorkout('healthkit')).toBe(false);
   });
 });

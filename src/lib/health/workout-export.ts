@@ -4,7 +4,8 @@ import { loadHealthKit, removeExportedSample } from './healthkit';
 
 // App-created workouts the user chose to also save to Apple Health. recordId is the `workouts.id`, so the sample is
 // tagged `LeaderboardRecordId = workout:<id>`; the Health workout importer skips samples with that key.
-// Imported (healthkit-source) workouts are never exportable (canExportWorkout).
+// Imported (healthkit-source) workouts are never exportable (canExportWorkout). Workouts imported from another
+// app's file can be, but start off: that app has usually written them to Health already.
 export const WORKOUT_KIND = 'workout';
 export const WORKOUT_WRITE_TYPE = 'HKWorkoutTypeIdentifier' as const; // the only type written: no associated samples, route or heart rate
 
@@ -12,7 +13,7 @@ export const WORKOUT_WRITE_TYPE = 'HKWorkoutTypeIdentifier' as const; // the onl
 export type WorkoutPayload = { activity: string; start: string; end: string; distanceM?: number; energyKcal?: number };
 type WorkoutFields = { activityType: string; startedAt: Date; endedAt: Date; distanceM?: number | null; energyKcal?: number | null };
 
-export const canExportWorkout = (source: string) => source === 'manual';
+export const canExportWorkout = (source: string) => source === 'manual' || source === 'import';
 
 // A value the user never entered stays absent; HealthKit cannot hold a zero total, so zero is absent too.
 const positive = (n: number | null | undefined) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined);

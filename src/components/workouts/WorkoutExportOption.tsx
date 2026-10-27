@@ -29,7 +29,8 @@ export function useWorkoutExport(source: string) {
   }, [key]);
   const inHealth = (id: string) => exp.entries.some((e) => e.kind === WORKOUT_KIND && e.recordId === id && e.op === 'save');
   const eligible = canExportWorkout(source) && isHealthAvailable();
-  const wanted = (id?: string) => eligible && (chosen ?? ((id !== undefined && inHealth(id)) || remembered));
+  // The remembered choice only covers workouts logged here; one imported from another app starts off.
+  const wanted = (id?: string) => eligible && (chosen ?? ((id !== undefined && inHealth(id)) || (remembered && source === 'manual')));
   const set = async (next: boolean) => {
     setMessage(null);
     if (next) {

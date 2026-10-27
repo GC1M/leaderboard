@@ -15,6 +15,14 @@ const config: ExpoConfig = {
   ios: {
     bundleIdentifier: 'com.shivamlalakiya.leaderboard',
     usesAppleSignIn: true,
+    infoPlist: {
+      // Puts Leaderboard in the share sheet for CSV files, so a workout export from Strong, Hevy, Fitbod or JEFIT opens
+      // the import preview (see src/app/+native-intent.tsx). iOS hands over a copy, never the other app's file.
+      CFBundleDocumentTypes: [
+        { CFBundleTypeName: 'CSV File', CFBundleTypeRole: 'Viewer', LSHandlerRank: 'Alternate', LSItemContentTypes: ['public.comma-separated-values-text'] },
+      ],
+      LSSupportsOpeningDocumentsInPlace: false,
+    },
   },
   android: {
     package: 'com.shivamlalakiya.leaderboard',

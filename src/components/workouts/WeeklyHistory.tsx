@@ -92,7 +92,7 @@ export function WeeklyHistoryView({ totals, unit, now = new Date() }: { totals: 
       <Section footer="Distance and calories add up only the workouts that recorded them. Weeks start on Monday.">
         {[...totals].reverse().map((t, i, all) => {
           const p = totalsParts(t, unit);
-          const from = [t.imported && `${t.imported} from Apple Health`, t.manual && `${t.manual} manual`].filter(Boolean).join(', ');
+          const from = [t.imported && `${t.imported} from Apple Health`, t.manual && `${t.manual} manual`, t.fromApps && `${t.fromApps} from other apps`].filter(Boolean).join(', ');
           return (
             <View
               key={t.weekStart}

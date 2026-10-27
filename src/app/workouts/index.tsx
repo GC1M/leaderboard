@@ -34,6 +34,7 @@ export default function Workouts() {
     <Screen title="Workouts" back>
       <Button label="New Workout" onPress={() => router.push('/workouts/new')} />
       <Button secondary label="Start from Template" onPress={() => router.push('/workouts/templates')} />
+      <Button secondary label="Import from Another App" onPress={() => router.push('/workouts/import')} />
       {drafts.length > 0 && (
         <Section>
           {drafts.map((d, i) => (
@@ -51,7 +52,7 @@ export default function Workouts() {
       ) : !rows ? (
         <Skeleton label="Loading workouts" />
       ) : rows.length === 0 ? (
-        <Text style={[styles.body, { color: c.inkSoft }]}>No workouts yet. Log one, or import them from Apple Health.</Text>
+        <Text style={[styles.body, { color: c.inkSoft }]}>No workouts yet. Log one, or import them from Apple Health or another workout app.</Text>
       ) : (
         <Section>
           {rows.map((w, i) => (

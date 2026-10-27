@@ -4,8 +4,9 @@ import { supabase } from './supabase';
 type WorkoutRow = Database['public']['Tables']['workouts']['Row'];
 type SetRow = Database['public']['Tables']['workout_sets']['Row'];
 
-// source 'healthkit' = imported summary (no exercises or sets); 'manual' = app-authored log.
-export type Workout = Omit<WorkoutRow, 'source'> & { source: 'healthkit' | 'manual' };
+// source 'healthkit' = imported summary (no exercises or sets); 'manual' = app-authored log; 'import' = detailed log
+// from another app's export (source_app says which), edited like a manual one.
+export type Workout = Omit<WorkoutRow, 'source'> & { source: 'healthkit' | 'manual' | 'import' };
 export type ExerciseCategory = 'strength' | 'cardio' | 'core' | 'mobility';
 export type Exercise = { id: string; name: string; category: ExerciseCategory; isCustom: boolean };
 // Canonical units: kilograms, meters, seconds. null means not recorded; 0 means a recorded zero.
@@ -69,6 +70,15 @@ async function save(id: string | null, input: ManualWorkoutInput): Promise<strin
   return data;
 }
 
+// Apps like Strong also write each session to Apple Health, so the Health importer brings in a summary of a
+// workout the file import already has in detail. A Health workout that overlaps an imported one is that copy:
+// it's left out here, as group_workouts leaves it out of group totals.
+export function hideHealthDuplicates(rows: readonly Workout[]): Workout[] {
+  const t = (s: string) => new Date(s).getTime();
+  const imports = rows.filter((w) => w.source === 'import');
+  return rows.filter((w) => w.source !== 'healthkit' || !imports.some((i) => t(i.started_at) < t(w.ended_at) && t(i.ended_at) > t(w.started_at)));
+}
+
 // Newest first. Summaries only; use getWorkout for exercises and sets.
 export async function listWorkouts(limit = 50): Promise<Workout[]> {
   const user_id = await currentUserId();
@@ -79,7 +89,7 @@ export async function listWorkouts(limit = 50): Promise<Workout[]> {
     .order('started_at', { ascending: false })
     .limit(limit);
   if (error) throw new Error(LOAD_MESSAGE);
-  return data as Workout[];
+  return hideHealthDuplicates(data as Workout[]);
 }
 
 // Everything that started on or after `from`, newest first, for weekly history. Summaries only.
@@ -93,7 +103,7 @@ export async function listWorkoutsSince(from: Date): Promise<Workout[]> {
     .order('started_at', { ascending: false })
     .limit(1000);
   if (error) throw new Error(LOAD_MESSAGE);
-  return data as Workout[];
+  return hideHealthDuplicates(data as Workout[]);
 }
 
 export async function getWorkout(id: string): Promise<WorkoutDetail | null> {
