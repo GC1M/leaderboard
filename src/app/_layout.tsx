@@ -24,8 +24,9 @@ function Routes() {
   // Protected routes keep query parameters when auth changes. Resume only our validated invite route,
   // never an arbitrary return URL, and still let the user confirm joining on that screen.
   // Native loses the query param, so fall back to the invite join/[code] parked, and resume it only once.
+  // Wait until the guard flip has moved off sign-in: the stack reset it triggers overwrites an earlier replace.
   useEffect(() => {
-    if (gate !== 'signed-in') return;
+    if (gate !== 'signed-in' || segments[0] === 'sign-in') return;
     const next = isValidCode(invite) ? invite : pendingInvite.code;
     pendingInvite.code = '';
     if (isValidCode(next) && segments[0] !== 'join') router.replace(`/join/${next}`);

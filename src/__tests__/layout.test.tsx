@@ -93,6 +93,32 @@ test('native: the invite resumes once after sign-in even though the guard flip d
   await act(async () => r.unmount());
 });
 
+test('native warm start: a link opened on the mounted sign-in screen resumes after the guard flip settles', async () => {
+  mockParams = {};
+  mockSegments = ['sign-in'];
+  mockReplace.mockClear();
+  mockAuth.mockReturnValue({ session: null, loading: false });
+  const r = createRoot();
+  await act(async () => r.render(<RootLayout />));
+  // The link pushes join/[code] over sign-in, which parks the invite and redirects back to sign-in.
+  mockParams = { code: 'abcd-2345' };
+  mockSegments = ['join', '[code]'];
+  await act(async () => r.render(<JoinByLink />));
+  await act(async () => r.render(<RootLayout />));
+  mockSegments = ['sign-in'];
+  await act(async () => r.render(<RootLayout />));
+  // Signed in, but the guard has not swapped sign-in out yet: a replace now is overwritten by the flip.
+  mockAuth.mockReturnValue({ session: { user: { id: 'user' } }, loading: false });
+  await act(async () => r.render(<RootLayout />));
+  expect(mockReplace).not.toHaveBeenCalled();
+  // The flip lands on (tabs) and drops the sign-in route's code param.
+  mockParams = {};
+  mockSegments = ['(tabs)'];
+  await act(async () => r.render(<RootLayout />));
+  expect(mockReplace).toHaveBeenCalledWith('/join/ABCD2345');
+  await act(async () => r.unmount());
+});
+
 test.each(['https://outside.example', '', ['ABCD2345', 'WXYZ6789']])('does not redirect to untrusted or ambiguous invite params: %s', async (code) => {
   mockParams = { code };
   mockSegments = ['(tabs)'];
