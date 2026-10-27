@@ -37,7 +37,7 @@ export function WeekChart({ dates, rows }: { dates: string[]; rows: StepRow[] })
         (max > 0 ? `, best ${max.toLocaleString()} on ${weekday(dates[values.indexOf(max)], 'long')}` : '');
   return (
     <View accessible accessibilityRole="image" accessibilityLabel={summary} style={{ gap: 8 }}>
-      <View style={styles.chart}>
+      {days > 0 && <View style={styles.chart}>
         {values.map((v, i) => (
           <View key={dates[i]} style={styles.col}>
             <View style={styles.track}>
@@ -55,7 +55,7 @@ export function WeekChart({ dates, rows }: { dates: string[]; rows: StepRow[] })
             <Text style={[ui.caption, { color: c.inkSoft }]}>{weekday(dates[i], 'narrow')}</Text>
           </View>
         ))}
-      </View>
+      </View>}
       <Text style={[ui.caption, { color: c.inkSoft }]}>{caption}</Text>
     </View>
   );

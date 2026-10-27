@@ -46,14 +46,14 @@ export function Screen({
           accessibilityRole="button"
           accessibilityLabel="Back"
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          style={styles.back}
+          style={[styles.back, Platform.OS === 'web' && styles.webWidth]}
         >
           <Icon name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} color={c.accent} size={20} />
           <Text style={[styles.body, { color: c.accent }]}>Back</Text>
         </Pressable>
       )}
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, Platform.OS === 'web' && styles.webWidth]}
         keyboardShouldPersistTaps="handled"
         refreshControl={refreshControl}
       >
@@ -288,6 +288,7 @@ export function ErrorText({ children }: { children?: string | null }) {
 
 export const styles = StyleSheet.create({
   back: { minHeight: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingHorizontal: 12 },
+  webWidth: { width: '100%', maxWidth: 640, alignSelf: 'center' },
   content: { flexGrow: 1, padding: 16, gap: 16 },
   // Apple's text styles: large title, title 3, body, headline, footnote.
   title: { fontSize: 34, lineHeight: 41, fontWeight: '700' },

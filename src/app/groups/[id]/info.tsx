@@ -12,6 +12,7 @@ import {
   getMyShares,
   inviteLink,
   isNotMember,
+  isValidGroupId,
   leaveGroup,
   listMembers,
   removeMember,
@@ -48,12 +49,14 @@ export default function GroupInfo() {
 
   const load = useCallback(async () => {
     try {
+      if (!isValidGroupId(id)) throw new Error('not a member of this group');
       const [g, m, s] = await Promise.all([
-        supabase.from('groups').select('name, invite_code, owner_id').eq('id', id).single(),
+        supabase.from('groups').select('name, invite_code, owner_id').eq('id', id).maybeSingle(),
         listMembers(id),
         getMyShares(id),
       ]);
       if (g.error) throw g.error;
+      if (!g.data) throw new Error('not a member of this group');
       setGroup(g.data);
       setName(g.data.name);
       setMembers(m);
@@ -62,8 +65,8 @@ export default function GroupInfo() {
     } catch (e) {
       if (isNotMember(e)) {
         // Removed or left elsewhere: nothing here to show any more.
-        router.dismissAll();
-        router.navigate('/groups');
+        if (router.canDismiss()) router.dismissAll();
+        router.replace({ pathname: '/groups', params: { notice: 'unavailable' } });
         return;
       }
       setError("Couldn't load this group. Check your connection and try again.");
@@ -143,8 +146,8 @@ export default function GroupInfo() {
             try {
               await (owner ? deleteGroup(id) : leaveGroup(id));
               // Group info sits on the root stack above the tabs: pop back to the tabs, then show Groups.
-              router.dismissAll();
-              router.navigate('/groups');
+              if (router.canDismiss()) router.dismissAll();
+              router.replace('/groups');
             } catch (e) {
               setBusy(false);
               setError(e instanceof Error ? e.message : 'Something went wrong. Try again.');

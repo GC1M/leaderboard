@@ -185,3 +185,6 @@ export function isNotMember(e: unknown): boolean {
   const o = (typeof e === 'object' && e ? e : {}) as { message?: unknown; code?: unknown };
   return String(o.message ?? '').includes('not a member of this group') || o.code === 'PGRST116';
 }
+
+// Reject malformed deep links before sending a UUID filter to PostgREST.
+export const isValidGroupId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);

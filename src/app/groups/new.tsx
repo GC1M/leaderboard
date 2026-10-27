@@ -77,7 +77,7 @@ export default function NewGroup() {
         onChangeText={setName}
         onSubmitEditing={submit}
         placeholder="Office steps"
-        helper={`${name.length}/60. Friends see this name when they join.`}
+        helper={name.trim() ? `${name.length}/60. Friends see this name when they join.` : 'Enter a group name to enable Create Group.'}
         error={error}
       />
       <Button label="Create Group" busy={busy} disabled={!name.trim()} onPress={submit} />
