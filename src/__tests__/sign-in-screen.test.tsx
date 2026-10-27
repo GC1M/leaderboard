@@ -111,6 +111,7 @@ test('code step: one box per digit, verifies on the 6th, strips spaces from a pa
     expect(style.opacity ?? 1).toBe(1);
     expect(style.color).toBe('transparent');
     expect(input.props.caretHidden).toBe(true);
+    expect(input.props.placeholderTextColor).toBe('transparent');
     // The resend and change links wrap at large text sizes instead of pushing one off-screen.
     const row = c.queryAll((n: any) => StyleSheet.flatten(n.props.style)?.flexWrap === 'wrap' && JSON.stringify(n).includes('Change Email'));
     expect(row.length).toBeGreaterThan(0);
