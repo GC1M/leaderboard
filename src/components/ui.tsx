@@ -116,14 +116,15 @@ export function Field({
   error,
   code,
   ...input
-}: TextInputProps & { label: string; helper?: string; error?: string | null; code?: boolean }) {
+}: TextInputProps & { label: string; helper?: string; error?: string | null; code?: boolean | number }) {
   const c = useTheme();
   const [focused, setFocused] = useState(false);
   const field = (
     <TextInput
       accessibilityLabel={label}
-      placeholderTextColor={c.inkSoft}
-      caretHidden={code}
+      // The code input's text is transparent over the boxes, so its placeholder must be too.
+      placeholderTextColor={code ? 'transparent' : c.inkSoft}
+      caretHidden={!!code}
       {...input}
       onFocus={(e) => {
         setFocused(true);
@@ -143,11 +144,12 @@ export function Field({
           borderWidth: focused || error ? 2 : 1,
           padding: focused || error ? 11 : 12,
         },
-        code && styles.codeInput,
+        !!code && styles.codeInput,
       ]}
     />
   );
-  const length = input.maxLength ?? 6;
+  // `code` alone is the 6-digit sign-in code; a number sets the box count without a maxLength that would cut a paste.
+  const length = typeof code === 'number' ? code : 6;
   const value = input.value ?? '';
   return (
     <View style={{ gap: 8 }}>
