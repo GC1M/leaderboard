@@ -1,9 +1,10 @@
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Share, Text, View } from 'react-native';
+import { Share, Text, View } from 'react-native';
 
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
+import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import {
   deleteGroup,
@@ -108,7 +109,7 @@ export default function GroupInfo() {
   const renamed = name.trim() !== group.name && name.trim().length > 0;
 
   const memberOptions = (m: Member) =>
-    Alert.alert(m.name, undefined, [
+    alert(m.name, undefined, [
       {
         text: "Delete Today's Manual Steps",
         style: 'destructive',
@@ -118,7 +119,7 @@ export default function GroupInfo() {
         text: 'Remove from Group',
         style: 'destructive',
         onPress: () =>
-          Alert.alert(`Remove ${m.name}?`, 'They can join again with the invite code unless you share a new one.', [
+          alert(`Remove ${m.name}?`, 'They can join again with the invite code unless you share a new one.', [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Remove', style: 'destructive', onPress: () => act(() => removeMember(id, m.userId)) },
           ]),
@@ -127,7 +128,7 @@ export default function GroupInfo() {
     ]);
 
   const confirmLeave = () =>
-    Alert.alert(
+    alert(
       owner ? `Delete ${group.name}?` : `Leave ${group.name}?`,
       owner
         ? "Everyone in it loses this leaderboard. Steps stay in each person's history. This can't be undone."

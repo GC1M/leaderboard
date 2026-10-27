@@ -8,7 +8,7 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-0000-0000-00000000000c', 'carol@x.com', '{}');
 
 select is((select display_name from profiles where id = '00000000-0000-0000-0000-00000000000a'), 'Alice', 'profile uses metadata name');
-select is((select display_name from profiles where id = '00000000-0000-0000-0000-00000000000b'), 'bob', 'profile falls back to email prefix');
+select is((select display_name from profiles where id = '00000000-0000-0000-0000-00000000000b'), 'Player 0000', 'profile falls back to a neutral name, never the email');
 
 select ok((select bool_and(public.gen_invite_code() ~ '^[A-HJ-NP-Z2-9]{8}$') from generate_series(1, 200)), 'gen_invite_code always yields 8 unambiguous chars');
 
@@ -72,7 +72,7 @@ select throws_ok($$select * from group_leaderboard((select id from g1), 'steps',
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
 select results_eq(
   $$select display_name, value, rank from group_leaderboard((select id from g1), 'steps', 'day')$$,
-  $$values ('bob'::text, 7000::numeric, 1::bigint), ('Alice', 5000, 2)$$, 'day ranking order');
+  $$values ('Player 0000'::text, 7000::numeric, 1::bigint), ('Alice', 5000, 2)$$, 'day ranking order');
 select is(
   (select value from group_leaderboard((select id from g1), 'steps', 'week') where display_name = 'Alice'),
   (select sum(steps) from group_steps((select id from g1), date_trunc('week', current_date)::date, current_date + 7) where user_id = '00000000-0000-0000-0000-00000000000a'),
@@ -87,7 +87,7 @@ select results_eq(
 
 select results_eq(
   $$select display_name, rank from group_leaderboard((select id from g1), 'screen_min', 'day') order by rank$$,
-  $$values ('Alice'::text, 1::bigint), ('bob', 2)$$, 'member with no screen_min data ranks last');
+  $$values ('Alice'::text, 1::bigint), ('Player 0000', 2)$$, 'member with no screen_min data ranks last');
 
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
 delete from group_members where user_id = auth.uid();

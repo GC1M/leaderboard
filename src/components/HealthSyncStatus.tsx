@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { Button, ErrorText, styles } from '@/components/ui';
 import { useHealthSync } from '@/lib/health/sync';
 import { HEALTH_METRICS, type MetricSyncState } from '@/lib/health/coordinator';
@@ -23,6 +23,10 @@ export function describeHealthSync(m:MetricSyncState):string {
 export function HealthSyncStatus(){
   const t=useTheme(),health=useHealthSync(),router=useRouter();
   const [busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null);
+  if(Platform.OS==='web')return <View style={{gap:8,marginBottom:16}}>
+    <Text style={[styles.heading,{color:t.ink}]}>Apple Health</Text>
+    <Text style={[styles.caption,{color:t.inkSoft}]}>Apple Health import is available in the iPhone app.</Text>
+  </View>;
   const action=async(fn:()=>Promise<void>)=>{setBusy(true);setError(null);try{await fn();}catch(e){setError(e instanceof Error?e.message:'Could not connect to Health.');}finally{setBusy(false);}};
   return <View style={{gap:8,marginBottom:16}}>
     <Text style={[styles.heading,{color:t.ink}]}>Apple Health</Text>

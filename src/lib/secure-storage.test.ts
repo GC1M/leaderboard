@@ -65,3 +65,21 @@ test('writes and reads with keychainAccessible AFTER_FIRST_UNLOCK', async () => 
   for (const call of (SecureStore.setItemAsync as jest.Mock).mock.calls) expect(call[2]).toEqual(opts);
   for (const call of (SecureStore.getItemAsync as jest.Mock).mock.calls) expect(call[1]).toEqual(opts);
 });
+
+test('web uses localStorage because expo-secure-store has no web implementation', async () => {
+  jest.resetModules();
+  jest.doMock('react-native', () => ({ Platform: { OS: 'web' } }));
+  const local = new Map<string, string>();
+  (globalThis as { localStorage?: unknown }).localStorage = {
+    getItem: (k: string) => local.get(k) ?? null,
+    setItem: (k: string, v: string) => local.set(k, v),
+    removeItem: (k: string) => local.delete(k),
+  };
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const web = (require('./secure-storage') as typeof import('./secure-storage')).secureStorage;
+  await web.setItem('k', 'x'.repeat(5000));
+  expect(local.get('k')).toHaveLength(5000);
+  expect(await web.getItem('k')).toHaveLength(5000);
+  await web.removeItem('k');
+  expect(await web.getItem('k')).toBeNull();
+});

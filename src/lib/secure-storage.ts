@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 // SecureStore caps values at ~2KB on some platforms and a Supabase session can exceed that,
 // so a value is split across keys `<key>.0`, `<key>.1`, ... and `<key>` holds the part count.
@@ -19,7 +20,20 @@ async function removeParts(key: string, from: number, to: number) {
   for (let i = from; i < to; i++) await SecureStore.deleteItemAsync(partKey(key, i));
 }
 
-export const secureStorage = {
+// expo-secure-store has no web implementation, so web keeps values in localStorage instead.
+const webStorage = {
+  async getItem(key: string): Promise<string | null> {
+    return localStorage.getItem(key);
+  },
+  async setItem(key: string, value: string): Promise<void> {
+    localStorage.setItem(key, value);
+  },
+  async removeItem(key: string): Promise<void> {
+    localStorage.removeItem(key);
+  },
+};
+
+const nativeStorage = {
   async getItem(key: string): Promise<string | null> {
     const count = await readCount(key);
     if (count === 0) return null;
@@ -52,3 +66,5 @@ export const secureStorage = {
     await removeParts(key, 0, count);
   },
 };
+
+export const secureStorage = Platform.OS === 'web' ? webStorage : nativeStorage;

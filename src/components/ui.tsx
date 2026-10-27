@@ -33,10 +33,12 @@ export function Screen({
   const c = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  // On web the tab bar floats over the top of tab screens (fixed, 24px down, 40px tall), so leave room for it.
+  const top = insets.top + (Platform.OS === 'web' && !back ? 64 : 0);
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top, paddingBottom: insets.bottom }}
+      style={{ flex: 1, backgroundColor: c.bg, paddingTop: top, paddingBottom: insets.bottom }}
     >
       {back && (
         <Pressable

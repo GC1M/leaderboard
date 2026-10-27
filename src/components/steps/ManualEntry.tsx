@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ExportOption, type useExportChoice } from '@/components/health/ExportOption';
 import { Button, Field, styles as ui } from '@/components/ui';
 
+import { alert } from '@/lib/alert';
 import { readDailySteps } from '@/lib/health/healthkit';
 import { MANUAL_KINDS, stepsPayload } from '@/lib/health/manual-export';
 import { validateSteps, type StepRow } from '@/lib/health/rules';
@@ -53,13 +54,13 @@ export function ManualEntry({ dates, rows, onSaved, choice }: Props) {
     const v = validateSteps(text);
     const have = choice.on && v.ok ? await healthSteps() : 0;
     if (v.ok && have > 0) {
-      Alert.alert(
+      alert(
         'Health already has steps for this day',
         `Health has ${have.toLocaleString()} steps. Saving ${v.value.toLocaleString()} to Health adds them on top, so Health would show ${(have + v.value).toLocaleString()}. The leaderboard counts ${v.value.toLocaleString()}.`,
         [{ text: 'Cancel', style: 'cancel' }, { text: 'Save Without Health', onPress: () => void save(false) }, { text: 'Add to Health', onPress: () => void save(true) }],
       );
     } else if (existing?.source === 'healthkit') {
-      Alert.alert(
+      alert(
         'Replace Health data?',
         `Health already has ${existing.value.toLocaleString()} steps for this day. A manual number will replace it and be marked Manual.`,
         [{ text: 'Cancel', style: 'cancel' }, { text: 'Replace', onPress: () => void save(choice.on) }],

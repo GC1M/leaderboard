@@ -1,10 +1,11 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Text, View } from 'react-native';
+import { AppState, Text, View } from 'react-native';
 
 import { Segmented } from '@/components/history/Segmented';
 import { ExercisePicker } from '@/components/workouts/ExercisePicker';
 import { Button, ErrorText, Field, Screen, Skeleton, styles } from '@/components/ui';
+import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { localDateKey } from '@/lib/health/dates';
 import { loadWeightUnit, saveWeightUnit } from '@/lib/weight-unit';
@@ -159,7 +160,7 @@ export function TemplateEditor({ id }: { id?: string }) {
   };
 
   const confirm = (title: string, message: string, action: string, run: () => Promise<void>) =>
-    Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: action, style: 'destructive', onPress: () => void run() }]);
+    alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: action, style: 'destructive', onPress: () => void run() }]);
 
   const remove = () =>
     confirm('Delete this template?', 'Workouts you already made from it are not affected.', 'Delete', async () => {
