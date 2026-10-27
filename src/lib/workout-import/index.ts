@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { groupWorkouts, type ImportFormat, type ParsedWorkout, type Skipped, type Units } from './shared';
+import { fitbod } from './fitbod';
 import { hevy } from './hevy';
 import { strong } from './strong';
 
@@ -8,7 +9,7 @@ export type { ImportApp, ParsedWorkout, Units } from './shared';
 // Workout history from other apps' CSV exports. Everything is parsed on the device; the preview shows what was
 // found before anything is saved, and import_workouts stores it atomically per batch.
 
-export const FORMATS: readonly ImportFormat[] = [strong, hevy];
+export const FORMATS: readonly ImportFormat[] = [strong, hevy, fitbod];
 
 export type ImportPreview = {
   format: ImportFormat;
