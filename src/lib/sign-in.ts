@@ -19,6 +19,16 @@ function loadGoogle(): typeof import('@react-native-google-signin/google-signin'
   }
 }
 
+// Plain messages instead of raw provider errors. Rate limits get their own, since "try again" would be wrong advice.
+// SMS provider failures are not the user's fault, so don't tell them to check their number.
+export const friendly = (e: unknown, fallback: string) => {
+  const { status, code } = (e ?? {}) as { status?: number; code?: string };
+  if (status === 429) return 'Too many tries. Wait a minute, then request a new code.';
+  if (code === 'sms_send_failed' || code === 'phone_provider_disabled')
+    return "Text codes aren't working right now. Sign in with email instead.";
+  return fallback;
+};
+
 export const googleAvailable = () => !!googleWebClientId && !!googleIosClientId && !!loadGoogle();
 
 export async function sendEmailCode(email: string) {

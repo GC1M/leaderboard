@@ -127,3 +127,24 @@ test('code step: one box per digit, verifies on the 6th, strips spaces from a pa
     jest.useRealTimers();
   }
 });
+
+
+test('explains disabled send and rejects incomplete email addresses', async () => {
+  const { text, type } = await setup();
+  expect(text()).toContain('Enter your email address to receive a sign-in code.');
+  await type('friend@');
+  expect(text()).toContain('Enter a valid email address, such as you@example.com.');
+  expect(mockOtp).not.toHaveBeenCalled();
+  await type('friend@example.com');
+  expect(text()).not.toContain('Enter a valid email address');
+});
+
+test('the shared Screen scroll view dismisses number pads on drag and clears the iOS tab bar', async () => {
+  const { c } = await setup();
+  const scroll = c.queryAll((n: any) => n.props.keyboardDismissMode)[0];
+  expect(scroll.props.keyboardDismissMode).toBe('interactive');
+  expect(scroll.props.contentInsetAdjustmentBehavior).toBe('automatic');
+  expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+  // A content container stretched to the frame plus the automatic inset would make short screens scroll.
+  expect(StyleSheet.flatten(scroll.props.contentContainerStyle).flexGrow).toBeUndefined();
+});

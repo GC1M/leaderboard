@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
 
@@ -9,6 +9,13 @@ import { listMyGroups, type MyGroup } from '@/lib/groups';
 export default function Groups() {
   const c = useTheme();
   const router = useRouter();
+  const { notice } = useLocalSearchParams<{ notice?: string }>();
+  const unavailable = notice === 'unavailable' ? (
+    <View style={{ gap: 8 }}>
+      <Text accessibilityLiveRegion="polite" style={[styles.body, { color: c.inkSoft }]}>This group is unavailable. You may no longer be a member, or it may have been deleted.</Text>
+      <Button plain label="Dismiss Notice" onPress={() => router.setParams({ notice: undefined })} />
+    </View>
+  ) : null;
   const [groups, setGroups] = useState<MyGroup[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,6 +52,7 @@ export default function Groups() {
   if (!groups) {
     return (
       <Screen title="Groups">
+        {unavailable}
         {error ? (
           <>
             <ErrorText>{error}</ErrorText>
@@ -59,6 +67,7 @@ export default function Groups() {
 
   return (
     <Screen title="Groups" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
+      {unavailable}
       <ErrorText>{error}</ErrorText>
       {groups.length === 0 ? (
         <View style={{ gap: 4 }}>

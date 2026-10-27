@@ -7,6 +7,7 @@ import { Button, Field, Screen, styles } from '@/components/ui';
 import { normalizePhone } from '@/lib/phone';
 import {
   appleAvailable,
+  friendly,
   googleAvailable,
   sendEmailCode,
   sendPhoneCode,
@@ -18,10 +19,6 @@ import {
 import { useTheme } from '@/theme';
 
 const RESEND_SECONDS = 30;
-
-// Plain messages instead of raw provider errors. Rate limits get their own, since "try again" would be wrong advice.
-const friendly = (e: unknown, fallback: string) =>
-  (e as { status?: number })?.status === 429 ? 'Too many tries. Wait a minute, then request a new code.' : fallback;
 
 export default function SignIn() {
   const c = useTheme();
@@ -46,7 +43,10 @@ export default function SignIn() {
   }, [cooldown]);
 
   const target = mode === 'email' ? contact.trim() : normalizePhone(contact);
-  const valid = mode === 'email' ? target!.includes('@') : !!target;
+  const valid = mode === 'email' ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target!) : !!target;
+  const contactHint = mode === 'email'
+    ? contact.trim() ? 'Enter a valid email address, such as you@example.com.' : 'Enter your email address to receive a sign-in code.'
+    : 'Enter your phone number with its country code, such as +1 555 123 4567.';
 
   // The session change from supabase flips the route guard, so nothing to navigate to on success.
   const run = async (fn: () => Promise<unknown>, fallback: string) => {
@@ -149,6 +149,7 @@ export default function SignIn() {
         <>
           <Field
             key={mode}
+            helper={!valid ? contactHint : undefined}
             label={mode === 'email' ? 'Email' : 'Phone number'}
             error={error}
             placeholder={mode === 'email' ? 'you@example.com' : '+1 555 123 4567'}

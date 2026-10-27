@@ -1,6 +1,6 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 
-import { sendEmailCode, sendPhoneCode, verifyPhoneCode, signInWithApple, verifyEmailCode } from './sign-in';
+import { friendly, sendEmailCode, sendPhoneCode, verifyPhoneCode, signInWithApple, verifyEmailCode } from './sign-in';
 import { supabase } from './supabase';
 
 jest.mock('./supabase', () => {
@@ -92,4 +92,12 @@ test('phone: sends an SMS OTP and verifies it with type sms', async () => {
 test('phone: errors are thrown', async () => {
   s.auth.signInWithOtp.mockResolvedValueOnce({ error: new Error('sms failed') });
   await expect(sendPhoneCode('+14152127777')).rejects.toThrow('sms failed');
+});
+
+test('friendly: rate limit and SMS provider failures get their own text, others the fallback', () => {
+  expect(friendly({ status: 429 }, 'fb')).toMatch(/Too many tries/);
+  expect(friendly({ status: 500, code: 'sms_send_failed' }, 'fb')).toMatch(/Sign in with email/);
+  expect(friendly({ status: 400, code: 'phone_provider_disabled' }, 'fb')).toMatch(/Sign in with email/);
+  expect(friendly({ status: 400, code: 'validation_failed' }, 'fb')).toBe('fb');
+  expect(friendly(undefined, 'fb')).toBe('fb');
 });

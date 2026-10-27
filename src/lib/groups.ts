@@ -15,6 +15,9 @@ export function isValidCode(code: string): boolean {
   return CODE_RE.test(code);
 }
 
+// Native drops the sign-in route's query params when the auth guard flips, so join/[code] also parks the invite here.
+export const pendingInvite = { code: '' };
+
 export function inviteLink(code: string): string {
   return `leaderboard://join/${code}`;
 }
@@ -185,3 +188,6 @@ export function isNotMember(e: unknown): boolean {
   const o = (typeof e === 'object' && e ? e : {}) as { message?: unknown; code?: unknown };
   return String(o.message ?? '').includes('not a member of this group') || o.code === 'PGRST116';
 }
+
+// Reject malformed deep links before sending a UUID filter to PostgREST.
+export const isValidGroupId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);

@@ -97,6 +97,7 @@ export function WorkoutEditor({ id, templateId, day }: { id?: string; templateId
 
   const edit = (f: (x: WorkoutForm) => WorkoutForm) => {
     dirty.current = true;
+    setError(null);
     setForm((x) => (x ? f(x) : x));
   };
   const setExercise = (i: number, f: (e: ExerciseForm) => ExerciseForm) =>

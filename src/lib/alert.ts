@@ -1,14 +1,26 @@
 import { Alert, Platform, type AlertButton } from 'react-native';
 
-// Alert.alert does nothing in react-native-web. On web a single action is a window.confirm, and several
-// actions are a numbered window.prompt. Declining runs nothing. Native keeps the system alert.
+export type WebDialog = { title: string; message?: string; buttons: AlertButton[] };
+let dialogs: WebDialog[] = [];
+const listeners = new Set<() => void>();
+export const getWebDialog = () => dialogs[0] ?? null;
+export const subscribeWebDialog = (listener: () => void) => {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+};
+const emit = () => listeners.forEach((listener) => listener());
+
+// Remove before invoking an action: a confirmation opened by that action becomes the next dialog.
+export function closeWebDialog(button?: AlertButton) {
+  if (!dialogs.length) return;
+  dialogs = dialogs.slice(1);
+  emit();
+  // Dismissing via Cancel, Escape or the backdrop never runs a destructive callback.
+  if (button?.style !== 'cancel') button?.onPress?.();
+}
+
 export function alert(title: string, message?: string, buttons: AlertButton[] = []) {
   if (Platform.OS !== 'web') return Alert.alert(title, message, buttons);
-  const actions = buttons.filter((b) => b.style !== 'cancel');
-  const text = [title, message].filter(Boolean).join('\n\n');
-  if (actions.length === 0) return window.alert(text);
-  if (actions.length === 1) return window.confirm(text) ? actions[0].onPress?.() : undefined;
-  const list = actions.map((b, i) => `${i + 1}. ${b.text}`).join('\n');
-  const n = Number(window.prompt(`${text}\n\nEnter a number:\n${list}`)?.trim());
-  actions[n - 1]?.onPress?.();
+  dialogs = [...dialogs, { title, message, buttons: buttons.length ? buttons : [{ text: 'OK' }] }];
+  emit();
 }
