@@ -66,7 +66,7 @@ export function WeeklyHistoryView({ totals, unit, now = new Date() }: { totals: 
     <View style={{ gap: 12 }}>
       <View accessible accessibilityLabel={`This week: ${parts.length ? parts.join(', ') : 'no workouts yet'}`} style={{ gap: 4 }}>
         <Text style={[ui.caption, { color: c.inkSoft }]}>This week</Text>
-        <Text style={[styles.big, { color: parts.length ? c.ink : c.inkSoft }]}>{parts.length ? parts.slice(0, 2).join(', ') : 'No workouts yet'}</Text>
+        <Text maxFontSizeMultiplier={1.5} style={[styles.big, { color: parts.length ? c.ink : c.inkSoft }]}>{parts.length ? parts.slice(0, 2).join(', ') : 'No workouts yet'}</Text>
         {parts.slice(2).map((p) => (
           <Text key={p} style={[ui.caption, { color: c.inkSoft }]}>{p}</Text>
         ))}

@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 
 import { BarHistory } from '@/components/history/BarHistory';
 import { ExportOption, useExportChoice } from '@/components/health/ExportOption';
-import { Button, Field, Screen, styles } from '@/components/ui';
+import { Button, Field, Screen, styles, useLargeText } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatLocalDateTime, parseLocalDateTime } from '@/lib/health/dates';
 import { formatSleep } from '@/lib/health/format';
@@ -24,6 +24,7 @@ const defaultTimes = () => {
 
 export default function Sleep() {
   const c = useTheme();
+  const large = useLargeText();
   const { session } = useAuth();
   const me = session?.user.id ?? '';
   const fetchSleep = useCallback((days: number) => getMyRecentSleep(me, days), [me]);
@@ -81,13 +82,16 @@ export default function Sleep() {
     }
   };
 
+  // At accessibility sizes "YYYY-MM-DD HH:mm" is wider than the screen, so let it wrap onto two lines; Return still submits, never adds a newline.
+  const dateTimeWrap = large ? { multiline: true, submitBehavior: 'blurAndSubmit' as const } : {};
+
   return (
     <Screen title="My Sleep" back>
       <BarHistory fetch={fetchSleep} fmt={formatSleep} noun="sleep" refresh={tries} />
       <View style={{ gap: 12 }}>
         <Text style={[styles.heading, { color: c.ink }]}>{editing ? 'Edit sleep' : 'Add sleep'}</Text>
-        <Field label="Fell asleep" value={times.bed} onChangeText={(v) => { setTimes({ ...times, bed: v }); setError(null); }} placeholder="YYYY-MM-DD HH:mm" autoCapitalize="none" autoCorrect={false} />
-        <Field label="Woke up" value={times.wake} onChangeText={(v) => { setTimes({ ...times, wake: v }); setError(null); }} placeholder="YYYY-MM-DD HH:mm" autoCapitalize="none" autoCorrect={false}
+        <Field label="Fell asleep" value={times.bed} onChangeText={(v) => { setTimes({ ...times, bed: v }); setError(null); }} placeholder="YYYY-MM-DD HH:mm" autoCapitalize="none" autoCorrect={false} {...dateTimeWrap} />
+        <Field label="Woke up" value={times.wake} onChangeText={(v) => { setTimes({ ...times, wake: v }); setError(null); }} placeholder="YYYY-MM-DD HH:mm" autoCapitalize="none" autoCorrect={false} {...dateTimeWrap}
           helper="Counted on the day you woke up. It replaces Health's total for that day." error={error} />
         <ExportOption type="sleep" choice={choice} note="Saved to Health as time asleep, from bedtime to wake time." />
         <Button label={editing ? 'Save Changes' : 'Save Sleep'} busy={busy} onPress={() => void save()} />
