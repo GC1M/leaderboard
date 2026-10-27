@@ -7,6 +7,7 @@ import { Button, Field, Screen, styles } from '@/components/ui';
 import { normalizePhone } from '@/lib/phone';
 import {
   appleAvailable,
+  friendly,
   googleAvailable,
   sendEmailCode,
   sendPhoneCode,
@@ -18,10 +19,6 @@ import {
 import { useTheme } from '@/theme';
 
 const RESEND_SECONDS = 30;
-
-// Plain messages instead of raw provider errors. Rate limits get their own, since "try again" would be wrong advice.
-const friendly = (e: unknown, fallback: string) =>
-  (e as { status?: number })?.status === 429 ? 'Too many tries. Wait a minute, then request a new code.' : fallback;
 
 export default function SignIn() {
   const c = useTheme();
