@@ -5,6 +5,7 @@ import { Segmented } from '@/components/history/Segmented';
 import { WeightChart } from '@/components/history/WeightChart';
 import { ExportOption, useExportChoice } from '@/components/health/ExportOption';
 import { Button, ErrorText, Field, Screen, Skeleton, styles } from '@/components/ui';
+import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { formatLocalDateTime, parseLocalDateTime, readingDateLabel, startOfLocalDay } from '@/lib/health/dates';
 import { formatWeight, RANGES, type Range } from '@/lib/health/format';
@@ -49,16 +50,17 @@ export default function Weight() {
   const [when, setWhen] = useState(() => formatLocalDateTime(new Date()));
   const [editing, setEditing] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [whenError, setWhenError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const manual = (current?.rows ?? []).filter((r) => canExport(r.source ?? '')).reverse();
-  const reset = () => { setText(''); setWhen(formatLocalDateTime(new Date())); setEditing(null); setFormError(null); };
+  const reset = () => { setText(''); setWhen(formatLocalDateTime(new Date())); setEditing(null); setFormError(null); setWhenError(null); };
   // A queue error never undoes the saved entry; the Health status line shows what failed.
   const send = (id: string, op: 'save' | 'delete', payload: unknown) => { void exp.enqueue(MANUAL_KINDS.weight, id, op, payload).catch(() => {}); };
   const save = async () => {
     const v = validateWeight(text, unit);
     const at = parseLocalDateTime(when);
     if (!v.ok) return setFormError(v.message);
-    if (!at || at.getTime() > Date.now()) return setFormError('Enter a time that has passed as YYYY-MM-DD HH:mm.');
+    if (!at || at.getTime() > Date.now()) return setWhenError('Enter a time that has passed as YYYY-MM-DD HH:mm.');
     setBusy(true);
     try {
       const id = await saveManualWeight(me, { id: editing ?? undefined, kg: v.kg, measuredAt: at.toISOString() });
@@ -81,6 +83,9 @@ export default function Weight() {
       setFormError(e instanceof Error ? e.message : "Couldn't delete weight.");
     }
   };
+
+  const confirmRemove = (id: string) =>
+    alert('Delete this weight reading?', "It's removed for good.", [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => void remove(id) }]);
 
   return (
     <Screen title="My Weight" back>
@@ -118,17 +123,17 @@ export default function Weight() {
       )}
       <View style={{ gap: 12 }}>
         <Text style={[styles.heading, { color: c.ink }]}>{editing ? 'Edit weight' : 'Add weight'}</Text>
-        <Field label={`Weight (${unit})`} value={text} onChangeText={(v) => { setText(v); setFormError(null); }} keyboardType="decimal-pad" placeholder={unit === 'lb' ? '165.0' : '75.0'} error={formError} />
-        <Field label="When" value={when} onChangeText={(v) => { setWhen(v); setFormError(null); }} placeholder="YYYY-MM-DD HH:mm" autoCapitalize="none" autoCorrect={false} />
+        <Field label={`Weight (${unit})`} value={text} onChangeText={(v) => { setText(v); setFormError(null); setWhenError(null); }} keyboardType="decimal-pad" placeholder={unit === 'lb' ? '165.0' : '75.0'} error={formError} />
+        <Field label="When" value={when} onChangeText={(v) => { setWhen(v); setFormError(null); setWhenError(null); }} placeholder="YYYY-MM-DD HH:mm" autoCapitalize="none" autoCorrect={false} error={whenError} />
         <ExportOption type="weight" choice={choice} note="Saved as a body mass sample at that time." />
         <Button label={editing ? 'Save Changes' : 'Save Weight'} busy={busy} disabled={text.trim() === ''} onPress={() => void save()} />
         {editing && <Button plain label="Cancel Edit" onPress={reset} />}
         {manual.map((r) => (
           <View key={r.id} style={{ gap: 4 }}>
             <Text style={[styles.body, { color: c.ink }]}>{`${formatWeight(r.kg, unit)} on ${formatLocalDateTime(new Date(r.measuredAt))}`}</Text>
-            <View style={{ flexDirection: 'row' }}>
-              <Button plain label="Edit" onPress={() => { setEditing(r.id!); setText(displayWeight(r.kg, unit).toFixed(1)); setWhen(formatLocalDateTime(new Date(r.measuredAt))); setFormError(null); }} />
-              <Button plain danger label="Delete" onPress={() => void remove(r.id!)} />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <Button plain label="Edit" onPress={() => { setEditing(r.id!); setText(displayWeight(r.kg, unit).toFixed(1)); setWhen(formatLocalDateTime(new Date(r.measuredAt))); setFormError(null); setWhenError(null); }} />
+              <Button plain danger label="Delete" onPress={() => confirmRemove(r.id!)} />
             </View>
           </View>
         ))}

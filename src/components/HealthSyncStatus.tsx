@@ -30,7 +30,7 @@ export function HealthSyncStatus(){
   const action=async(fn:()=>Promise<void>)=>{setBusy(true);setError(null);try{await fn();}catch(e){setError(e instanceof Error?e.message:'Could not connect to Health.');}finally{setBusy(false);}};
   return <View style={{gap:8,marginBottom:16}}>
     <Text style={[styles.heading,{color:t.ink}]}>Apple Health</Text>
-    <Text style={[styles.caption,{color:t.inkSoft}]}>{health.connected?'Imports run while you use the app and when you return. Reading access can be limited separately for each metric.':'Connect this account to import steps, sleep summaries, and weight readings to your private account. Group sharing is controlled separately.'}</Text>
+    <Text style={[styles.caption,{color:t.inkSoft}]}>{health.connected?'Imports run while you use the app and when you return. Reading access can be limited separately for each metric.':'Connect this account to import steps, sleep summaries, weight readings, and workouts to your private account. Group sharing is controlled separately.'}</Text>
     <ErrorText>{error ?? health.error}</ErrorText>
     {health.connected && HEALTH_METRICS.map((metric)=>{
       const m=health.metrics[metric];
