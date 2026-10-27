@@ -84,13 +84,15 @@ export function meters(v: number | null, unit: string, fallback: DistanceUnit): 
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
-// "2024-10-26 18:05:00", "2024-10-26T18:05", with or without an offset ("+0000", "Z"), or "26 Oct 2024, 18:05".
-// No offset means the device's local time, which is how these apps write it. Null if it can't be read.
+// "2024-10-26 18:05:00", "2024-10-26T18:05", "2024-10-26 6:05:00 pm" (Strong, 12-hour devices, often with a narrow
+// no-break space), with or without an offset ("+0000", "Z"), or "26 Oct 2024, 18:05". No offset means the device's
+// local time, which is how these apps write it. Null if it can't be read.
 export function parseDate(s: string): Date | null {
   const t = s.trim();
-  let m = t.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?)?\s*(Z|[+-]\d{2}:?\d{2})?$/i);
+  let m = t.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(?:\s*([ap])\.?m\.?)?)?\s*(Z|[+-]\d{2}:?\d{2})?$/i);
   if (m) {
-    const [, y, mo, d, h = '0', mi = '0', sec = '0', off] = m;
+    const [, y, mo, d, hh = '0', mi = '0', sec = '0', ampm, off] = m;
+    const h = String(ampm ? (+hh % 12) + (ampm.toLowerCase() === 'p' ? 12 : 0) : +hh);
     if (off) {
       const o = off.toUpperCase() === 'Z' ? 'Z' : `${off.slice(0, 3)}:${off.slice(-2)}`;
       return valid(new Date(`${y}-${mo}-${d}T${h.padStart(2, '0')}:${mi}:${sec.padStart(2, '0')}${o}`));

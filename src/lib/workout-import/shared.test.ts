@@ -25,6 +25,9 @@ describe('num and parseDate', () => {
   it('reads the date formats the apps write', () => {
     expect(parseDate('2024-03-02 18:30:00')).toEqual(new Date(2024, 2, 2, 18, 30));
     expect(parseDate('2024-03-02T18:30')).toEqual(new Date(2024, 2, 2, 18, 30));
+    expect(parseDate('2025-01-30 12:34:56\u202fpm')).toEqual(new Date(2025, 0, 30, 12, 34, 56));
+    expect(parseDate('2025-01-30 12:05:00 AM')).toEqual(new Date(2025, 0, 30, 0, 5));
+    expect(parseDate('2025-01-30 6:05:00 PM')).toEqual(new Date(2025, 0, 30, 18, 5));
     expect(parseDate('2024-03-02 18:30:00 +0000')).toEqual(new Date(Date.UTC(2024, 2, 2, 18, 30)));
     expect(parseDate('2024-03-02T18:30:00.000Z')).toEqual(new Date(Date.UTC(2024, 2, 2, 18, 30)));
     expect(parseDate('26 Oct 2024, 18:05')).toEqual(new Date(2024, 9, 26, 18, 5));
