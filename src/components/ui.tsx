@@ -122,7 +122,8 @@ export function Field({
   const field = (
     <TextInput
       accessibilityLabel={label}
-      placeholderTextColor={c.inkSoft}
+      // The code input's text is transparent over the boxes, so its placeholder must be too.
+      placeholderTextColor={code ? 'transparent' : c.inkSoft}
       caretHidden={!!code}
       {...input}
       onFocus={(e) => {
