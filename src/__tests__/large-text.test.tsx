@@ -87,6 +87,14 @@ describe('group leaderboard', () => {
     expect(scroll.queryAll((n: any) => n === bar)).toHaveLength(0);
     mockFontScale = 1;
   });
+
+  test('member names truncate at default size and wrap at accessibility sizes', async () => {
+    expect(texts((await setup()).c, 'Alice')[0].props.numberOfLines).toBe(1);
+    act(() => root.unmount());
+    mockFontScale = 3.1;
+    expect(texts((await setup()).c, 'Alice')[0].props.numberOfLines).toBeUndefined();
+    mockFontScale = 1;
+  });
 });
 
 describe('list row', () => {
