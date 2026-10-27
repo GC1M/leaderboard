@@ -116,6 +116,6 @@ const styles = StyleSheet.create({
   chart: { flexDirection: 'row', height: 120 },
   track: { flex: 1, justifyContent: 'flex-end' },
   gap: { height: 8, borderWidth: 1, borderStyle: 'dashed' },
-  axis: { flexDirection: 'row', justifyContent: 'space-between' },
+  axis: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 12 },
   week: { paddingHorizontal: 16, paddingVertical: 12, gap: 2 },
 });

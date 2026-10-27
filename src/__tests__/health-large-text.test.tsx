@@ -69,6 +69,7 @@ describe('segmented control', () => {
     expect(style(group).flexWrap).toBe('wrap');
     expect(style(option).flexBasis).toBe('auto');
     expect(style(option).flexShrink).toBe(0);
+    expect(style(option).flex).toBeUndefined(); // flex: 1 would keep equal zero-basis widths and break labels mid-word
   });
 });
 

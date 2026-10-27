@@ -23,7 +23,7 @@ export function Segmented<T extends string | number>({ options, value, onChange,
             accessibilityLabel={o.a11y ?? o.label}
             accessibilityState={{ selected: on }}
             onPress={() => onChange(o.value)}
-            style={[styles.option, large && styles.wrapOption, on && { backgroundColor: c.surface }]}
+            style={[styles.option, large ? styles.wrapOption : styles.equal, on && { backgroundColor: c.surface }]}
           >
             <Text style={[ui.bodyStrong, { color: on ? c.accent : c.ink }]}>{o.label}</Text>
           </Pressable>
@@ -37,6 +37,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', borderRadius: 10, padding: 2 },
   // At accessibility sizes the labels outgrow equal parts, so options size to their text and wrap.
   wrap: { flexWrap: 'wrap' },
+  // `flex: 1` forces a zero basis even with flexBasis 'auto' on top, so it's only applied at default sizes.
   wrapOption: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', paddingHorizontal: 12 },
-  option: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  equal: { flex: 1 },
+  option: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
 });
