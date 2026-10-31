@@ -2,8 +2,8 @@ import { Text, View } from 'react-native';
 import { useState } from 'react';
 import { Segmented } from '@/components/history/Segmented';
 import { Button, Field, styles, useLargeText } from '@/components/ui';
-import { DateField, DurationField, NumberField, RemoveButton } from '@/components/inputs';
-import { ACTIVITIES, categoryForActivity, changeCategory, convertUnits, emptySet, fieldsFor, WORKOUT_CATEGORIES, type WorkoutForm } from '@/lib/workout-form';
+import { DateField, DropdownField, DurationField, NumberField, RemoveButton } from '@/components/inputs';
+import { categoryForActivity, changeCategory, convertUnits, emptySet, fieldsFor, WORKOUT_CATEGORIES, type WorkoutForm } from '@/lib/workout-form';
 import { formatLocalDateTime, localDateKey, parseLocalDateTime } from '@/lib/health/dates';
 import { useTheme } from '@/theme';
 
@@ -13,17 +13,13 @@ export function WorkoutFields({ form, edit, template, onAddExercise, onError }: 
   const large = useLargeText();
   const [units, setUnits] = useState(false);
   const category = form.category ?? categoryForActivity(form.activityType);
-  const activities = ACTIVITIES[category].includes(form.activityType) ? ACTIVITIES[category] : [form.activityType, ...ACTIVITIES[category]];
   const at = parseLocalDateTime(`${form.date} ${form.time}`) ?? new Date();
   const changeUnits = (weight: WorkoutForm['weightUnit'], distance: WorkoutForm['distanceUnit']) => {
     try { const next = convertUnits(form, weight, distance); edit(() => next); } catch (e) { onError((e as Error).message); }
   };
   return <>
-    <Text accessibilityRole="header" style={[styles.heading, { color: c.ink }]}>Workout type</Text>
-    <Segmented label="Workout type" options={WORKOUT_CATEGORIES} value={category} onChange={(v) => edit((f) => changeCategory(f, v))} />
-    <Text style={[styles.bodyStrong, { color: c.ink }]}>Activity</Text>
-    <Segmented label="Activity" options={activities.filter(Boolean).map((a) => ({ value: a, label: a }))} value={form.activityType} onChange={(v) => edit((f) => ({ ...f, activityType: v }))} />
-    {form.exercises.some((e) => e.category !== category) && <Text style={[styles.caption, { color: c.inkSoft }]}>Mixed session: your existing exercises and measurements are kept when the workout type changes.</Text>}
+    <DropdownField label="Workout type" options={WORKOUT_CATEGORIES} value={category} onChange={(v) => edit((f) => changeCategory(f, v))} />
+    {category !== 'full_body' && form.exercises.some((e) => e.category !== category) && <Text style={[styles.caption, { color: c.inkSoft }]}>Your existing exercises and measurements are kept when the workout type changes.</Text>}
     {!template && <>
       <DateField label="Date" mode="date" value={at} onChange={(v) => edit((f) => ({ ...f, date: localDateKey(v) }))} />
       <DateField label="Start time" mode="time" value={at} onChange={(v) => edit((f) => ({ ...f, time: formatLocalDateTime(v).slice(11) }))} />

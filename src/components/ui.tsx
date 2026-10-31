@@ -42,7 +42,7 @@ export function Screen({
   const c = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const segments = useSegments();
+  const segments: readonly string[] = useSegments();
   const top = insets.top;
   return (
     <KeyboardAvoidingView

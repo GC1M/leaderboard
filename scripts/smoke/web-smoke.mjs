@@ -148,8 +148,10 @@ try {
     await page.getByText('No workouts yet.', { exact: false }).waitFor();
     if (await page.getByRole('radiogroup', { name: 'Time range', exact: true }).count()) throw new Error('An empty workout history still shows ranges');
     await page.getByRole('button', { name: 'Log Workout', exact: true }).click();
-    await page.getByRole('radio', { name: 'Cardio', exact: true }).click();
-    await page.getByRole('radio', { name: 'Cycling', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Workout type', exact: true }).click();
+    await page.getByRole('radio', { name: 'Full Body', exact: true }).click();
+    if (await page.getByRole('radiogroup', { name: 'Activity', exact: true }).count()) throw new Error('The separate activity selector remains visible');
+    if (await page.getByRole('textbox', { name: 'Duration seconds', exact: true }).count()) throw new Error('Duration still shows seconds');
     await page.getByRole('textbox', { name: 'Duration minutes', exact: true }).fill('30');
     await page.getByRole('tab', { name: 'Groups', exact: true }).click();
     await page.getByRole('tab', { name: 'Workouts', exact: true }).click();

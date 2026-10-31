@@ -51,6 +51,7 @@ const NAMES: Record<number, string> = {
 const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 // Free-text activity names people commonly type for the manual logger. Each maps to one unambiguous type.
 const ALIASES: Record<string, number> = {
+  fullbody: 11, core: 59, cardio: 73, mobility: 62,
   strength: 50, strengthtraining: 50, weights: 50, weighttraining: 50, weightlifting: 50, lifting: 50,
   run: 37, jog: 37, jogging: 37, walk: 52, bike: 13, biking: 13, swim: 46, hiit: 63,
 };

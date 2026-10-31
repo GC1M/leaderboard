@@ -2,10 +2,9 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 
 import { WorkoutDetailView } from '@/components/workouts/WorkoutDetailView';
-import { Button, ErrorText, Row, Screen, Skeleton } from '@/components/ui';
+import { Button, ErrorText, Row, Screen, Section, Skeleton } from '@/components/ui';
 import { useWeightUnit } from '@/lib/weight-unit';
 import { useDistanceUnit } from '@/lib/distance-unit';
-import { Overflow } from '@/components/inputs';
 import { alert } from '@/lib/alert';
 import { useWorkoutExport } from '@/components/workouts/WorkoutExportOption';
 import { deleteWorkout, getWorkout, type WorkoutDetail } from '@/lib/workouts';
@@ -44,7 +43,7 @@ export default function WorkoutDetailScreen() {
       ) : (
         <>
           <WorkoutDetailView w={w} weightUnit={unit} distanceUnit={distanceUnit} />
-          {w.source !== 'healthkit' && <Overflow name={w.activity_type}><Row label="Delete Workout" danger last disabled={busy} onPress={remove} /></Overflow>}
+          {w.source !== 'healthkit' && <Section><Row label="Delete Workout" danger last disabled={busy} onPress={remove} /></Section>}
         </>
       )}
     </Screen>

@@ -171,7 +171,7 @@ export function WorkoutEditor({ id, templateId, day }: { id?: string; templateId
 
   // Keeps what is on screen as a template named after the activity, then opens it to rename or refine.
   const saveAsTemplate = async () => {
-    if (!form.activityType.trim()) return setError('Enter an activity type first. It names the template.');
+    if (!form.activityType.trim()) return setError('Choose a workout type first. It names the template.');
     const r = buildTemplate(form.activityType, form);
     if (!r.ok) return setError(r.message);
     setError(null);

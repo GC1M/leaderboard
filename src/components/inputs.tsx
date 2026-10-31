@@ -10,29 +10,69 @@ export function NumberField({ whole, error, ...props }: NumberProps) {
   return <Field {...props} keyboardType={whole ? 'number-pad' : 'decimal-pad'} inputMode={whole ? 'numeric' : 'decimal'} returnKeyType="done" onSubmitEditing={Keyboard.dismiss} error={error || numericError(props.value ?? '', whole)} helper={props.helper ?? (whole ? 'Whole numbers only.' : 'Decimals may use a dot or comma.')} />;
 }
 
-// Editors store minutes for backwards-compatible drafts. The UI makes h/m/s unambiguous.
+// A compact selector using the same surface, border and typography as the other fields.
+export function DropdownField<T extends string>({ label, options, value, onChange }: {
+  label: string;
+  options: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  const c = useTheme();
+  const [open, setOpen] = useState(false);
+  const selected = options.find((option) => option.value === value);
+  return <View style={{ gap: 8 }}>
+    <Text style={[styles.bodyStrong, { color: c.ink }]}>{label}</Text>
+    <Pressable
+      accessibilityRole="combobox"
+      accessibilityLabel={label}
+      accessibilityValue={{ text: selected?.label }}
+      accessibilityState={{ expanded: open }}
+      onPress={() => { Keyboard.dismiss(); setOpen((v) => !v); }}
+      style={{ minHeight: 48, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: open ? c.accent : c.border, backgroundColor: c.surface, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+    >
+      <Text style={[styles.body, { color: c.ink, flex: 1 }]}>{selected?.label}</Text>
+      <Icon name={{ ios: 'chevron.down', android: 'expand_more', web: 'expand_more' }} color={c.inkSoft} size={18} />
+    </Pressable>
+    {open && <Section><View accessibilityRole="radiogroup" accessibilityLabel={`${label} options`}>
+      {options.map((option) => <Pressable
+        key={option.value}
+        accessibilityRole="radio"
+        accessibilityLabel={option.label}
+        accessibilityState={{ selected: option.value === value }}
+        onPress={() => { onChange(option.value); setOpen(false); }}
+        style={{ minHeight: 48, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+      >
+        <Text style={[styles.body, { color: option.value === value ? c.accent : c.ink, flex: 1 }]}>{option.label}</Text>
+        {option.value === value && <Icon name={{ ios: 'checkmark', android: 'check', web: 'check' }} color={c.accent} size={18} />}
+      </Pressable>)}
+    </View></Section>}
+  </View>;
+}
+
+// Editors store minutes for backwards-compatible drafts. The UI uses hours and minutes; fractional minutes preserve existing shorter sets.
 export function DurationField({ label, value, onChange, optional }: { label: string; value: string; onChange: (v: string) => void; optional?: boolean }) {
   const c = useTheme();
   const large = useLargeText();
   const split = (raw: string) => {
-    const total = Math.round(Number(raw.replace(',', '.')) * 60 * 1e6) / 1e6;
-    return raw && Number.isFinite(total) && total >= 0 ? [String(Math.floor(total / 3600)), String(Math.floor(total / 60) % 60), String(Number((total % 60).toFixed(6)))] : ['', '', ''];
+    const total = Number(raw.replace(',', '.'));
+    return raw && Number.isFinite(total) && total >= 0 ? [String(Math.floor(total / 60)), String(Number((total % 60).toFixed(6)))] : ['', ''];
   };
   const [state, setState] = useState(() => ({ source: value, parts: split(value), error: null as string | null }));
   if (state.source !== value) setState({ source: value, parts: split(value), error: null });
   const { parts, error } = state;
   const update = (index: number, text: string) => {
     const next = parts.map((v, i) => i === index ? text : v);
-    const bad = next.slice(0, 2).some((v) => v !== '' && !/^\d+$/.test(v)) || (!!next[2] && decimalValue(next[2]) === null) || Number(next[1]) >= 60 || (decimalValue(next[2]) ?? 0) >= 60;
-    const source = bad ? 'invalid' : next.every((v) => v === '') ? '' : String((Number(next[0]) * 3600 + Number(next[1]) * 60 + (decimalValue(next[2]) ?? 0)) / 60);
-    setState({ source, parts: next, error: bad ? 'Use whole hours, 0–59 minutes and seconds below 60.' : null });
+    const minutes = decimalValue(next[1]);
+    const bad = (!!next[0] && !/^\d+$/.test(next[0])) || (!!next[1] && minutes === null) || (minutes ?? 0) >= 60;
+    const source = bad ? 'invalid' : next.every((v) => v === '') ? '' : String(Number(next[0]) * 60 + (minutes ?? 0));
+    setState({ source, parts: next, error: bad ? 'Use whole hours and minutes from 0 to less than 60.' : null });
     // Never turn invalid input into a different valid duration.
     onChange(source);
   };
   return <View style={{ gap: 8 }}>
     <Text style={[styles.bodyStrong, { color: c.ink }]}>{label}{optional ? ' (optional)' : ''}</Text>
     <View style={{ flexDirection: large ? 'column' : 'row', gap: 8 }}>
-      {['Hours', 'Minutes', 'Seconds'].map((name, i) => <View key={name} style={{ flex: large ? undefined : 1 }}><NumberField label={name} accessibilityLabel={`${label} ${name.toLowerCase()}`} whole={i < 2} value={parts[i]} onChangeText={(v) => update(i, v)} helper=" " /></View>)}
+      {['Hours', 'Minutes'].map((name, i) => <View key={name} style={{ flex: large ? undefined : 1 }}><NumberField label={name} accessibilityLabel={`${label} ${name.toLowerCase()}`} whole={i === 0} value={parts[i]} onChangeText={(v) => update(i, v)} helper=" " /></View>)}
     </View>
     <ErrorText>{error}</ErrorText>
   </View>;

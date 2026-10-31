@@ -24,7 +24,7 @@ export default function TemplateDetailScreen() {
   return <Screen title={template?.name ?? 'Template'} back headerActions={template && <Button plain label="Edit" onPress={() => router.push(`/workouts/templates/${id}/edit`)} />}>
     <ErrorText>{error}</ErrorText>{error && <Button plain label="Try Again" onPress={load} />}
     {template === undefined ? <Skeleton label="Loading template" /> : template === null ? <ErrorText>That template no longer exists.</ErrorText> : <>
-      <Section><Row label="Activity" value={template.activity_type} /><Row label="Planned duration" value={template.duration_s == null ? 'Not planned' : formatSleep(template.duration_s / 60)} last /></Section>
+      <Section><Row label="Workout type" value={template.activity_type} /><Row label="Planned duration" value={template.duration_s == null ? 'Not planned' : formatSleep(template.duration_s / 60)} last /></Section>
       <Section title="Exercises">{template.exercises.map((e, i, all) => <Row key={e.id} label={e.name} value={`${e.sets.length} sets`} last={i === all.length - 1} />)}</Section>
       {!!template.notes && <Text style={[styles.body, { color: c.ink }]}>{template.notes}</Text>}
       <DateField label="Start a workout on" mode="date" value={day} onChange={setDay} />

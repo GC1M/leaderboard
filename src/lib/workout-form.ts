@@ -7,12 +7,13 @@ import type { Exercise, ExerciseCategory, ManualWorkoutInput, SetInput, Workout,
 // The editor works in text and display units; this module turns that into canonical kg, m and s.
 // Everything here is pure so it can be tested without a screen.
 
+export type WorkoutCategory = ExerciseCategory | 'full_body';
 export type DistanceUnit = 'km' | 'mi';
 export type SetField = 'reps' | 'load' | 'duration' | 'distance';
 export type SetForm = Record<SetField, string>; // load in the form's weight unit, duration in minutes, distance in its distance unit
 export type ExerciseForm = { exerciseId: string; name: string; category: ExerciseCategory; sets: SetForm[] };
 export type WorkoutForm = {
-  category?: ExerciseCategory; // Older drafts infer this without losing their activity.
+  category?: WorkoutCategory; // Older drafts infer this without losing their activity.
   activityType: string;
   date: string; // YYYY-MM-DD, local
   time: string; // HH:MM, local 24h
@@ -50,7 +51,7 @@ export const fieldsFor = (c: ExerciseCategory): SetField[] => FIELDS[c];
 export const emptySet = (): SetForm => ({ reps: '', load: '', duration: '', distance: '' });
 
 export function emptyForm(now: Date, weightUnit: WeightUnit, distanceUnit: DistanceUnit): WorkoutForm {
-  return { category: 'strength', activityType: 'Traditional Strength Training', date: localDateKey(now), time: hhmm(now), durationMin: '', notes: '', weightUnit, distanceUnit, exercises: [] };
+  return { category: 'strength', activityType: 'Strength', date: localDateKey(now), time: hhmm(now), durationMin: '', notes: '', weightUnit, distanceUnit, exercises: [] };
 }
 
 // Re-express typed values in new units so flipping a toggle never changes what was meant.
@@ -195,7 +196,7 @@ export function parseDraft(raw: string | null): Draft | null {
     const f = d.form;
     const ok =
       [f.activityType, f.date, f.time, f.durationMin, f.notes].every(isStr) &&
-      (f.category === undefined || (isStr(f.category) && f.category in FIELDS)) &&
+      (f.category === undefined || (isStr(f.category) && (f.category === 'full_body' || f.category in FIELDS))) &&
       (f.weightUnit === 'kg' || f.weightUnit === 'lb') &&
       (f.distanceUnit === 'km' || f.distanceUnit === 'mi') &&
       Array.isArray(f.exercises) &&
@@ -222,18 +223,16 @@ export function workoutSummary(w: Workout, distanceUnit: DistanceUnit): string {
 export const WORKOUT_CATEGORIES = [
   { value: 'strength', label: 'Strength' }, { value: 'core', label: 'Core' },
   { value: 'cardio', label: 'Cardio' }, { value: 'mobility', label: 'Mobility' },
+  { value: 'full_body', label: 'Full Body' },
 ] as const;
-export const ACTIVITIES: Record<ExerciseCategory, readonly string[]> = {
-  strength: ['Traditional Strength Training', 'Functional Strength Training'],
-  core: ['Core Training', 'Pilates'],
-  cardio: ['Running', 'Walking', 'Cycling', 'Swimming', 'Elliptical', 'Rowing', 'Stair Climbing', 'Mixed Cardio'],
-  mobility: ['Flexibility', 'Yoga', 'Tai Chi', 'Cooldown'],
-};
-export function categoryForActivity(activity: string): ExerciseCategory {
-  for (const c of WORKOUT_CATEGORIES) if (ACTIVITIES[c.value].some((a) => a.toLowerCase() === activity.toLowerCase())) return c.value;
-  return /cardio|run|cycling|swim|walk/i.test(activity) ? 'cardio' : /core|pilates/i.test(activity) ? 'core' : /yoga|mobility|stretch/i.test(activity) ? 'mobility' : 'strength';
+export function categoryForActivity(activity: string): WorkoutCategory {
+  if (/full[\s_-]*body/i.test(activity)) return 'full_body';
+  return /cardio|run|cycling|swim|walk|elliptical|rowing|stair/i.test(activity) ? 'cardio'
+    : /core|pilates/i.test(activity) ? 'core'
+    : /yoga|mobility|stretch|flexibility|tai chi|cooldown/i.test(activity) ? 'mobility' : 'strength';
 }
-export function changeCategory(f: WorkoutForm, category: ExerciseCategory): WorkoutForm {
-  // Mixed sessions retain every exercise and measurement.
-  return { ...f, category, activityType: ACTIVITIES[category][0] };
+export function changeCategory(f: WorkoutForm, category: WorkoutCategory): WorkoutForm {
+  // Keep existing exercises, measurements and Health mappings when reselecting the same type.
+  if ((f.category ?? categoryForActivity(f.activityType)) === category) return f;
+  return { ...f, category, activityType: WORKOUT_CATEGORIES.find((c) => c.value === category)!.label };
 }
