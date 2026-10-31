@@ -2,6 +2,7 @@ import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Share, Text } from 'react-native';
 import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
+import { CompetitionIntegrity } from '@/components/competitions/Integrity';
 import { CompetitionStandings } from '@/components/competitions/Standings';
 import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
@@ -49,6 +50,7 @@ export default function CompetitionDetail() {
           {now.getTime() < Date.parse(row.ends_at) + 86_400_000 && <Text style={[styles.caption, { color: c.inkSoft }]}>Available {new Date(Date.parse(row.ends_at) + 86_400_000).toLocaleString()}.</Text>}
         </>}
       </>}
+      <CompetitionIntegrity competition={row} uid={uid} onChanged={() => setTries((v) => v + 1)} />
       {participation && <Text style={[styles.caption, { color: c.inkSoft }]}>Your participation: {participation.status}</Text>}
     </>}
   </Screen>;
