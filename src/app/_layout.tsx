@@ -3,7 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
-import { isValidCode, normalizeCode, pendingInvite } from '@/lib/groups';
+import { isValidCode, isValidGroupId, normalizeCode, pendingInvite } from '@/lib/groups';
 import { WebDialogHost } from '@/components/WebDialogHost';
 import { authGate } from '@/lib/auth-gate';
 import { HealthSyncProvider } from '@/lib/health/sync';
@@ -19,7 +19,7 @@ function Routes() {
   const gate = authGate(loading, session);
   const router = useRouter();
   const segments = useSegments();
-  const { code } = useGlobalSearchParams<{ code?: string | string[] }>();
+  const { code, competition } = useGlobalSearchParams<{ code?: string | string[]; competition?: string | string[] }>();
   const invite = normalizeCode(typeof code === 'string' ? code : '');
   // Protected routes keep query parameters when auth changes. Resume only our validated invite route,
   // never an arbitrary return URL, and still let the user confirm joining on that screen.
@@ -28,9 +28,10 @@ function Routes() {
   useEffect(() => {
     if (gate !== 'signed-in' || segments[0] === 'sign-in') return;
     const next = isValidCode(invite) ? invite : pendingInvite.code;
-    pendingInvite.code = '';
-    if (isValidCode(next) && segments[0] !== 'join') router.replace(`/join/${next}`);
-  }, [gate, invite, router, segments]);
+    const contest = typeof competition === 'string' && isValidGroupId(competition) ? competition : pendingInvite.competition;
+    pendingInvite.code = ''; pendingInvite.competition = '';
+    if (isValidCode(next) && segments[0] !== 'join') router.replace(`/join/${next}${isValidGroupId(contest) ? `?competition=${contest}` : ''}`);
+  }, [gate, invite, competition, router, segments]);
   useEffect(() => {
     if (gate !== 'loading') SplashScreen.hideAsync().catch(() => {});
   }, [gate]);

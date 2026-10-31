@@ -7,7 +7,7 @@ import JoinByLink from '@/app/join/[code]';
 
 const mockAuth = jest.fn();
 const mockReplace = jest.fn();
-let mockParams: { code?: string | string[] } = {};
+let mockParams: { code?: string | string[]; competition?: string } = {};
 let mockSegments: string[] = [];
 jest.mock('@/lib/auth', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -126,4 +126,16 @@ test.each(['https://outside.example', '', ['ABCD2345', 'WXYZ6789']])('does not r
   mockAuth.mockReturnValue({ session: { user: { id: 'user' } }, loading: false });
   await render();
   expect(mockReplace).not.toHaveBeenCalled();
+});
+
+test('a competition invitation survives sign-in without automatic enrollment', async () => {
+  const id = '00000000-0000-0000-0000-000000000039';
+  mockParams = { code: 'ABCD2345', competition: id }; mockSegments = ['join', '[code]'];
+  mockAuth.mockReturnValue({ session: null, loading: false });
+  const r = createRoot(); await act(async () => r.render(<JoinByLink />));
+  mockParams = {}; mockSegments = ['sign-in']; await act(async () => r.render(<RootLayout />));
+  mockReplace.mockClear(); mockSegments = ['(tabs)']; mockAuth.mockReturnValue({ session: { user: { id: 'me' } }, loading: false });
+  await act(async () => r.render(<RootLayout />));
+  expect(mockReplace).toHaveBeenCalledWith(`/join/ABCD2345?competition=${id}`);
+  await act(async () => r.unmount());
 });
