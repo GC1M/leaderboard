@@ -29,3 +29,15 @@ export function competitionState(c: Pick<Competition, 'status' | 'starts_at' | '
 export function competitionDay(at: string, timezone: string) {
   return new Date(at).toLocaleDateString(undefined, { timeZone: timezone, dateStyle: 'medium' });
 }
+type StandingRow = Database['public']['Functions']['competition_standings']['Returns'][number];
+// Function metadata cannot express these SQL NULLs; preserve no-data and privacy states in the client.
+export type CompetitionStanding = Omit<StandingRow, 'score' | 'rank' | 'updated_at'> & { score: number | null; rank: number | null; updated_at: string | null };
+export const getCompetitionStandings = (id: string) => checked(supabase.rpc('competition_standings', { p_id: id }));
+export const finalizeCompetition = (id: string) => checked(supabase.rpc('finalize_competition', { p_id: id }));
+export function standingValue(row: Pick<CompetitionStanding, 'score' | 'eligibility'>, metric: string): string {
+  if (row.score === null) return eligibilityLabel(row.eligibility);
+  return metric === 'workout_duration' ? `${Math.round(row.score / 60).toLocaleString()} min` : `${Number(row.score).toLocaleString()} ${metric === 'steps' ? 'steps' : 'workouts'}`;
+}
+export function eligibilityLabel(value: string): string {
+  return ({ eligible: 'Eligible', no_data: 'No data', not_sharing: 'Not sharing', timezone_mismatch: 'Timezone does not match', left_group: 'No longer in group', manual_entries_excluded: 'Manual entries excluded' } as Record<string, string>)[value] ?? 'Data unavailable';
+}
