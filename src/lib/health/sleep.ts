@@ -2,7 +2,7 @@ import { localDateKey, startOfLocalDay } from './dates';
 import { HEALTH_TYPES, loadHealthKit } from './healthkit';
 
 export type SleepSample = { uuid: string; startDate: Date; endDate: Date; value: number };
-export type SleepDay = { date: string; value: number; windowStart: string; windowEnd: string };
+export type SleepDay = { source?: 'manual' | 'healthkit'; date: string; value: number; windowStart: string; windowEnd: string };
 const ASLEEP = new Set([1, 3, 4, 5]); // unspecified, core, deep, REM; never in-bed (0) or awake (2)
 const SESSION_GAP_MS = 90 * 60 * 1000;
 

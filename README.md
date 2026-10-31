@@ -17,7 +17,7 @@ cp .env.example .env   # fill in the variables below
 npm start              # press i for the iOS simulator, or a for Android
 ```
 
-Expo Go and simulators are fine for everything except Apple Health. See "Apple Health needs a native build".
+Web works without a native build. iOS date/time sheets use a local Expo module, so use a development build on the simulator (`npx expo prebuild --platform ios`, then `npx expo run:ios`); Expo Go cannot open those sheets. Apple Health additionally needs a signed physical-device build. See "Apple Health needs a native build" and [Phase 1/2 UX validation](docs/phase12-ux-validation.md).
 
 Checks (all run in CI): `npm run typecheck`, `npm run lint`, `npm test`. The full pipeline (coverage floor, database and types checks, API and web smoke tests, audit and secrets scan) is described in `docs/ci.md`.
 

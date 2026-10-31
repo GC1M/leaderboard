@@ -2,8 +2,8 @@ import { act } from 'react';
 import { AccessibilityInfo, Keyboard } from 'react-native';
 import { createRoot } from 'test-renderer';
 
-import GroupInfo from '@/app/groups/[id]/info';
-import JoinGroup from '@/app/groups/join';
+import GroupInfo from '@/app/(tabs)/groups/[id]/info';
+import JoinGroup from '@/app/(tabs)/groups/join';
 import JoinByLink from '@/app/join/[code]';
 
 const mockRouter = { replace: jest.fn(), canDismiss: jest.fn(), dismissAll: jest.fn(), canGoBack: jest.fn() };
@@ -15,6 +15,7 @@ const mockDelete = jest.fn();
 const mockAlert = jest.fn();
 const mockMembers = jest.fn();
 const mockRename = jest.fn();
+const mockShare = jest.fn();
 jest.mock('expo-router', () => ({
   useSegments: () => [],
   useLocalSearchParams: () => mockParams,
@@ -34,6 +35,7 @@ jest.mock('@/lib/groups', () => ({
   getMyShares: () => Promise.resolve(['steps']),
   deleteGroup: (...args: unknown[]) => mockDelete(...args),
   renameGroup: (...args: unknown[]) => mockRename(...args),
+  setShare: (...args: unknown[]) => mockShare(...args),
 }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -131,4 +133,22 @@ test('Done on the group name field saves the rename, dismisses the keyboard and 
   expect(announce).toHaveBeenCalledWith('Group name saved');
   expect(JSON.stringify(c)).toContain('"Saved"');
   act(() => r.unmount()); // the 2s "Saved" timer must not outlive the test
+});
+
+
+test('sharing uses labeled switches, blocks repeated writes and restores state on failure', async () => {
+  let reject: (e: Error) => void = () => {};
+  mockShare.mockImplementation(() => new Promise((_, fail) => { reject = fail; }));
+  const r = await render(<GroupInfo />);
+  const c = r.container as any;
+  const toggle = () => c.queryAll((n: any) => n.props.accessibilityLabel === 'Share sleep with this group' && n.props.onChange)[0];
+  const change = toggle().props.onChange;
+  await act(async () => { change({ nativeEvent: { value: true } }); change({ nativeEvent: { value: false } }); });
+  expect(mockShare).toHaveBeenCalledTimes(1);
+  expect(mockShare).toHaveBeenCalledWith(mockParams.id, 'sleep', true);
+  expect(JSON.stringify(c)).toContain('Saving sharing choice');
+  await act(async () => reject(new Error('Could not save sharing')));
+  expect(JSON.stringify(c)).toContain('Could not save sharing');
+  expect(toggle().props.value).toBe(false);
+  await act(async () => r.unmount());
 });

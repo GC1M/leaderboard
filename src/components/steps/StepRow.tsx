@@ -11,12 +11,16 @@ const dayLabel = (date: string, today: string) => {
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 };
 
-export function StepRow({ date, today, row, onUseHealth }: { date: string; today: string; row?: Row; onUseHealth?: () => void }) {
+export function StepRow({ date, today, row, onUseHealth, onPress }: { onPress?: () => void; date: string; today: string; row?: Row; onUseHealth?: () => void }) {
   const t = useTheme();
   const large = useLargeText();
   const label = dayLabel(date, today);
   const source = row?.source === 'manual' ? 'Manual' : 'Health';
   const a11y = row ? `${label}, ${row.value.toLocaleString()} steps, ${source}` : `${label}, no data`;
+  if (onPress) return <Pressable accessibilityRole="button" accessibilityLabel={a11y} onPress={onPress} style={[styles.row, large && styles.stacked, { borderBottomColor: t.line }]}>
+    <View style={styles.main}><Text style={[styles.day, { color: t.ink }]}>{label}</Text><Text style={[styles.tag, { color: t.inkSoft }]}>{source}</Text></View>
+    <Text style={[styles.value, { color: t.ink }]}>{row?.value.toLocaleString()} steps</Text>
+  </Pressable>;
   return (
     <View accessible={!onUseHealth || row?.source !== 'manual'} accessibilityLabel={a11y} style={[styles.row, large && styles.stacked, { borderBottomColor: t.line }]}>
       <View style={styles.main}>

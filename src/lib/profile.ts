@@ -1,3 +1,4 @@
+import { clearMeasurementDraft } from './measurement-draft';
 import { deleteHealthJournal } from './health/journal';
 import { secureStorage } from './secure-storage';
 import { supabase } from './supabase';
@@ -34,5 +35,5 @@ export async function deleteAccount(): Promise<void> {
   const { error } = await supabase.rpc('delete_my_account');
   if (error) throw new Error("Couldn't delete your account. Check your connection and try again.");
   await supabase.auth.signOut({ scope: 'local' });
-  await Promise.allSettled([deleteHealthJournal(uid), secureStorage.removeItem(`health-connection-${uid}`), clearAllDrafts(uid), clearAllTemplateDrafts(uid)]);
+  await Promise.allSettled([deleteHealthJournal(uid), secureStorage.removeItem(`health-connection-${uid}`), clearAllDrafts(uid), clearAllTemplateDrafts(uid), clearMeasurementDraft(uid, 'weight'), clearMeasurementDraft(uid, 'sleep'), clearMeasurementDraft(uid, 'steps')]);
 }

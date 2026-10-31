@@ -66,13 +66,13 @@ test('accepts a decimal comma', () => {
 
 test('unit conversion round-trips through storage', () => {
   const lb = convertUnits(base({ exercises: [squat({ load: '100' })] }), 'lb', 'mi');
-  expect(lb.exercises[0].sets[0].load).toBe('220.46');
+  expect(Number(lb.exercises[0].sets[0].load)).toBeCloseTo(220.462262, 5);
   expect(convertUnits(lb, 'kg', 'km').exercises[0].sets[0].load).toBe('100');
   const mi = convertUnits(base({ exercises: [{ ...squat({ distance: '5' }), category: 'cardio' }] }), 'kg', 'mi');
-  expect(mi.exercises[0].sets[0].distance).toBe('3.11');
-  expect(convertUnits(base({ exercises: [squat({ load: 'x' })] }), 'lb', 'km').exercises[0].sets[0].load).toBe('x');
-  expect(convertUnits(base({ exercises: [squat({ load: '22,5' })] }), 'lb', 'km').exercises[0].sets[0].load).toBe('49.6');
-  expect(convertUnits(base({ exercises: [squat({ load: '100.' })] }), 'lb', 'km').exercises[0].sets[0].load).toBe('220.46');
+  expect(Number(mi.exercises[0].sets[0].distance)).toBeCloseTo(3.106856, 5);
+  expect(() => convertUnits(base({ exercises: [squat({ load: 'x' })] }), 'lb', 'km')).toThrow('Correct the invalid number');
+  expect(Number(convertUnits(base({ exercises: [squat({ load: '22,5' })] }), 'lb', 'km').exercises[0].sets[0].load)).toBeCloseTo(49.604, 3);
+  expect(Number(convertUnits(base({ exercises: [squat({ load: '100.' })] }), 'lb', 'km').exercises[0].sets[0].load)).toBeCloseTo(220.462, 3);
 });
 
 test('default distance unit follows the region', () => {

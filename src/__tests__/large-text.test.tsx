@@ -2,7 +2,7 @@ import { act } from 'react';
 import { StyleSheet } from 'react-native';
 import { createRoot } from 'test-renderer';
 
-import GroupDetail from '@/app/groups/[id]';
+import GroupDetail from '@/app/(tabs)/groups/[id]';
 import { Row } from '@/components/ui';
 
 let mockFontScale = 1;

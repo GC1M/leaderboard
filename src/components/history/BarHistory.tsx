@@ -12,21 +12,21 @@ type Day = { date: string; value: number };
 // 7/30/90-day bars for a daily metric (steps, sleep minutes). `fetch` must be stable (module function or useCallback).
 // A new `refresh` value refetches the current range, e.g. after the screen's own reload.
 // Days without a row draw a dashed outline, never a zero bar; the summary averages recorded days only.
-export function BarHistory({ fetch, fmt, noun, refresh }: { fetch: (days: number) => Promise<Day[]>; fmt: (v: number) => string; noun: string; refresh?: unknown }) {
+export function BarHistory({ fetch, fmt, noun, refresh, hasAny, emptyAction }: { hasAny?: () => Promise<boolean>; emptyAction?: { label: string; onPress: () => void }; fetch: (days: number) => Promise<Day[]>; fmt: (v: number) => string; noun: string; refresh?: unknown }) {
   const c = useTheme();
   const [days, setDays] = useState<Range>(7);
   const [tries, setTries] = useState(0);
   // Keyed by range, so switching range shows the loading state until its own result arrives.
-  const [res, setRes] = useState<{ days: number; rows?: Day[]; error?: string } | null>(null);
+  const [res, setRes] = useState<{ days: number; rows?: Day[]; any?: boolean; error?: string } | null>(null);
 
   useEffect(() => {
     let live = true;
-    fetch(days).then(
-      (rows) => live && setRes({ days, rows }),
+    Promise.all([fetch(days), hasAny ? hasAny() : Promise.resolve(true)]).then(
+      ([rows, any]) => live && setRes({ days, rows, any }),
       (e) => live && setRes({ days, error: e instanceof Error ? e.message : `Couldn't load your ${noun}.` }),
     );
     return () => { live = false; };
-  }, [fetch, days, noun, tries, refresh]);
+  }, [fetch, hasAny, days, noun, tries, refresh]);
 
   const current = res?.days === days ? res : null;
   const rows = current?.rows ?? null;
@@ -41,12 +41,12 @@ export function BarHistory({ fetch, fmt, noun, refresh }: { fetch: (days: number
 
   return (
     <View style={{ gap: 12 }}>
-      <Segmented
+      {current?.any && <Segmented
         label="Time range"
         options={RANGES.map((r) => ({ value: r, label: `${r}D`, a11y: `${r} days` }))}
         value={days}
         onChange={setDays}
-      />
+      />}
       {error ? (
         <View>
           <ErrorText>{error}</ErrorText>
@@ -54,6 +54,8 @@ export function BarHistory({ fetch, fmt, noun, refresh }: { fetch: (days: number
         </View>
       ) : !rows ? (
         <Skeleton label={`Loading ${noun}`} rows={2} />
+      ) : current?.any === false ? (
+        <View style={{ gap: 12 }}><Text style={[ui.body, { color: c.inkSoft }]}>{`No ${noun} recorded yet.`}</Text>{emptyAction && <Button label={emptyAction.label} onPress={emptyAction.onPress} />}</View>
       ) : !rows.length ? (
         <Text style={[ui.body, { color: c.inkSoft }]}>{`No ${noun} recorded in the last ${days} days.`}</Text>
       ) : (

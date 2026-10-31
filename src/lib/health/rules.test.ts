@@ -3,12 +3,11 @@ import { planSync, validateSleep, validateSteps, validateWeight } from './rules'
 describe('validateSteps', () => {
   it.each([
     ['0', 0],
-    ['8,412', 8412],
     [' 80000 ', 80000],
   ])('accepts %p', (input, expected) => {
     expect(validateSteps(input)).toEqual({ ok: true, value: expected });
   });
-  it.each(['80001', '-1', '12.5', 'abc', '', '1e3'])('rejects %p', (input) => {
+  it.each(['80001', '-1', '12.5', 'abc', '', '1e3', '7,5', '8,412', '1 2'])('rejects %p', (input) => {
     expect(validateSteps(input).ok).toBe(false);
   });
   it('gives the friendly cap message', () => {

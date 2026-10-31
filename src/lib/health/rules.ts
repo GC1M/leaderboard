@@ -1,3 +1,4 @@
+import { decimalValue } from '../numeric-input';
 import { displayWeight, kgFromDisplay } from './weight';
 
 // Manual entry only. Health totals are measurements and are never capped.
@@ -7,7 +8,7 @@ export type StepsValidation = { ok: true; value: number } | { ok: false; message
 
 // Manual entry: whole number 0..80000 (the DB check rejects manual rows above).
 export function validateSteps(input: string): StepsValidation {
-  const text = input.replace(/[,\s]/g, '');
+  const text = input.trim();
   if (!/^\d+$/.test(text)) return { ok: false, message: 'Enter a whole number of steps.' };
   const value = Number(text);
   if (value > MAX_MANUAL_STEPS) return { ok: false, message: "Steps can't be more than 80,000 in a day." };
@@ -36,9 +37,9 @@ export function planSync(health: { date: string; value: number }[], existing: St
 export const MAX_MANUAL_KG = 450;
 export type WeightValidation = { ok: true; kg: number } | { ok: false; message: string };
 export function validateWeight(input: string, unit: 'kg' | 'lb'): WeightValidation {
-  const value = Number(input.trim().replace(',', '.'));
-  const kg = Math.round(kgFromDisplay(value, unit) * 1000) / 1000;
-  if (!/^\d+([.,]\d+)?$/.test(input.trim()) || !(kg > 0)) return { ok: false, message: `Enter your weight in ${unit}.` };
+  const value = decimalValue(input);
+  const kg = Math.round(kgFromDisplay(value ?? 0, unit) * 1000) / 1000;
+  if (value === null || !(kg > 0)) return { ok: false, message: `Enter your weight in ${unit}.` };
   if (kg > MAX_MANUAL_KG) return { ok: false, message: `Weight can't be more than ${Math.floor(displayWeight(MAX_MANUAL_KG, unit))} ${unit}.` };
   return { ok: true, kg };
 }

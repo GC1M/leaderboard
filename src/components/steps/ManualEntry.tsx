@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { ExportOption, type useExportChoice } from '@/components/health/ExportOption';
-import { Button, Field, styles as ui } from '@/components/ui';
+import { Button, Screen } from '@/components/ui';
 
+import { DateField, NumberField } from '@/components/inputs';
 import { alert } from '@/lib/alert';
 import { readDailySteps } from '@/lib/health/healthkit';
 import { MANUAL_KINDS, stepsPayload } from '@/lib/health/manual-export';
@@ -11,19 +12,43 @@ import { validateSteps, type StepRow } from '@/lib/health/rules';
 import { useHealthExport } from '@/lib/health/sync';
 import { upsertDailyMetrics } from '@/lib/metrics';
 
-import { useTheme } from '@/theme';
+import { localDateKey } from '@/lib/health/dates';
+import { dateFromKey } from '@/lib/health/format';
+import { useEditorNavigation } from '@/lib/editor-navigation';
+import { useAuth } from '@/lib/auth';
+import { clearMeasurementDraft, loadMeasurementDraft, saveMeasurementDraft } from '@/lib/measurement-draft';
+import { isDay } from '@/lib/workout-template-form';
 
-type Props = { dates: string[]; rows: StepRow[]; onSaved: () => void; choice: ReturnType<typeof useExportChoice> };
+type Props = { initialDate?: string; initialText?: string; dates: string[]; rows: StepRow[]; onSaved: () => void; onCancel?: () => void; choice: ReturnType<typeof useExportChoice> };
 
 // `dates` is oldest first; chips show newest first.
-export function ManualEntry({ dates, rows, onSaved, choice }: Props) {
-  const t = useTheme();
+export function ManualEntry({ dates, rows, onSaved, choice, initialDate, initialText = '', onCancel }: Props) {
+  const uid = useAuth().session?.user.id ?? '';
+  const [draft, setDraft] = useState<{ date: string; text: string } | null>(null);
   const exp = useHealthExport();
   const today = dates[dates.length - 1];
-  const [date, setDate] = useState(today);
-  const [text, setText] = useState('');
+  const [date, setDate] = useState(initialDate ?? today);
+  const [text, setText] = useState(initialText);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [changed, setChanged] = useState(false);
+  const persist = async () => { if (changed) await saveMeasurementDraft(uid, 'steps', { date, text }); };
+  const clear = async () => { setChanged(false); await clearMeasurementDraft(uid, 'steps'); };
+  const leave = useEditorNavigation(changed && !busy, persist, clear);
+  useEffect(() => {
+    let live = true;
+    void loadMeasurementDraft(uid, 'steps').then((raw) => { const d = raw as { date?: unknown; text?: unknown } | null; if (live && d && typeof d.date === 'string' && isDay(d.date) && typeof d.text === 'string') setDraft({ date: d.date, text: d.text }); });
+    return () => { live = false; };
+  }, [uid]);
+  useEffect(() => { const timer = setTimeout(() => { if (changed) void saveMeasurementDraft(uid, 'steps', { date, text }); }, 400); return () => clearTimeout(timer); }, [uid, changed, date, text]);
+  const cancel = () => {
+    if (!changed) return onCancel?.();
+    alert('Unsaved changes', 'Keep editing, save a draft for later, or discard.', [
+      { text: 'Keep Editing', style: 'cancel' },
+      { text: 'Save Draft', onPress: () => void persist().then(() => { setChanged(false); leave(() => onCancel?.()); }) },
+      { text: 'Discard Changes', style: 'destructive', onPress: () => void clear().then(() => leave(() => onCancel?.())) },
+    ]);
+  };
   const existing = rows.find((r) => r.date === date);
 
   const save = async (toHealth: boolean) => {
@@ -35,8 +60,9 @@ export function ManualEntry({ dates, rows, onSaved, choice }: Props) {
       await upsertDailyMetrics([{ date, value: v.value, source: 'manual' }]);
       // A queue error never undoes the saved entry; the Health status line shows what failed.
       if (toHealth) void exp.enqueue(MANUAL_KINDS.steps, date, 'save', stepsPayload(date, v.value)).catch(() => {});
+      await clear();
       setText('');
-      onSaved();
+      leave(onSaved);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save your steps.");
     } finally {
@@ -51,6 +77,7 @@ export function ManualEntry({ dates, rows, onSaved, choice }: Props) {
   };
 
   const onPress = async () => {
+    if (date > localDateKey(new Date())) return setError('Choose a date that has passed.');
     const v = validateSteps(text);
     const have = choice.on && v.ok ? await healthSteps() : 0;
     if (v.ok && have > 0) {
@@ -69,27 +96,15 @@ export function ManualEntry({ dates, rows, onSaved, choice }: Props) {
   };
 
   return (
-    <View>
-      <Text style={[ui.heading, styles.heading, { color: t.ink }]}>Add steps manually</Text>
-      <View style={styles.chips} accessibilityRole="radiogroup">
-        {[...dates].reverse().map((d) => (
-          <Pressable
-            key={d}
-            onPress={() => setDate(d)}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: d === date }}
-            accessibilityLabel={d === today ? 'Today' : d}
-            style={[styles.chip, { borderColor: d === date ? t.accent : t.border, backgroundColor: d === date ? t.accent : t.surface }]}
-          >
-            <Text style={{ color: d === date ? t.onAccent : t.ink, fontWeight: '600' }}>{d === today ? 'Today' : d.slice(5)}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Field
+    <Screen title={initialText ? 'Edit Steps' : 'Add Steps'} back backLabel="Cancel" onBack={cancel}>
+      {draft && <View style={{ gap: 8 }}><Button secondary label="Resume Steps Draft" onPress={() => { setDate(draft.date); setText(draft.text); setChanged(true); setDraft(null); }} /><Button plain label="Discard Previous Draft" onPress={() => { void clearMeasurementDraft(uid, 'steps'); setDraft(null); }} /></View>}
+      <DateField label="Date" mode="date" value={dateFromKey(date)} onChange={(v) => { setDate(localDateKey(v)); setChanged(true); }} />
+      <NumberField whole
         label="Steps"
         value={text}
         onChangeText={(v) => {
           setText(v);
+          setChanged(true);
           setError(null);
         }}
         keyboardType="number-pad"
@@ -101,7 +116,7 @@ export function ManualEntry({ dates, rows, onSaved, choice }: Props) {
       <View style={styles.save}>
         <Button label={existing ? 'Replace Steps' : 'Save Steps'} busy={busy} disabled={text.trim() === ''} onPress={() => void onPress()} />
       </View>
-    </View>
+    </Screen>
   );
 }
 

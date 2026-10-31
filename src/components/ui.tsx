@@ -3,6 +3,8 @@ import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { type ReactElement, type ReactNode, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
+  InputAccessoryView,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -25,9 +27,15 @@ export function Screen({
   back,
   refreshControl,
   children,
+  onBack,
+  backLabel = 'Back',
+  headerActions,
 }: {
   title: string;
   back?: boolean;
+  onBack?: () => void;
+  backLabel?: string;
+  headerActions?: ReactNode;
   refreshControl?: ReactElement<RefreshControlProps>;
   children: ReactNode;
 }) {
@@ -35,8 +43,7 @@ export function Screen({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const segments = useSegments();
-  // On web the tab bar floats over the top of tab screens (fixed, 24px down, 40px tall), so leave room for it.
-  const top = insets.top + (Platform.OS === 'web' && segments[0] === '(tabs)' ? 64 : 0);
+  const top = insets.top;
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -45,19 +52,20 @@ export function Screen({
       {back && (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+          accessibilityLabel={backLabel}
+          onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace(segments.includes('workouts') ? '/workouts' : segments.includes('groups') ? '/groups' : segments.includes('profile') ? '/profile' : '/')))}
           style={[styles.back, Platform.OS === 'web' && styles.webWidth]}
         >
           <Icon name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} color={c.accent} size={20} />
-          <Text style={[styles.body, { color: c.accent }]}>Back</Text>
+          <Text style={[styles.body, { color: c.accent }]}>{backLabel}</Text>
         </Pressable>
       )}
+      {headerActions && <View style={{ paddingHorizontal: 16 }}>{headerActions}</View>}
       {/* Number pads have no return key, so dragging the list dismisses the keyboard. "automatic" lets iOS
           inset the content for the native tab bar (React Native defaults to "never"). The content must not
           flexGrow to fill the frame, or that inset makes even short screens scroll. */}
       <ScrollView
-        contentContainerStyle={[styles.content, Platform.OS === 'web' && styles.webWidth]}
+        contentContainerStyle={[styles.content, { paddingBottom: Math.max(32, insets.bottom + 24) }, Platform.OS === 'web' && styles.webWidth]}
         contentInsetAdjustmentBehavior="automatic"
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         keyboardShouldPersistTaps="handled"
@@ -69,6 +77,7 @@ export function Screen({
         </Text>
         {children}
       </ScrollView>
+      {Platform.OS === 'ios' && <InputAccessoryView nativeID="numeric-done"><View style={{ backgroundColor: c.surface, alignItems: 'flex-end', paddingHorizontal: 16 }}><Button plain label="Done" onPress={Keyboard.dismiss} /></View></InputAccessoryView>}
     </KeyboardAvoidingView>
   );
 }
@@ -133,6 +142,7 @@ export function Field({
       placeholderTextColor={code ? 'transparent' : c.inkSoft}
       caretHidden={!!code}
       {...input}
+      inputAccessoryViewID={input.inputAccessoryViewID ?? (input.keyboardType === 'decimal-pad' || input.keyboardType === 'number-pad' ? 'numeric-done' : undefined)}
       onFocus={(e) => {
         setFocused(true);
         input.onFocus?.(e);
@@ -249,9 +259,11 @@ export function Row({
   action,
   last,
   disabled,
+  wrap,
 }: {
   label: string;
   value?: string;
+  wrap?: boolean;
   icon?: SymbolViewProps['name'];
   onPress?: () => void;
   danger?: boolean;
@@ -262,7 +274,8 @@ export function Row({
   const c = useTheme();
   const color = danger ? c.danger : action ? c.accent : c.ink;
   // At accessibility sizes the label wraps and the value stacks under it instead of both truncating.
-  const large = useLargeText();
+  const largeText = useLargeText();
+  const large = largeText || wrap;
   return (
     <Pressable
       disabled={!onPress || disabled}
