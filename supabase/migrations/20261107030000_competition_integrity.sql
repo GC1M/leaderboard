@@ -43,7 +43,7 @@ declare c public.competitions;
 begin
   select * into c from public.competitions where id=p_id for update;
   if not found or auth.uid() is null or not public.is_group_member(c.group_id) then raise exception 'competition unavailable'; end if;
-  if not(c.creator_id=auth.uid() or exists(select 1 from public.groups g where g.id=c.group_id and g.owner_id=auth.uid())) then raise exception 'only the creator or current group owner can moderate'; end if;
+  if not(coalesce(c.creator_id=auth.uid(),false) or exists(select 1 from public.groups g where g.id=c.group_id and g.owner_id=auth.uid())) then raise exception 'only the creator or current group owner can moderate'; end if;
   if c.status='finalized' then raise exception 'finalized results cannot be moderated'; end if;
   if p_reason is null or char_length(btrim(p_reason)) not between 1 and 500 then raise exception 'give a moderation reason of 1 to 500 characters'; end if;
   perform set_config('app.competition_reason',btrim(p_reason),true);

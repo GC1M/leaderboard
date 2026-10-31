@@ -46,6 +46,15 @@ const SECTIONS: { title: string; body: string[] }[] = [
     ],
   },
   {
+    title: 'Competitions',
+    body: [
+      'Competitions are optional. Joining a group never enrolls you. Before joining a competition, review its dates, timezone, source eligibility and versioned scoring rules. Currently only steps are available; sleep, weight and food are not ranked.',
+      'Current group members can see competition totals, ranks, source counts and data freshness while the required metric sharing is on. Your detailed contribution explanations are visible only to you. Turning sharing off hides your results even after finalization. Leaving a group ends participation; returning does not automatically enroll you again.',
+      'Uploads, edits and deletions affect provisional scores until someone explicitly finalizes results, at least 24 hours after the end. Finalized scores are stored as a snapshot and later source edits or deletions do not change them. Your sharing choice still applies, and deleting your account removes your participation and stored results.',
+      'Creators and current group owners can cancel a competition or remove a participant before finalization, with a reason. Group members see the activity log, including generic notices that source records changed. The log contains no raw health measurements. Review flags do not alter your original records.',
+    ],
+  },
+  {
     title: 'Stopping and deleting',
     body: [
       'Stop Health Imports (on Summary) stops reading Apple Health. Data already uploaded stays until you delete it.',
