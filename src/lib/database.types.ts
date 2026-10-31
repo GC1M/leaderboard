@@ -23,7 +23,39 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "competition_participants": {
+            "competition_audit": {
+                  Row: {
+                    "actor_id": string | null,"competition_id": string,"created_at": string,"event": string,"id": string,"reason": string | null,"target_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "actor_id"?: string | null,"competition_id": string,"created_at"?: string,"event": string,"id"?: string,"reason"?: string | null,"target_id"?: string | null
+                  }
+                  Update: {
+                    "actor_id"?: string | null,"competition_id"?: string,"created_at"?: string,"event"?: string,"id"?: string,"reason"?: string | null,"target_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "competition_audit_actor_id_fkey"
+      columns: ["actor_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "competition_audit_competition_id_fkey"
+      columns: ["competition_id"]
+isOneToOne: false
+      referencedRelation: "competitions"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "competition_audit_target_id_fkey"
+      columns: ["target_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"competition_participants": {
                   Row: {
                     "competition_id": string,"departed_at": string | null,"joined_at": string,"status": string,"user_id": string
                   }
@@ -537,6 +569,14 @@ isOneToOne: false
                            },
 "leave_competition":
 { Args: { "p_id": string }; Returns: undefined
+                           },
+"moderate_competition":
+{ Args: { "p_action": string,"p_id": string,"p_reason": string,"p_user_id"?: string }; Returns: undefined
+                           },
+"my_competition_contributions":
+{ Args: { "p_id": string }; Returns: {
+              "flagged": boolean,"included": boolean,"measured_on": string,"reason": string,"record_id": string,"source": string,"updated_at": string,"value": number
+            }[]
                            },
 "record_health_export":
 { Args: { "p_device": string,"p_kind": string,"p_record_id": string,"p_sample_uuid": string,"p_version": number }; Returns: boolean
