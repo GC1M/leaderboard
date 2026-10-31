@@ -433,6 +433,12 @@ isOneToOne: false
 "apply_health_workouts":
 { Args: { "p_device": string,"p_owner": string,"p_remove": (string)[],"p_workouts": Json }; Returns: undefined
                            },
+"competition_invite":
+{ Args: { "p_code": string,"p_id": string }; Returns: Json
+                           },
+"create_competition":
+{ Args: { "p_end_day": string,"p_group_id": string,"p_include_manual"?: boolean,"p_metric": string,"p_name": string,"p_start_day": string,"p_timezone": string }; Returns: string
+                           },
 "create_group":
 { Args: { "name": string }; Returns: {
               "created_at": string,
@@ -490,8 +496,14 @@ isOneToOne: false
 "is_group_member":
 { Args: { "p_group_id": string }; Returns: boolean
                            },
+"join_competition":
+{ Args: { "p_id": string }; Returns: undefined
+                           },
 "join_group":
 { Args: { "code": string }; Returns: string
+                           },
+"leave_competition":
+{ Args: { "p_id": string }; Returns: undefined
                            },
 "record_health_export":
 { Args: { "p_device": string,"p_kind": string,"p_record_id": string,"p_sample_uuid": string,"p_version": number }; Returns: boolean
