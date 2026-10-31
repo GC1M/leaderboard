@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Segmented } from '@/components/history/Segmented';
 import { Button, Field, styles, useLargeText } from '@/components/ui';
 import { DateField, DropdownField, DurationField, NumberField, RemoveButton } from '@/components/inputs';
@@ -8,14 +8,21 @@ import { formatLocalDateTime, localDateKey, parseLocalDateTime } from '@/lib/hea
 import { useTheme } from '@/theme';
 
 // Shared editor surface keeps templates and workouts consistent. Dates only belong to a workout.
-export function WorkoutFields({ form, edit, template, onAddExercise, onError }: { form: WorkoutForm; edit: (f: (x: WorkoutForm) => WorkoutForm) => void; template?: boolean; onAddExercise: () => void; onError: (s: string) => void }) {
+export function WorkoutFields({ form, edit, template, onAddExercise, onError, durationError }: { form: WorkoutForm; edit: (f: (x: WorkoutForm) => WorkoutForm) => void; template?: boolean; onAddExercise: () => void; onError: (s: string) => void; durationError?: string | null }) {
   const c = useTheme();
   const large = useLargeText();
   const [units, setUnits] = useState(false);
   const category = form.category ?? categoryForActivity(form.activityType);
   const at = parseLocalDateTime(`${form.date} ${form.time}`) ?? new Date();
+  // Switching units back, with no edits in between, restores the exact values rather than rounded conversions.
+  const unitUndo = useRef<{ from: WorkoutForm; to: WorkoutForm } | null>(null);
   const changeUnits = (weight: WorkoutForm['weightUnit'], distance: WorkoutForm['distanceUnit']) => {
-    try { const next = convertUnits(form, weight, distance); edit(() => next); } catch (e) { onError((e as Error).message); }
+    try {
+      const back = unitUndo.current;
+      const next = back && back.to === form && back.from.weightUnit === weight && back.from.distanceUnit === distance ? back.from : convertUnits(form, weight, distance);
+      unitUndo.current = { from: form, to: next };
+      edit(() => next);
+    } catch (e) { onError((e as Error).message); }
   };
   return <>
     <DropdownField label="Workout type" options={WORKOUT_CATEGORIES} value={category} onChange={(v) => edit((f) => changeCategory(f, v))} />
@@ -24,7 +31,7 @@ export function WorkoutFields({ form, edit, template, onAddExercise, onError }: 
       <DateField label="Date" mode="date" value={at} onChange={(v) => edit((f) => ({ ...f, date: localDateKey(v) }))} />
       <DateField label="Start time" mode="time" value={at} onChange={(v) => edit((f) => ({ ...f, time: formatLocalDateTime(v).slice(11) }))} />
     </>}
-    <DurationField label={template ? 'Planned duration' : 'Duration'} value={form.durationMin} optional={template} onChange={(v) => edit((f) => ({ ...f, durationMin: v }))} />
+    <DurationField label={template ? 'Planned duration' : 'Duration'} value={form.durationMin} optional={template} saveError={durationError} onChange={(v) => edit((f) => ({ ...f, durationMin: v }))} />
     <Button plain label={`Units: ${form.weightUnit}, ${form.distanceUnit} · Change for this entry`} onPress={() => setUnits((v) => !v)} />
     {units && <View style={{ gap: 8 }}>
       <Text style={[styles.bodyStrong, { color: c.ink }]}>Weight and load</Text>

@@ -14,5 +14,6 @@ export function convertDecimal(raw: string, convert: (n: number) => number): str
   const n = decimalValue(raw);
   if (!raw.trim()) return raw;
   if (n === null) throw new Error('Correct the invalid number before changing units.');
-  return String(Number(convert(n).toFixed(6)));
+  // Two decimals: 165.5 lb shows as 75.07 kg, not 75.069537, and switching back gives 165.5 again.
+  return String(Number(convert(n).toFixed(2)));
 }

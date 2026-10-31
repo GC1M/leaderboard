@@ -19,6 +19,7 @@ export function useExportChoice(type: ManualType) {
   const key = `health-export-${session?.user.id}-${type}`;
   const [on, setOn] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
     secureStorage.getItem(key).then((v) => live && setOn(v === '1'), () => {});
@@ -26,16 +27,21 @@ export function useExportChoice(type: ManualType) {
   }, [key]);
   const set = async (next: boolean) => {
     setMessage(null);
-    if (next) {
-      try { await allowWrite([HEALTH_TYPES[type]]); } catch { /* the access check below reports it */ }
-      if (getHealthWriteAccess(HEALTH_TYPES[type]) !== 'granted') return setMessage(DENIED);
-    } else {
-      await discard(MANUAL_KINDS[type]);
+    setBusy(true);
+    try {
+      if (next) {
+        try { await allowWrite([HEALTH_TYPES[type]]); } catch { /* the access check below reports it */ }
+        if (getHealthWriteAccess(HEALTH_TYPES[type]) !== 'granted') return setMessage(DENIED);
+      } else {
+        await discard(MANUAL_KINDS[type]);
+      }
+      setOn(next);
+      try { await secureStorage.setItem(key, next ? '1' : '0'); } catch { /* applies until the screen closes */ }
+    } finally {
+      setBusy(false);
     }
-    setOn(next);
-    try { await secureStorage.setItem(key, next ? '1' : '0'); } catch { /* applies until the screen closes */ }
   };
-  return { on, message, set };
+  return { on, message, busy, set };
 }
 
 export function ExportOption({ type, choice, note }: { type: ManualType; choice: ReturnType<typeof useExportChoice>; note?: string }) {
@@ -50,8 +56,9 @@ export function ExportOption({ type, choice, note }: { type: ManualType; choice:
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <Text style={[styles.bodyStrong, { color: c.ink, flex: 1 }]}>Also save to Apple Health</Text>
-        <Switch accessibilityLabel="Also save to Apple Health" value={choice.on} onValueChange={(v) => void choice.set(v)} />
+        <Switch accessibilityLabel="Also save to Apple Health" value={choice.on} disabled={choice.busy} onValueChange={(v) => void choice.set(v)} />
       </View>
+      {choice.busy && <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: c.inkSoft }]}>Waiting for Apple Health…</Text>}
       {(choice.message || note) && <Text style={[styles.caption, { color: choice.message ? c.danger : c.inkSoft }]}>{choice.message ?? note}</Text>}
       {failed.length > 0 && (
         <View>

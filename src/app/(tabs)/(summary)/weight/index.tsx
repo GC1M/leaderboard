@@ -70,6 +70,8 @@ export default function Weight() {
   useEditorNavigation(view === 'edit' && changed && !busy, persist, clear);
   const exp = useHealthExport();
   const choice = useExportChoice('weight');
+  // Switching units back, with no typing in between, restores the exact text rather than a rounded conversion.
+  const unitUndo = useRef<{ unit: 'kg' | 'lb'; text: string; shown: string } | null>(null);
   const send = (id: string, op: 'save' | 'delete', payload: unknown) => { void exp.enqueue(MANUAL_KINDS.weight, id, op, payload).catch(() => {}); };
   const current = res?.days === days ? res : null;
   const displayUnit = view === 'history' ? preferred : unit;
@@ -106,7 +108,12 @@ export default function Weight() {
     <NumberField label={`Weight (${unit})`} value={text} onChangeText={(v) => { setText(v); setChanged(true); setFormError(null); }} placeholder={unit === 'kg' ? '75.0' : '165.0'} error={formError} />
     <Button plain label={`Weight unit: ${unit} · Change for this entry`} onPress={() => setUnitsOpen((v) => !v)} />
     {unitsOpen && <Segmented label="Weight unit for this entry" options={[{ value: 'kg', label: 'kg' }, { value: 'lb', label: 'lb' }] as const} value={unit} onChange={(u) => {
-      try { setText(convertDecimal(text, (v) => displayWeight(kgFromDisplay(v, unit), u))); setUnit(u); setChanged(true); } catch (e) { setFormError((e as Error).message); }
+      try {
+        const back = unitUndo.current;
+        const next = back && back.unit === u && back.shown === text ? back.text : convertDecimal(text, (v) => displayWeight(kgFromDisplay(v, unit), u));
+        unitUndo.current = { unit, text, shown: next };
+        setText(next); setUnit(u); setChanged(true);
+      } catch (e) { setFormError((e as Error).message); }
     }} />}
     <DateField label="When" value={when} onChange={(v) => { setWhen(v); setChanged(true); setWhenError(null); }} />
     <ErrorText>{whenError}</ErrorText>

@@ -22,6 +22,7 @@ export function useWorkoutExport(source: string) {
   const [remembered, setRemembered] = useState(false);
   const [chosen, setChosen] = useState<boolean | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
     secureStorage.getItem(key).then((v) => live && setRemembered(v === '1'), () => {});
@@ -33,17 +34,22 @@ export function useWorkoutExport(source: string) {
   const wanted = (id?: string) => eligible && (chosen ?? ((id !== undefined && inHealth(id)) || (remembered && source === 'manual')));
   const set = async (next: boolean) => {
     setMessage(null);
-    if (next) {
-      try { await exp.allowWrite([WORKOUT_WRITE_TYPE]); } catch { /* the access check below reports it */ }
-      if (getHealthWriteAccess(WORKOUT_WRITE_TYPE) !== 'granted') return setMessage(DENIED);
+    setBusy(true);
+    try {
+      if (next) {
+        try { await exp.allowWrite([WORKOUT_WRITE_TYPE]); } catch { /* the access check below reports it */ }
+        if (getHealthWriteAccess(WORKOUT_WRITE_TYPE) !== 'granted') return setMessage(DENIED);
+      }
+      setChosen(next);
+      try { await secureStorage.setItem(key, next ? '1' : '0'); } catch { /* applies until the screen closes */ }
+    } finally {
+      setBusy(false);
     }
-    setChosen(next);
-    try { await secureStorage.setItem(key, next ? '1' : '0'); } catch { /* applies until the screen closes */ }
   };
   // A queue error never undoes the saved workout; the option shows what failed.
   const send = (id: string, op: 'save' | 'delete', payload: unknown) => exp.enqueue(WORKOUT_KIND, id, op, payload).catch(() => {});
   return {
-    eligible, message, set, on: (id?: string) => wanted(id) === true,
+    eligible, message, busy, set, on: (id?: string) => wanted(id) === true,
     // After a save: write (or replace) the Health workout, or remove it if the user turned the choice off.
     saved: (id: string, w: Parameters<typeof workoutPayload>[0]) => {
       if (wanted(id)) return send(id, 'save', workoutPayload(w));
@@ -66,9 +72,9 @@ export function WorkoutExportOption({ id, choice }: { id?: string; choice: Retur
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <Text style={[styles.bodyStrong, { color: c.ink, flex: 1 }]}>Also save to Apple Health</Text>
-        <Switch accessibilityLabel="Also save to Apple Health" value={choice.on(id)} onValueChange={(v) => void choice.set(v)} />
+        <Switch accessibilityLabel="Also save to Apple Health" value={choice.on(id)} disabled={choice.busy} onValueChange={(v) => void choice.set(v)} />
       </View>
-      <Text style={[styles.caption, { color: choice.message ? c.danger : c.inkSoft }]}>{choice.message ?? NOTE}</Text>
+      <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: choice.message ? c.danger : c.inkSoft }]}>{choice.busy ? 'Waiting for Apple Health…' : choice.message ?? NOTE}</Text>
       {failed.length > 0 && (
         <View>
           <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: c.danger }]}>

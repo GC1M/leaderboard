@@ -50,7 +50,7 @@ export function DropdownField<T extends string>({ label, options, value, onChang
 }
 
 // Editors store minutes for backwards-compatible drafts. The UI uses hours and minutes; fractional minutes preserve existing shorter sets.
-export function DurationField({ label, value, onChange, optional }: { label: string; value: string; onChange: (v: string) => void; optional?: boolean }) {
+export function DurationField({ label, value, onChange, optional, saveError }: { label: string; value: string; onChange: (v: string) => void; optional?: boolean; saveError?: string | null }) {
   const c = useTheme();
   const large = useLargeText();
   const split = (raw: string) => {
@@ -74,7 +74,7 @@ export function DurationField({ label, value, onChange, optional }: { label: str
     <View style={{ flexDirection: large ? 'column' : 'row', gap: 8 }}>
       {['Hours', 'Minutes'].map((name, i) => <View key={name} style={{ flex: large ? undefined : 1 }}><NumberField label={name} accessibilityLabel={`${label} ${name.toLowerCase()}`} whole={i === 0} value={parts[i]} onChangeText={(v) => update(i, v)} helper=" " /></View>)}
     </View>
-    <ErrorText>{error}</ErrorText>
+    <ErrorText>{error ?? saveError}</ErrorText>
   </View>;
 }
 
