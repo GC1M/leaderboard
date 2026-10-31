@@ -59,7 +59,7 @@ See `docs/health-sync.md` for how import and reconciliation work.
 
 ### Apple signing prerequisites
 
-- A paid Apple Developer Program team. A free personal team cannot use the HealthKit capability or TestFlight.
+- An Apple team. A free personal team can sign HealthKit for a development build (builds expire after 7 days), but not Sign in with Apple: delete `com.apple.developer.applesignin` from the generated `ios/Leaderboard/Leaderboard.entitlements` first. TestFlight needs the paid Apple Developer Program.
 - App ID with bundle id `com.shivamlalakiya.leaderboard` (from `app.config.ts`) and the HealthKit capability enabled.
 - The iPhone in Developer Mode, registered to the team.
 
@@ -133,3 +133,25 @@ Run on a signed physical-device build with real Health data, after the Phase 1 c
 - [ ] Leaving or being removed from a group stops sharing; rejoining does not turn it back on
 - [ ] The privacy page matches what the app reads, saves to Health, stores and shares
 - [ ] Account deletion removes workouts, templates and exported-record mappings; sign-out then another account shows none of the first account's data
+
+## Competition rules (version 1, issue #43)
+
+These are the defaults the server enforces (`supabase/migrations/20261107*_competition_*.sql`). The app shows the same rules on the create, detail and standings screens.
+
+- Steps only. Weight, sleep and food are never ranked; workout metrics are not enabled yet.
+- 1 to 90 whole calendar days in one timezone chosen at creation. Every participant must use that timezone; anyone else is shown as a timezone mismatch with no score.
+- Creating a competition does not enroll anyone. Members opt in before the start, and must keep step sharing on for the group.
+- Apple Health entries count; manual entries are excluded unless the creator allowed them at creation. Rules cannot be edited after creation.
+- Missing data is unranked, recorded zeroes count, and ties share a rank.
+- Leaving the competition, leaving the group, turning off sharing or deleting the account removes the score from live and final standings.
+- Results stay provisional until a participant, the creator or the group owner finalizes them, at least 24 hours after the end. Finalizing freezes a server snapshot; later edits do not change it.
+- The creator or group owner can remove a participant or cancel, with a reason that is kept in the audit log.
+
+## Competition checklist (issue #43)
+
+SQL tests cover the lifecycle, scoring, permissions and boundaries (`supabase/tests/competition_*.test.sql`). On a device:
+
+- [ ] Create a competition, share its invite, open the link on a second account: it lands on the group join screen and says joining the group does not enroll
+- [ ] Join the group, then the competition, before the start
+- [ ] During the competition, standings show both participants, refresh after a step sync, and hide a participant who turns off step sharing
+- [ ] After the end plus 24 hours, finalize; the result stays the same after editing a step entry
