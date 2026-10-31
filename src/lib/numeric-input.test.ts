@@ -22,7 +22,7 @@ test('mixed categories retain exercises and canonical measurements through unit 
   const converted = convertUnits(mixed, 'lb', 'mi');
   const built = buildWorkout(converted);
   expect(built.ok).toBe(true);
-  if (built.ok) expect(built.input.exercises[0].sets[0].loadKg).toBeCloseTo(75, 5);
+  if (built.ok) expect(built.input.exercises[0].sets[0].loadKg).toBeCloseTo(75, 2);
   expect(form.weightUnit).toBe('kg');
 });
 
@@ -33,4 +33,10 @@ test('Full Body survives draft recovery and saved-record category detection', ()
   expect(parseDraft(serializeDraft({ editingId: null, form }))?.form.category).toBe('full_body');
   const running = { ...form, category: 'cardio' as const, activityType: 'Running' };
   expect(changeCategory(running, 'cardio').activityType).toBe('Running');
+});
+
+test('unit switches show two decimals and round-trip without drift', () => {
+  const toKg = (lb: number) => lb * 0.45359237, toLb = (kg: number) => kg / 0.45359237;
+  expect(convertDecimal('165.5', toKg)).toBe('75.07');
+  expect(convertDecimal(convertDecimal('165.5', toKg), toLb)).toBe('165.5');
 });

@@ -31,9 +31,11 @@ test('typing, locale paste, editing units, saving and reopening a measurement', 
   expect(button(c, 'Save Weight').props.accessibilityState.disabled).toBe(false);
   await click(c, 'Weight unit: kg · Change for this entry'); await click(c, 'lb');
   const field = c.queryAll((n: any) => n.props.onChangeText && n.props.accessibilityLabel === 'Weight (lb)')[0];
-  expect(Number(field.props.value)).toBeCloseTo(165.3467, 3);
+  expect(field.props.value).toBe('165.35');
+  await click(c, 'kg');
+  expect(c.queryAll((n: any) => n.props.onChangeText && n.props.accessibilityLabel === 'Weight (kg)')[0].props.value).toBe('75.');
   await click(c, 'Save Weight');
-  expect(mockSave.mock.calls[0][1].kg).toBeCloseTo(75, 3);
+  expect(mockSave.mock.calls[0][1].kg).toBe(75);
   expect(JSON.stringify(c)).toContain('Weight Reading');
   await click(c, 'Edit'); await type(c, 'Weight (kg)', '74,5'); await click(c, 'Save Changes');
   expect(mockSave.mock.calls[1][1]).toMatchObject({ id: 'new-id', kg: 74.5 });

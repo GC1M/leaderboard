@@ -124,6 +124,17 @@ function parseStart(date: string, time: string): Date {
 
 export type Built = { ok: true; input: ManualWorkoutInput } | { ok: false; message: string };
 
+// Separate from buildWorkout so the editor can show it beside the duration field, which may be off-screen.
+export function durationError(f: WorkoutForm): string | null {
+  try {
+    const minutes = num(f.durationMin, 'Duration');
+    if (minutes === null) return 'Enter how long the workout lasted.';
+    return minutes === 0 ? 'The duration must be more than zero.' : null;
+  } catch (e) {
+    return (e as Error).message;
+  }
+}
+
 // Validates and converts to canonical units. The end time is start plus duration, so an end before the
 // start shows up as a negative duration and is rejected. Never produces calories: manual entry has none.
 export function buildWorkout(f: WorkoutForm): Built {
@@ -133,9 +144,9 @@ export function buildWorkout(f: WorkoutForm): Built {
     if (activityType.length > 60) throw new Error('The activity type must be 60 characters or fewer.');
     if (f.notes.length > 2000) throw new Error('Notes must be 2,000 characters or fewer.');
     const startedAt = parseStart(f.date, f.time);
-    const minutes = num(f.durationMin, 'Duration');
-    if (minutes === null) throw new Error('Enter how long the workout lasted.');
-    if (minutes === 0) throw new Error('The duration must be more than zero.');
+    const bad = durationError(f);
+    if (bad) throw new Error(bad);
+    const minutes = num(f.durationMin, 'Duration')!;
     const exercises = f.exercises.map((e) => {
       if (!e.sets.length) throw new Error(`Add at least one set to ${e.name}, or remove it.`);
       return {

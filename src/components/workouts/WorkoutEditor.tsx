@@ -14,7 +14,7 @@ import { localDateKey, readingDateLabel } from '@/lib/health/dates';
 import { loadWeightUnit } from '@/lib/weight-unit';
 import { clearDraft, loadDraft, saveDraft } from '@/lib/workout-draft';
 import {
-  buildWorkout, categoryForActivity, type DistanceUnit, emptyForm, emptySet, formFromDetail,
+  buildWorkout, categoryForActivity, durationError, type DistanceUnit, emptyForm, emptySet, formFromDetail,
   type WorkoutForm, workoutSummary,
 } from '@/lib/workout-form';
 import { applyTemplate, buildTemplate, isDay } from '@/lib/workout-template-form';
@@ -186,7 +186,7 @@ export function WorkoutEditor({ id, templateId, day }: { id?: string; templateId
 
   return (
     <Screen title={id ? 'Edit Workout' : 'New Workout'} back backLabel="Cancel" onBack={cancel}>
-      <WorkoutFields form={form} edit={edit} onAddExercise={() => setPicking(true)} onError={setError} />
+      <WorkoutFields form={form} edit={edit} onAddExercise={() => setPicking(true)} onError={setError} durationError={error ? durationError(form) : null} />
 
       <WorkoutExportOption id={id} choice={health} />
       <Text style={[styles.caption, { color: c.inkSoft }]}>Only you can see your workouts. Calories are not tracked for manual entries.</Text>
