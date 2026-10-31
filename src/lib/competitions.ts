@@ -41,3 +41,10 @@ export function standingValue(row: Pick<CompetitionStanding, 'score' | 'eligibil
 export function eligibilityLabel(value: string): string {
   return ({ eligible: 'Eligible', no_data: 'No data', not_sharing: 'Not sharing', timezone_mismatch: 'Timezone does not match', left_group: 'No longer in group', manual_entries_excluded: 'Manual entries excluded' } as Record<string, string>)[value] ?? 'Data unavailable';
 }
+export const moderateCompetition = (id: string, action: 'cancel' | 'remove', reason: string, userId?: string) => checked(supabase.rpc('moderate_competition', { p_id: id, p_action: action, p_reason: reason, ...(userId ? { p_user_id: userId } : {}) }));
+export const getCompetitionAudit = (id: string) => checked(supabase.from('competition_audit').select('*').eq('competition_id', id).order('created_at', { ascending: false }).limit(50));
+export const getMyContributions = (id: string) => checked(supabase.rpc('my_competition_contributions', { p_id: id }));
+export const getCompetitionParticipants = (id: string) => checked(supabase.from('competition_participants').select('*').eq('competition_id', id));
+export function contributionReason(reason: string): string {
+  return ({ eligible: 'Included', after_finalization: 'Changed after finalization; frozen result unchanged', outside_period: 'Session crosses a competition boundary', duplicate_import_summary: 'Detailed imported session counted instead', competition_cancelled: 'Competition cancelled', not_enrolled: 'Not enrolled' } as Record<string, string>)[reason] ?? eligibilityLabel(reason);
+}
