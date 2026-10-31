@@ -49,6 +49,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"competition_results": {
+                  Row: {
+                    "competition_id": string,"eligibility": string,"excluded_entries": number,"health_entries": number,"manual_entries": number,"score": number | null,"updated_at": string | null,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "competition_id": string,"eligibility": string,"excluded_entries": number,"health_entries": number,"manual_entries": number,"score"?: number | null,"updated_at"?: string | null,"user_id": string
+                  }
+                  Update: {
+                    "competition_id"?: string,"eligibility"?: string,"excluded_entries"?: number,"health_entries"?: number,"manual_entries"?: number,"score"?: number | null,"updated_at"?: string | null,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "competition_results_competition_id_user_id_fkey"
+      columns: ["competition_id","user_id"]
+isOneToOne: true
+      referencedRelation: "competition_participants"
+      referencedColumns: ["competition_id","user_id"]
+    }
+                  ]
                 },"competition_rules": {
                   Row: {
                     "rules": NonNullable<Json>,"version": number
@@ -436,6 +456,16 @@ isOneToOne: false
 "competition_invite":
 { Args: { "p_code": string,"p_id": string }; Returns: Json
                            },
+"competition_live_scores":
+{ Args: { "p_id": string }; Returns: {
+              "eligibility": string,"excluded_entries": number,"health_entries": number,"manual_entries": number,"score": number,"updated_at": string,"user_id": string
+            }[]
+                           },
+"competition_standings":
+{ Args: { "p_id": string }; Returns: {
+              "display_name": string,"eligibility": string,"excluded_entries": number,"health_entries": number,"manual_entries": number,"rank": number,"score": number,"updated_at": string,"user_id": string
+            }[]
+                           },
 "create_competition":
 { Args: { "p_end_day": string,"p_group_id": string,"p_include_manual"?: boolean,"p_metric": string,"p_name": string,"p_start_day": string,"p_timezone": string }; Returns: string
                            },
@@ -461,6 +491,9 @@ isOneToOne: false
                            },
 "delete_my_health_imports":
 { Args: Record<PropertyKey, never>; Returns: undefined
+                           },
+"finalize_competition":
+{ Args: { "p_id": string }; Returns: undefined
                            },
 "gen_invite_code":
 { Args: Record<PropertyKey, never>; Returns: string
