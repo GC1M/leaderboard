@@ -15,6 +15,8 @@ Web uses browser date/time controls. Expo Go cannot load this local module and s
 
 ## Automated checks
 
+The native picker source also passes standalone Swift typechecking against the cached ExpoModulesCore framework and iOS Simulator SDK. This is separate from building and exercising the full app.
+
 Run `npm run typecheck`, `npm run lint -- --no-cache`, `npm test -- --coverage`, the iOS/web exports in CI, and `supabase test db`.
 
 - Numeric tests cover typed/pasted decimal separators and intermediate `75.`, reject ambiguous grouped steps such as `7,5`, preserve blanks versus recorded zeroes, and check conversions through canonical values.
