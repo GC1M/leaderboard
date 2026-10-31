@@ -2,13 +2,16 @@ import { act } from 'react';
 import { StyleSheet } from 'react-native';
 import { createRoot } from 'test-renderer';
 
-import Sleep from '@/app/sleep';
-import Weight from '@/app/weight';
+import Sleep from '@/app/(tabs)/(summary)/sleep';
+import Weight from '@/app/(tabs)/(summary)/weight';
 import { WeightChart } from '@/components/history/WeightChart';
 import { Segmented } from '@/components/history/Segmented';
 import { StepRow } from '@/components/steps/StepRow';
 import { WeeklyHistoryView } from '@/components/workouts/WeeklyHistory';
 
+jest.mock('@/lib/history-presence', () => ({ hasSleepHistory: () => Promise.resolve(false) }));
+jest.mock('@/lib/editor-navigation', () => ({ useEditorNavigation: () => (go: () => void) => go() }));
+jest.mock('@/lib/measurement-draft', () => ({ loadMeasurementDraft: () => Promise.resolve(null), saveMeasurementDraft: jest.fn(), clearMeasurementDraft: jest.fn() }));
 let mockFontScale = 1;
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
@@ -85,38 +88,23 @@ describe('workouts weekly total', () => {
   });
 });
 
-describe('sleep entry', () => {
-  const inputs = (c: any) => c.queryAll((n: any) => n.props.placeholder === 'YYYY-MM-DD HH:mm' && n.props.onChangeText && typeof n.type === 'string');
-
-  test('date-time inputs stay single line at default size', async () => {
-    const fields = inputs(await render(<Sleep />));
-    expect(fields).toHaveLength(2);
-    fields.forEach((f: any) => expect(f.props.multiline).toBeFalsy());
+describe('native date entry at accessibility sizes', () => {
+  test.each([1, 3.1])('sleep opens date pickers without free-text date strings at %s scale', async (scale) => {
+    mockFontScale = scale;
+    const c = await render(<Sleep />);
+    const add = c.queryAll((n: any) => n.props.onClick && n.props.accessibilityLabel === 'Add Sleep')[0];
+    await act(async () => add.props.onClick());
+    expect(JSON.stringify(c)).toContain('Fell asleep');
+    expect(JSON.stringify(c)).toContain('Woke up');
+    expect(JSON.stringify(c)).not.toContain('YYYY-MM-DD HH:mm');
   });
-
-  test('date-time inputs wrap at accessibility sizes and Return still submits', async () => {
-    mockFontScale = 3.1;
-    const fields = inputs(await render(<Sleep />));
-    expect(fields).toHaveLength(2);
-    fields.forEach((f: any) => {
-      expect(f.props.multiline).toBe(true);
-      expect(f.props.submitBehavior).toBe('blurAndSubmit');
-    });
-  });
-});
-
-describe('weight entry', () => {
-  const when = (c: any) => c.queryAll((n: any) => n.props.accessibilityLabel === 'When' && typeof n.type === 'string')[0];
-
-  test('"When" stays single line at default size', async () => {
-    expect(when(await render(<Weight />)).props.multiline).toBeFalsy();
-  });
-
-  test('"When" wraps at accessibility sizes so the time stays visible', async () => {
-    mockFontScale = 3.1;
-    const f = when(await render(<Weight />));
-    expect(f.props.multiline).toBe(true);
-    expect(f.props.submitBehavior).toBe('blurAndSubmit');
+  test.each([1, 3.1])('weight offers a labeled date picker at %s scale', async (scale) => {
+    mockFontScale = scale;
+    const c = await render(<Weight />);
+    const add = c.queryAll((n: any) => n.props.onClick && n.props.accessibilityLabel === 'Add Weight')[0];
+    await act(async () => add.props.onClick());
+    expect(JSON.stringify(c)).toContain('When');
+    expect(JSON.stringify(c)).not.toContain('YYYY-MM-DD HH:mm');
   });
 });
 

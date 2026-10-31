@@ -54,3 +54,14 @@ test('storage failures never throw', async () => {
   await expect(saveDraft('u1', fresh)).resolves.toBeUndefined();
   await expect(loadDraft('u1', null)).resolves.toBeNull();
 });
+
+test('a clear waits for an in-flight autosave so discarded drafts cannot reappear', async () => {
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  (secureStorage.setItem as jest.Mock).mockImplementationOnce(async (k: string, v: string) => { await gate; mockMem.set(k, v); });
+  const saving = saveDraft('u1', fresh);
+  const clearing = clearDraft('u1', null);
+  release(); await Promise.all([saving, clearing]);
+  expect(await loadDraft('u1', null)).toBeNull();
+  expect(await listDrafts('u1')).toEqual([]);
+});

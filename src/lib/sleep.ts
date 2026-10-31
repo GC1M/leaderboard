@@ -17,10 +17,10 @@ export async function saveHealthSleep(userId: string, days: readonly SleepDay[])
 
 export async function getMyRecentSleep(userId: string, days: number, now = new Date()): Promise<SleepDay[]> {
   await assertHealthOwner(userId);
-  const { data, error } = await supabase.from('daily_metrics').select('date,value,window_start,window_end')
+  const { data, error } = await supabase.from('daily_metrics').select('date,value,window_start,window_end,source')
     .eq('user_id', userId).eq('metric', 'sleep_min').gte('date', lastNDates(days, now)[0]).order('date');
   if (error) throw new Error("Couldn't load sleep. Try again.");
-  return data.map((d) => ({ date: d.date, value: Number(d.value), windowStart: d.window_start!, windowEnd: d.window_end! }));
+  return data.map((d) => ({ date: d.date, value: Number(d.value), source: d.source === 'manual' ? 'manual' : 'healthkit', windowStart: d.window_start!, windowEnd: d.window_end! }));
 }
 
 // Manual sleep is one row per wake-up date (the same row Health import fills, which it never overwrites once manual).
@@ -47,8 +47,8 @@ export async function deleteManualSleep(userId: string, date: string): Promise<v
 
 export async function getMyManualSleep(userId: string, days: number, now = new Date()): Promise<SleepDay[]> {
   await assertHealthOwner(userId);
-  const { data, error } = await supabase.from('daily_metrics').select('date,value,window_start,window_end')
+  const { data, error } = await supabase.from('daily_metrics').select('date,value,window_start,window_end,source')
     .eq('user_id', userId).eq('metric', 'sleep_min').eq('source', 'manual').gte('date', lastNDates(days, now)[0]).order('date', { ascending: false });
   if (error) throw new Error("Couldn't load sleep. Try again.");
-  return data.map((d) => ({ date: d.date, value: Number(d.value), windowStart: d.window_start!, windowEnd: d.window_end! }));
+  return data.map((d) => ({ date: d.date, value: Number(d.value), source: d.source === 'manual' ? 'manual' : 'healthkit', windowStart: d.window_start!, windowEnd: d.window_end! }));
 }

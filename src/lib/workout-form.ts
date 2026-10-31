@@ -1,3 +1,4 @@
+import { convertDecimal, decimalValue } from './numeric-input';
 import { localDateKey } from './health/dates';
 import { formatSleep, type WeightUnit } from './health/format';
 import { displayWeight } from './health/weight';
@@ -6,11 +7,13 @@ import type { Exercise, ExerciseCategory, ManualWorkoutInput, SetInput, Workout,
 // The editor works in text and display units; this module turns that into canonical kg, m and s.
 // Everything here is pure so it can be tested without a screen.
 
+export type WorkoutCategory = ExerciseCategory | 'full_body';
 export type DistanceUnit = 'km' | 'mi';
 export type SetField = 'reps' | 'load' | 'duration' | 'distance';
 export type SetForm = Record<SetField, string>; // load in the form's weight unit, duration in minutes, distance in its distance unit
 export type ExerciseForm = { exerciseId: string; name: string; category: ExerciseCategory; sets: SetForm[] };
 export type WorkoutForm = {
+  category?: WorkoutCategory; // Older drafts infer this without losing their activity.
   activityType: string;
   date: string; // YYYY-MM-DD, local
   time: string; // HH:MM, local 24h
@@ -48,16 +51,11 @@ export const fieldsFor = (c: ExerciseCategory): SetField[] => FIELDS[c];
 export const emptySet = (): SetForm => ({ reps: '', load: '', duration: '', distance: '' });
 
 export function emptyForm(now: Date, weightUnit: WeightUnit, distanceUnit: DistanceUnit): WorkoutForm {
-  return { activityType: '', date: localDateKey(now), time: hhmm(now), durationMin: '', notes: '', weightUnit, distanceUnit, exercises: [] };
+  return { category: 'strength', activityType: 'Strength', date: localDateKey(now), time: hhmm(now), durationMin: '', notes: '', weightUnit, distanceUnit, exercises: [] };
 }
 
 // Re-express typed values in new units so flipping a toggle never changes what was meant.
 export function convertUnits(f: WorkoutForm, weightUnit: WeightUnit, distanceUnit: DistanceUnit): WorkoutForm {
-  // Same number syntax as num(), so anything the save path accepts also converts.
-  const conv = (s: string, to: (v: number) => number) => {
-    const n = s.trim().replace(',', '.');
-    return /^(\d+\.?\d*|\.\d+)$/.test(n) ? tidy(to(Number(n))) : s;
-  };
   return {
     ...f,
     weightUnit,
@@ -66,8 +64,8 @@ export function convertUnits(f: WorkoutForm, weightUnit: WeightUnit, distanceUni
       ...e,
       sets: e.sets.map((s) => ({
         ...s,
-        load: conv(s.load, (v) => displayWeight(toKg(v, f.weightUnit), weightUnit)),
-        distance: conv(s.distance, (v) => toMeters(v, f.distanceUnit) / (distanceUnit === 'mi' ? M_PER_MI : 1000)),
+        load: weightUnit === f.weightUnit ? s.load : convertDecimal(s.load, (v) => displayWeight(toKg(v, f.weightUnit), weightUnit)),
+        distance: distanceUnit === f.distanceUnit ? s.distance : convertDecimal(s.distance, (v) => toMeters(v, f.distanceUnit) / (distanceUnit === 'mi' ? M_PER_MI : 1000)),
       })),
     })),
   };
@@ -78,10 +76,11 @@ export function formFromDetail(d: WorkoutDetail, weightUnit: WeightUnit, distanc
   const seconds = d.duration_s ?? (new Date(d.ended_at).getTime() - start.getTime()) / 1000;
   const opt = (v: number | null, f: (n: number) => string) => (v == null ? '' : f(Number(v)));
   return {
+    category: categoryForActivity(d.activity_type),
     activityType: d.activity_type,
     date: localDateKey(start),
     time: hhmm(start),
-    durationMin: tidy(seconds / 60),
+    durationMin: String(seconds / 60),
     notes: d.notes ?? '',
     weightUnit,
     distanceUnit,
@@ -89,7 +88,7 @@ export function formFromDetail(d: WorkoutDetail, weightUnit: WeightUnit, distanc
       const sets = e.sets.map((s) => ({
         reps: opt(s.reps, String),
         load: opt(s.load_kg, (n) => fromKg(n, weightUnit)),
-        duration: opt(s.duration_s, (n) => tidy(n / 60)),
+        duration: opt(s.duration_s, (n) => String(n / 60)),
         distance: opt(s.distance_m, (n) => fromMeters(n, distanceUnit)),
       }));
       // Catalog unavailable: guess from what was recorded. The editor also shows any field that holds a value.
@@ -107,7 +106,8 @@ function num(raw: string, what: string, whole = false): number | null {
   const n = Number(s);
   if (!Number.isFinite(n)) throw new Error(`${what} must be a number.`);
   if (n < 0) throw new Error(`${what} can't be negative.`);
-  if (whole && !Number.isInteger(n)) throw new Error(`${what} must be a whole number.`);
+  if (whole && !/^\d+$/.test(raw.trim())) throw new Error(`${what} must be a whole number.`);
+  if (!whole && decimalValue(raw) === null) throw new Error(`${what} must be a number.`);
   return n;
 }
 
@@ -196,6 +196,7 @@ export function parseDraft(raw: string | null): Draft | null {
     const f = d.form;
     const ok =
       [f.activityType, f.date, f.time, f.durationMin, f.notes].every(isStr) &&
+      (f.category === undefined || (isStr(f.category) && (f.category === 'full_body' || f.category in FIELDS))) &&
       (f.weightUnit === 'kg' || f.weightUnit === 'lb') &&
       (f.distanceUnit === 'km' || f.distanceUnit === 'mi') &&
       Array.isArray(f.exercises) &&
@@ -217,4 +218,21 @@ export function workoutSummary(w: Workout, distanceUnit: DistanceUnit): string {
   if (w.distance_m != null) parts.push(`${fromMeters(Number(w.distance_m), distanceUnit)} ${distanceUnit}`);
   if (w.source === 'healthkit' && w.energy_kcal != null) parts.push(`${Math.round(Number(w.energy_kcal))} kcal`);
   return parts.join(', ');
+}
+
+export const WORKOUT_CATEGORIES = [
+  { value: 'strength', label: 'Strength' }, { value: 'core', label: 'Core' },
+  { value: 'cardio', label: 'Cardio' }, { value: 'mobility', label: 'Mobility' },
+  { value: 'full_body', label: 'Full Body' },
+] as const;
+export function categoryForActivity(activity: string): WorkoutCategory {
+  if (/full[\s_-]*body/i.test(activity)) return 'full_body';
+  return /cardio|run|cycling|swim|walk|elliptical|rowing|stair/i.test(activity) ? 'cardio'
+    : /core|pilates/i.test(activity) ? 'core'
+    : /yoga|mobility|stretch|flexibility|tai chi|cooldown/i.test(activity) ? 'mobility' : 'strength';
+}
+export function changeCategory(f: WorkoutForm, category: WorkoutCategory): WorkoutForm {
+  // Keep existing exercises, measurements and Health mappings when reselecting the same type.
+  if ((f.category ?? categoryForActivity(f.activityType)) === category) return f;
+  return { ...f, category, activityType: WORKOUT_CATEGORIES.find((c) => c.value === category)!.label };
 }

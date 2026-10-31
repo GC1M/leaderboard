@@ -8,9 +8,13 @@ export default function TabsLayout() {
   const { accent, surface, inkSoft, youTint } = useTheme();
   return (
     <NativeTabs tintColor={accent} {...(Platform.OS === 'web' ? { backgroundColor: surface, indicatorColor: youTint, labelStyle: { default: { color: inkSoft }, selected: { color: accent } } } : {})}>
-      <NativeTabs.Trigger name="index">
+      <NativeTabs.Trigger name="(summary)">
         <NativeTabs.Trigger.Icon sf={{ default: 'figure.walk', selected: 'figure.walk' }} md="directions_walk" />
         <NativeTabs.Trigger.Label>Summary</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="workouts">
+        <NativeTabs.Trigger.Icon sf="dumbbell" md="fitness_center" />
+        <NativeTabs.Trigger.Label>Workouts</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="groups">
         <NativeTabs.Trigger.Icon sf={{ default: 'person.3', selected: 'person.3.fill' }} md="groups" />

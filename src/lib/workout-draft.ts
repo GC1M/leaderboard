@@ -1,3 +1,4 @@
+import { orderedDraftWrite } from './ordered-draft-write';
 import { secureStorage } from './secure-storage';
 import { type Draft, parseDraft, serializeDraft } from './workout-form';
 
@@ -29,26 +30,32 @@ export async function listDrafts(uid: string): Promise<(string | null)[]> {
   return targets.filter((_, i) => found[i]);
 }
 
-export async function saveDraft(uid: string, d: Draft): Promise<void> {
-  try {
-    const index = await readIndex(uid);
-    if (!index.includes(d.editingId)) await secureStorage.setItem(indexKey(uid), JSON.stringify([...index, d.editingId]));
-    await secureStorage.setItem(key(uid, d.editingId), serializeDraft(d));
-  } catch {
-    // A draft is a convenience; failing to keep one must not interrupt typing.
-  }
+export function saveDraft(uid: string, d: Draft): Promise<void> {
+  return orderedDraftWrite(uid, async () => {
+    try {
+      const index = await readIndex(uid);
+      if (!index.includes(d.editingId)) await secureStorage.setItem(indexKey(uid), JSON.stringify([...index, d.editingId]));
+      await secureStorage.setItem(key(uid, d.editingId), serializeDraft(d));
+    } catch {
+      // A draft is a convenience; failing to keep one must not interrupt typing.
+    }
+  });
 }
 
-export async function clearDraft(uid: string, target: string | null): Promise<void> {
-  try {
-    await secureStorage.removeItem(key(uid, target));
-    await secureStorage.setItem(indexKey(uid), JSON.stringify((await readIndex(uid)).filter((t) => t !== target)));
-  } catch {
-    // A stale draft is only ever offered, never applied on its own.
-  }
+export function clearDraft(uid: string, target: string | null): Promise<void> {
+  return orderedDraftWrite(uid, async () => {
+    try {
+      await secureStorage.removeItem(key(uid, target));
+      await secureStorage.setItem(indexKey(uid), JSON.stringify((await readIndex(uid)).filter((t) => t !== target)));
+    } catch {
+      // A stale draft is only ever offered, never applied on its own.
+    }
+  });
 }
 
-export async function clearAllDrafts(uid: string): Promise<void> {
-  const targets = await readIndex(uid);
-  await Promise.allSettled([...targets.map((t) => secureStorage.removeItem(key(uid, t))), secureStorage.removeItem(indexKey(uid))]);
+export function clearAllDrafts(uid: string): Promise<void> {
+  return orderedDraftWrite(uid, async () => {
+    const targets = await readIndex(uid);
+    await Promise.allSettled([...targets.map((t) => secureStorage.removeItem(key(uid, t))), secureStorage.removeItem(indexKey(uid))]);
+  });
 }

@@ -109,6 +109,60 @@ try {
     await page.getByRole('tab', { name: 'Summary', exact: true }).waitFor();
   });
 
+  // #122: real browser coverage for empty histories, decimal typing/paste, persistent tabs and drafts.
+  await visit(browser, base, 'Phase 1/2 entry and tab navigation', async (page) => {
+    const user = { id: '12345678-1234-1234-1234-123456789abc', aud: 'authenticated', role: 'authenticated', email: 'ux@example.com', user_metadata: {}, app_metadata: {}, created_at: new Date().toISOString() };
+    await page.route(/\/auth\/v1\//, (route) => {
+      const path = new URL(route.request().url()).pathname;
+      return route.fulfill({ json: path.endsWith('/verify') ? { access_token: 'ui-test-access-token', refresh_token: 'ui-test-refresh-token', token_type: 'bearer', expires_in: 3600, user } : path.endsWith('/user') ? user : {} });
+    });
+    await page.route(/\/rest\/v1\//, (route) => {
+      const path = new URL(route.request().url()).pathname;
+      return route.fulfill({ json: path.endsWith('/profiles') ? { display_name: 'Test Player', timezone: 'UTC' } : path.endsWith('/latest_weight') ? null : [] });
+    });
+  }, async (page) => {
+    await page.getByPlaceholder('you@example.com').fill('ux@example.com');
+    await page.getByText('Send Me a Code', { exact: true }).click();
+    await page.getByLabel('6-digit code', { exact: true }).fill('123456');
+    await page.getByRole('tab', { name: 'Profile', exact: true }).click();
+    await page.getByText('Units', { exact: true }).click();
+    await page.getByRole('radio', { name: 'Kilograms (kg)', exact: true }).click();
+    await page.getByRole('radio', { name: 'Kilometers (km)', exact: true }).click();
+    await page.goto(`${base}/weight`);
+    await page.getByText('No weight recorded yet.', { exact: true }).waitFor();
+    if (await page.getByRole('radiogroup', { name: 'Time range', exact: true }).count()) throw new Error('An empty weight history still shows ranges');
+    for (const name of ['Summary', 'Workouts', 'Groups', 'Profile']) await page.getByRole('tab', { name, exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Add Weight', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Weight (kg)', exact: true }).fill('75.');
+    if (await page.getByRole('button', { name: 'Save Weight', exact: true }).isDisabled()) throw new Error('Decimal typing left save disabled');
+    await page.getByRole('textbox', { name: 'Weight (kg)', exact: true }).fill('75,5');
+    await page.getByRole('button', { name: 'Weight unit: kg · Change for this entry', exact: true }).click();
+    await page.getByRole('radio', { name: 'lb', exact: true }).click();
+    const pounds = Number(await page.getByRole('textbox', { name: 'Weight (lb)', exact: true }).inputValue());
+    if (Math.abs(pounds - 166.449) > 0.01) throw new Error('Switching units changed the physical weight');
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.getByText('Unsaved changes', { exact: true }).waitFor();
+    await page.getByText('Save Draft', { exact: true }).click();
+    await page.getByRole('button', { name: 'Resume Weight Draft', exact: true }).waitFor();
+    await page.getByRole('tab', { name: 'Workouts', exact: true }).click();
+    await page.getByText('No workouts yet.', { exact: false }).waitFor();
+    if (await page.getByRole('radiogroup', { name: 'Time range', exact: true }).count()) throw new Error('An empty workout history still shows ranges');
+    await page.getByRole('button', { name: 'Log Workout', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Workout type', exact: true }).click();
+    await page.getByRole('radio', { name: 'Full Body', exact: true }).click();
+    if (await page.getByRole('radiogroup', { name: 'Activity', exact: true }).count()) throw new Error('The separate activity selector remains visible');
+    if (await page.getByRole('textbox', { name: 'Duration seconds', exact: true }).count()) throw new Error('Duration still shows seconds');
+    await page.getByRole('textbox', { name: 'Duration minutes', exact: true }).fill('30');
+    await page.getByRole('tab', { name: 'Groups', exact: true }).click();
+    await page.getByRole('tab', { name: 'Workouts', exact: true }).click();
+    if (await page.getByRole('textbox', { name: 'Duration minutes', exact: true }).inputValue() !== '30') throw new Error('Switching tabs lost the workout draft');
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.getByText('Discard Changes', { exact: true }).click();
+    await page.getByRole('button', { name: 'Log Workout', exact: true }).waitFor();
+    await page.getByRole('tab', { name: 'Workouts', exact: true }).click();
+    await page.getByRole('button', { name: 'Log Workout', exact: true }).waitFor();
+  });
+
   // Backend unreachable: requests to Supabase fail at the network level.
   await visit(browser, base, 'failed network calls do not blank the app', (page) => page.route(/\/(auth|rest)\/v1\//, (route) => route.abort('connectionrefused')), async (page) => {
     await page.getByPlaceholder('you@example.com').fill('offline@example.com');

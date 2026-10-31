@@ -22,7 +22,7 @@ test('Save Name dismisses the keyboard and confirms the save', async () => {
   const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
   mockUpdate.mockResolvedValue('Sam B');
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Profile = require('@/app/(tabs)/profile').default;
+  const Profile = require('@/app/(tabs)/profile/index').default;
   const r = createRoot();
   await act(async () => r.render(<Profile />));
   const c = r.container as any;

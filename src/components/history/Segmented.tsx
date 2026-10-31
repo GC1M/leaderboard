@@ -13,7 +13,7 @@ export function Segmented<T extends string | number>({ options, value, onChange,
   const c = useTheme();
   const large = useLargeText();
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel={label} style={[styles.row, large && styles.wrap, { backgroundColor: c.lane }]}>
+    <View accessibilityRole="radiogroup" accessibilityLabel={label} style={[styles.row, (large || options.length > 4) && styles.wrap, { backgroundColor: c.lane }]}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -23,7 +23,7 @@ export function Segmented<T extends string | number>({ options, value, onChange,
             accessibilityLabel={o.a11y ?? o.label}
             accessibilityState={{ selected: on }}
             onPress={() => onChange(o.value)}
-            style={[styles.option, large ? styles.wrapOption : styles.equal, on && { backgroundColor: c.surface }]}
+            style={[styles.option, (large || options.length > 4) ? styles.wrapOption : styles.equal, on && { backgroundColor: c.surface }]}
           >
             <Text style={[ui.bodyStrong, { color: on ? c.accent : c.ink }]}>{o.label}</Text>
           </Pressable>

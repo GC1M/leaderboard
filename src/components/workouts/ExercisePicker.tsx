@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 
 import { Segmented } from '@/components/history/Segmented';
 import { Button, ErrorText, Field, Row, Section, Skeleton, styles } from '@/components/ui';
-import { filterExercises } from '@/lib/workout-form';
+import { filterExercises, type WorkoutCategory } from '@/lib/workout-form';
 import { createCustomExercise, type Exercise, type ExerciseCategory, listExercises } from '@/lib/workouts';
 import { useTheme } from '@/theme';
 
@@ -15,11 +15,12 @@ const CATEGORIES = [
 ] as const;
 
 // Search the starter catalog and your own exercises, or create a custom one from what you typed.
-export function ExercisePicker({ onPick, onCancel }: { onPick: (e: Exercise) => void; onCancel: () => void }) {
+export function ExercisePicker({ onPick, onCancel, initialCategory = 'strength' }: { initialCategory?: WorkoutCategory; onPick: (e: Exercise) => void; onCancel: () => void }) {
   const c = useTheme();
   const [all, setAll] = useState<Exercise[] | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<ExerciseCategory>('strength');
+  const [category, setCategory] = useState<ExerciseCategory>(initialCategory === 'full_body' ? 'strength' : initialCategory);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tries, setTries] = useState(0);
@@ -34,7 +35,7 @@ export function ExercisePicker({ onPick, onCancel }: { onPick: (e: Exercise) => 
   }, [tries]);
 
   const name = query.trim();
-  const hits = all ? filterExercises(all, query) : [];
+  const hits = all ? filterExercises(showAll || initialCategory === 'full_body' ? all : all.filter((e) => e.category === initialCategory), query) : [];
   const canCreate = !!all && name !== '' && !all.some((e) => e.name.toLowerCase() === name.toLowerCase());
 
   const create = async () => {
@@ -51,6 +52,8 @@ export function ExercisePicker({ onPick, onCancel }: { onPick: (e: Exercise) => 
   return (
     <>
       <Field label="Search exercises" value={query} onChangeText={setQuery} autoFocus autoCapitalize="words" autoCorrect={false} returnKeyType="search" />
+      <Text style={[styles.caption, { color: c.inkSoft }]}>{showAll || initialCategory === 'full_body' ? 'All workout types' : `${initialCategory} exercises`}</Text>
+      {initialCategory !== 'full_body' && <Button plain label={showAll ? 'Show Selected Type' : 'Show All'} onPress={() => setShowAll((v) => !v)} />}
       {!all && !error && <Skeleton label="Loading exercises" rows={4} />}
       {!all && error && (
         <View>

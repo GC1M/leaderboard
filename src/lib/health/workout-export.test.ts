@@ -55,6 +55,10 @@ describe('activity type', () => {
     expect(activityCode('Running')).toBe(37);
     expect(activityCode('traditional strength training')).toBe(50);
     expect(activityCode('Strength')).toBe(50);
+    expect(activityCode('Full Body')).toBe(11);
+    expect(activityCode('Cardio')).toBe(73);
+    expect(activityCode('Core')).toBe(59);
+    expect(activityCode('Mobility')).toBe(62);
     expect(activityCode('Mind and Body')).toBe(29);
     expect(activityCode('High-Intensity Interval Training')).toBe(63);
     expect(activityCode('Spartan obstacle race')).toBe(3000);

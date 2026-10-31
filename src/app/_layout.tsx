@@ -38,26 +38,9 @@ function Routes() {
   return (
     <>
       {/* Without contentStyle the stack stays white in dark mode. */}
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: bg } }}>
+      <Stack key={session?.user.id ?? 'signed-out'} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: bg } }}>
         <Stack.Protected guard={gate === 'signed-in'}>
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="groups/[id]/index" />
-          <Stack.Screen name="groups/[id]/info" />
-          <Stack.Screen name="groups/join" />
-          <Stack.Screen name="groups/new" />
-          <Stack.Screen name="steps/index" />
-          <Stack.Screen name="steps/permission" />
-          <Stack.Screen name="steps/sources" />
-          <Stack.Screen name="sleep/index" />
-          <Stack.Screen name="weight/index" />
-          <Stack.Screen name="workouts/index" />
-          <Stack.Screen name="workouts/new" />
-          <Stack.Screen name="workouts/import" />
-          <Stack.Screen name="workouts/[id]/index" />
-          <Stack.Screen name="workouts/[id]/edit" />
-          <Stack.Screen name="workouts/templates/index" />
-          <Stack.Screen name="workouts/templates/new" />
-          <Stack.Screen name="workouts/templates/[id]" />
           <Stack.Screen name="privacy" />
         </Stack.Protected>
         <Stack.Protected guard={gate === 'signed-out'}>
