@@ -1,0 +1,15 @@
+# Competition rules, version 1
+
+Competitions are optional challenges inside a group. Joining a group or creating a challenge never enrolls anyone. Participants must explicitly consent and already share the competition's metric with that group. Sharing can be revoked at any time and is checked on every results read, including finalized results.
+
+- **Initial release:** step totals only. Workout count/duration are reserved in the model and remain unavailable until workout validation permits enabling them. Weight, sleep, food and other sensitive rankings are excluded.
+- **Period:** 1–90 full calendar days in the creator-selected IANA timezone. Start is inclusive; end is the midnight after the last scoring day and is exclusive. DST days may contain 23 or 25 hours.
+- **Steps:** the existing data consists of local-day totals, not timestamped individual steps. Participants must use the competition timezone in their profile to join and contribute. A timezone change makes their contribution ineligible until it matches again. We do not pretend to re-bucket another timezone's daily total into exact competition bounds.
+- **Sources:** Health-sourced steps by default. A creator can explicitly include manual entries when creating the competition; that choice is disclosed and immutable. Tracker data is not guaranteed to be cheat-proof. Original measurements are never modified for competition scoring.
+- **Enrollment:** opt in before the start. No late joins. Leave before the end; leaving removes a participant from standings. Rejoin is permitted only before the start; a moderator removal cannot be undone by self-enrollment. Leaving the group also ends participation, and rejoining the group does not restore it.
+- **Missing data:** null and unranked. A recorded zero is a real score of zero. Highest score wins; ties share a rank with gaps (1, 1, 3), without arbitrary name-based tie breaking.
+- **Corrections:** live results are provisional. Late uploads, edits and deletions are reflected until explicit finalization. Finalization becomes available 24 hours after the competition ends; it is not an automatic fixed cutoff. The actual finalization transaction is the cutoff, and results disclose that timestamp. No competing client can submit scores or ranks.
+- **Finalized results:** scores freeze, while current sharing/group membership/account deletion continue to control visibility. Revoking sharing hides a score and rank; visible standings are re-ranked to avoid revealing hidden participants through rank gaps.
+- **Cancellation/moderation:** creator or current group owner may cancel a non-finalized competition or remove a participant with a reason. Neither may edit another person's measurements, invent scores, or restore someone's sharing consent. Actions have an audit trail. Departed creators lose their creator powers; the current group owner can manage orphaned challenges.
+
+These defaults are implementation decisions for version 1. A future scoring change requires a new immutable rules version, rather than silently changing an existing competition.
