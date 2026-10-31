@@ -23,7 +23,79 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "daily_metrics": {
+            "competition_participants": {
+                  Row: {
+                    "competition_id": string,"departed_at": string | null,"joined_at": string,"status": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "competition_id": string,"departed_at"?: string | null,"joined_at"?: string,"status"?: string,"user_id": string
+                  }
+                  Update: {
+                    "competition_id"?: string,"departed_at"?: string | null,"joined_at"?: string,"status"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "competition_participants_competition_id_fkey"
+      columns: ["competition_id"]
+isOneToOne: false
+      referencedRelation: "competitions"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "competition_participants_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"competition_rules": {
+                  Row: {
+                    "rules": NonNullable<Json>,"version": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "rules": NonNullable<Json>,"version": number
+                  }
+                  Update: {
+                    "rules"?: NonNullable<Json>,"version"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"competitions": {
+                  Row: {
+                    "cancelled_at": string | null,"created_at": string,"creator_id": string | null,"ends_at": string,"finalized_at": string | null,"group_id": string,"id": string,"include_manual": boolean,"metric": string,"name": string,"scoring_version": number,"starts_at": string,"status": string,"timezone": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cancelled_at"?: string | null,"created_at"?: string,"creator_id"?: string | null,"ends_at": string,"finalized_at"?: string | null,"group_id": string,"id"?: string,"include_manual"?: boolean,"metric": string,"name": string,"scoring_version"?: number,"starts_at": string,"status"?: string,"timezone": string
+                  }
+                  Update: {
+                    "cancelled_at"?: string | null,"created_at"?: string,"creator_id"?: string | null,"ends_at"?: string,"finalized_at"?: string | null,"group_id"?: string,"id"?: string,"include_manual"?: boolean,"metric"?: string,"name"?: string,"scoring_version"?: number,"starts_at"?: string,"status"?: string,"timezone"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "competitions_creator_id_fkey"
+      columns: ["creator_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "competitions_group_id_fkey"
+      columns: ["group_id"]
+isOneToOne: false
+      referencedRelation: "groups"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "competitions_scoring_version_fkey"
+      columns: ["scoring_version"]
+isOneToOne: false
+      referencedRelation: "competition_rules"
+      referencedColumns: ["version"]
+    }
+                  ]
+                },"daily_metrics": {
                   Row: {
                     "date": string,"health_device_id": string | null,"metric": string,"source": string,"updated_at": string,"user_id": string,"value": number,"window_end": string | null,"window_start": string | null
                   }
