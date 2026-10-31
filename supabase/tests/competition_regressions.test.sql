@@ -1,5 +1,5 @@
 begin;
-select plan(21);
+select plan(24);
 insert into auth.users(id,email) values
  ('00000000-0000-0000-0000-000000000043','a43@example.com'),
  ('00000000-0000-0000-0000-000000000143','b43@example.com'),
@@ -39,6 +39,8 @@ select is((select score from competition_standings('00000000-0000-0000-0000-0000
 select is((select updated_at from competition_standings('00000000-0000-0000-0000-000000004301') where user_id=auth.uid()),null,'timezone mismatch masks source freshness');
 select is((select reason from my_competition_contributions('00000000-0000-0000-0000-000000004301')),'timezone_mismatch','own explanation matches eligibility');
 update profiles set timezone='America/New_York' where id=auth.uid();
+select throws_ok($$select leave_competition('00000000-0000-0000-0000-000000004301')$$,'P0001','leaving closes when the competition ends','enrolled participant cannot leave after the end');
+select throws_ok($$select finalize_competition(create_competition('00000000-0000-0000-0000-000000004300','Too early','steps',current_date+2,current_date+3,'UTC'))$$,'P0001','finalization opens 24 hours after the end','creator cannot finalize before the grace period');
 reset role;
 delete from group_members where user_id='00000000-0000-0000-0000-000000000143';
 select is((select status from competition_participants where competition_id='00000000-0000-0000-0000-000000004301' and user_id='00000000-0000-0000-0000-000000000143'),'left','group departure ends participation');
@@ -55,6 +57,7 @@ update competitions set creator_id=null where id='00000000-0000-0000-0000-000000
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000143',true);set local role authenticated;
 select throws_ok($$select moderate_competition('00000000-0000-0000-0000-000000004301','cancel','Not my competition')$$,'P0001','only the creator or current group owner can moderate','deleted creator does not authorize an ordinary member');
 select throws_ok($$select finalize_competition('00000000-0000-0000-0000-000000004301')$$,'P0001','only participants, the creator or group owner can finalize','deleted creator does not authorize a nonparticipant');
+select throws_ok($$select join_competition('00000000-0000-0000-0000-000000004301')$$,'P0001','enrollment closes when the competition starts','former participant cannot enroll after the start');
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000343',true);
 select throws_ok($$select * from competition_standings('00000000-0000-0000-0000-000000004301')$$,'P0001','competition unavailable','outsider cannot read standings');
 select throws_ok($$select * from my_competition_contributions('00000000-0000-0000-0000-000000004301')$$,'P0001','competition unavailable','outsider cannot read contribution explanations');
