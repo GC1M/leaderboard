@@ -58,7 +58,7 @@ export default function Profile() {
   const confirmDeleteImports = () =>
     alert(
       'Delete imported Health data?',
-      "This stops Health imports and deletes the steps, sleep, and weight Leaderboard imported from Apple Health, here and in your groups. Manual entries stay. Nothing is uploaded again until you reconnect Apple Health. Your data in the Health app isn't touched.",
+      "This stops Health imports and deletes the steps, sleep, weight, and workouts Leaderboard imported from Apple Health, here and in your groups. Manual entries stay. Nothing is uploaded again until you reconnect Apple Health. Your data in the Health app isn't touched.",
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete Imported Data', style: 'destructive', onPress: () => run(health.deleteImports) },
@@ -68,7 +68,7 @@ export default function Profile() {
   const confirmDelete = () =>
     alert(
       'Delete your account?',
-      "This deletes your profile, your steps, sleep and weight, your sharing choices and your memberships. Groups you own are deleted for everyone in them. This can't be undone.",
+      "This deletes your profile, your steps, sleep, weight, workouts and templates, your sharing choices and your memberships. Groups you own are deleted for everyone in them. This can't be undone.",
       [
         { text: 'Cancel', style: 'cancel' },
         // The session ends after the delete, and the route guard takes over from there.
@@ -101,7 +101,7 @@ export default function Profile() {
       {Platform.OS === 'ios' && (
         <Section
           title="Apple Health"
-          footer="Leaderboard reads steps, sleep, and weight that you allow. Deleting imported data doesn't change Apple's permissions: to change what Leaderboard can read, open the Health app, tap your profile picture, then Apps, then Leaderboard."
+          footer="Leaderboard reads steps, sleep, weight, and workouts that you allow. Deleting imported data doesn't change Apple's permissions: to change what Leaderboard can read, open the Health app, tap your profile picture, then Apps, then Leaderboard."
         >
           <Row label="Health Access" icon={{ ios: 'heart.text.square', android: 'favorite', web: 'favorite' }} onPress={() => router.push('/steps/permission')} />
           <Row
