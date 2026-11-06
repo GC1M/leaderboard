@@ -32,12 +32,17 @@ export async function updateDisplayName(name: string): Promise<string> {
 // Deletes every food entry, recipe and custom food on the server, then the unsent food changes on this device,
 // so nothing queued re-creates what was just deleted. Sharing choices stay: a group then sees no food logged.
 // Apple Health food samples this app wrote are the user's choice and are handled by the caller (profile screen),
-// which queues their deletes through the #48 export queue. They are not touched here.
+// which settles them through the #48 export queue. They are not touched here.
 export async function deleteFoodHistory(): Promise<void> {
   const uid = await myId();
-  const { error } = await supabase.rpc('delete_my_food_history');
-  if (error) throw new Error("Couldn't delete your food history. Check your connection and try again.");
+  const del = async () => {
+    const { error } = await supabase.rpc('delete_my_food_history');
+    if (error) throw new Error("Couldn't delete your food history. Check your connection and try again.");
+  };
+  await del();
   await clearFoodPending(uid);
+  // A flush that was in flight may have saved an entry after the first delete; the queue is empty now, so this is final.
+  await del();
 }
 
 // Deletes the auth user server-side (cascades to everything), then the local session, which stops Health

@@ -174,6 +174,14 @@ export function createExportQueue(deps: ExportDependencies) {
       for (const e of drop) await deps.store.remove(e.kind, e.recordId);
       emit(state.entries.filter((e) => !drop.includes(e)));
     },
+    // The user chose to keep what is already in Health: drop matching entries (all of the kind, or those `match` accepts)
+    // without writing or deleting anything, so nothing queued or reconciled later acts on them.
+    async forget(kind: string, match: (e: ExportEntry) => boolean = () => true) {
+      if (flight) await flight;
+      const drop = state.entries.filter((e) => e.kind === kind && match(e));
+      for (const e of drop) await deps.store.remove(e.kind, e.recordId);
+      emit(state.entries.filter((e) => !drop.includes(e)));
+    },
     // Account deletion: drop everything queued locally.
     async clear() {
       const token = ++epoch;

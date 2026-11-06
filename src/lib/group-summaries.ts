@@ -116,7 +116,7 @@ export function workoutsText(s: WorkoutSummary, now: Date = new Date()) {
 // is left out; a day logged with nothing known says so. "No food logged" is never "0 kcal".
 export function foodText(s: FoodSummary, now: Date = new Date()) {
   if (s.state === 'not_shared') return 'Not shared';
-  if (s.state === 'no_data') return 'No food logged';
+  if (s.state === 'no_data') return 'No food logged this week';
   const part = (label: string, key: 'energy_kcal' | 'protein_g' | 'carbs_g' | 'fat_g', unit: string, t: Total) => {
     const v = roundNutrient(key, t.value);
     return v == null ? null : `${label}${t.incomplete ? 'at least ' : ''}${key === 'energy_kcal' ? v.toLocaleString('en-US') : v} ${unit}`;

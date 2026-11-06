@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Switch, Text, View } from 'react-native';
 
 import { Button, styles } from '@/components/ui';
+import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
-import { allowedFoodMask, deletedFoodIds, fetchRecentFoodRows, FOOD_KIND, FOOD_WRITE_TYPES, foodDeleteVersion, pendingFoodSaves } from '@/lib/health/food-export';
+import { allowedFoodMask, deletedFoodIds, fetchRecentFoodRows, FOOD_KIND, FOOD_WRITE_TYPES, exportedFood, foodDeleteVersion, pendingFoodSaves, settleFoodExport } from '@/lib/health/food-export';
 import { getHealthWriteAccess, isHealthAvailable } from '@/lib/health/healthkit';
 import { useHealthExport } from '@/lib/health/sync';
 import { secureStorage } from '@/lib/secure-storage';
@@ -45,7 +46,23 @@ export function useFoodExport() {
     return running.current;
   }, []);
   useEffect(() => { if (on && exp.ready) void sync(); }, [on, exp.ready, sync]);
+  // Turning the switch off with food already in Health: the user chooses whether it stays (see settleFoodExport).
+  const turnOff = (fromHealth: boolean) => {
+    setBusy(true);
+    settleFoodExport(exp, fromHealth).then(() => apply(false), (e: Error) => setMessage(e.message)).finally(() => setBusy(false));
+  };
   const set = async (next: boolean) => {
+    const n = exportedFood(exp.getEntries()).length;
+    if (!next && n > 0) {
+      return alert('Turn off saving food to Health?', `${n} ${n === 1 ? 'entry was' : 'entries were'} saved to Apple Health. Choose whether to remove ${n === 1 ? 'it' : 'them'} from Health. Your food in this app stays either way.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Turn Off and Remove from Health', style: 'destructive', onPress: () => turnOff(true) },
+        { text: 'Turn Off, Keep in Health', onPress: () => turnOff(false) },
+      ]);
+    }
+    await apply(next);
+  };
+  const apply = async (next: boolean) => {
     setMessage(null);
     setBusy(true);
     try {

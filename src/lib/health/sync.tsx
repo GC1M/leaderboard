@@ -107,6 +107,9 @@ export function useHealthExport(){
     enqueue:(...args:Parameters<ExportQueue['enqueue']>)=>queue?.enqueue(...args) ?? Promise.resolve(),
     retry:()=>queue?.process() ?? Promise.resolve(),
     discard:(kind:string)=>queue?.discard(kind) ?? Promise.resolve(),
+    forget:(...args:Parameters<ExportQueue['forget']>)=>queue?.forget(...args) ?? Promise.resolve(),
+    // The queue as it is now, for an action that must not act on a render-time copy.
+    getEntries:()=>queue?.getSnapshot().entries ?? [],
     allowWrite:async(types:readonly HealthWriteType[])=>{await requestHealthWriteAccess(types);await queue?.process();},
   };
 }

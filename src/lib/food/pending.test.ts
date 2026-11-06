@@ -268,3 +268,20 @@ test('a purge that the server refuses is still retryable, never stuck as refused
   expect(await flushPending('u1')).toBe(0);
   expect(mockDelete).toHaveBeenCalledTimes(2);
 });
+
+test('clearFoodPending waits for a flush already in flight, so it cannot send after the clear', async () => {
+  await enqueue('u1', log);
+  let release!: () => void;
+  mockUpsert.mockImplementationOnce(() => new Promise((r) => { release = () => r({ error: null }); }));
+  const flush = flushPending('u1');
+  await new Promise((r) => setTimeout(r, 0));
+  let cleared = false;
+  const clear = clearFoodPending('u1').then(() => { cleared = true; });
+  await new Promise((r) => setTimeout(r, 0));
+  expect(cleared).toBe(false);
+  release();
+  await flush;
+  await clear;
+  expect(cleared).toBe(true);
+  expect(await loadPending('u1')).toEqual([]);
+});

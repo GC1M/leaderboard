@@ -172,6 +172,21 @@ test('discard (exports turned off) drops unsent saves of that kind so a later gr
   expect(rows.has('weight:r1')).toBe(false);
 });
 
+test('forget drops matching entries without writing or deleting anything, and never touches other kinds', async () => {
+  const { queue, writer, rows } = setup('denied');
+  await queue.initialize();
+  await queue.enqueue('weight', 'r1', 'save', { kg: 80 }, 1);
+  await queue.enqueue('weight', 'r2', 'delete', null, 1);
+  await queue.enqueue('sleep', 's1', 'save', {}, 1);
+  await queue.forget('weight', (e) => e.op === 'save');
+  expect(queue.getSnapshot().entries.map((e) => e.recordId).sort()).toEqual(['r2', 's1']);
+  await queue.forget('weight');
+  expect(queue.getSnapshot().entries.map((e) => e.recordId)).toEqual(['s1']);
+  expect(rows.has('weight:r1')).toBe(false);
+  expect(writer.save).not.toHaveBeenCalled();
+  expect(writer.remove).not.toHaveBeenCalled();
+});
+
 test('an edit enqueued while the old version is exporting is not overwritten by the old result', async () => {
   const { queue, writer, rows } = setup();
   await queue.initialize();

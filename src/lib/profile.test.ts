@@ -46,9 +46,11 @@ test('deleteFoodHistory clears the unsent food queue only after the server delet
   rpc.mockResolvedValue({ error: { message: 'boom' } });
   await expect(deleteFoodHistory()).rejects.toThrow(/Couldn't delete your food history/);
   expect(mockRemoveItem).not.toHaveBeenCalled();
+  rpc.mockClear();
   rpc.mockResolvedValue({ error: null });
   await deleteFoodHistory();
-  expect(rpc).toHaveBeenCalledWith('delete_my_food_history');
+  // Twice: the second one catches an entry a flush in flight saved after the first.
+  expect(rpc.mock.calls.filter((c) => c[0] === 'delete_my_food_history')).toHaveLength(2);
   expect(mockRemoveItem).toHaveBeenCalledWith('food-pending-me');
   expect(signOut).not.toHaveBeenCalled();
 });

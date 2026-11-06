@@ -64,6 +64,27 @@ export const foodDeleteVersion = (known: readonly ExportEntry[], id: string, now
   return prev ? Math.max(now, prev.version + 1) : null;
 };
 
+// What the user chooses for food this app saved to Apple Health when its link to Health ends (turning the export off,
+// deleting food history or the account). Entries are read now, not from a render. "Remove": a delete is queued for every
+// food save, which also drops its unsaved nutrients, and the queue removes the samples from Health. "Keep": every food
+// save is forgotten without any write, so a later sync or re-enabling the switch cannot find the deleted server rows
+// and remove them. Deletes already queued are left to finish.
+export type FoodExportControls = {
+  getEntries(): ExportEntry[];
+  enqueue(kind: string, recordId: string, op: 'save' | 'delete', payload: unknown, version?: number): Promise<unknown>;
+  forget(kind: string, match?: (e: ExportEntry) => boolean): Promise<unknown>;
+};
+export const exportedFood = (entries: readonly ExportEntry[]) => entries.filter((e) => e.kind === FOOD_KIND && e.op === 'save' && (e.status === 'success' || !!e.writtenTypes));
+
+export async function settleFoodExport(exp: FoodExportControls, removeFromHealth: boolean): Promise<void> {
+  if (!removeFromHealth) return void (await exp.forget(FOOD_KIND, (e) => e.op === 'save'));
+  for (const e of exp.getEntries().filter((x) => x.kind === FOOD_KIND && x.op === 'save')) {
+    await exp.enqueue(FOOD_KIND, e.recordId, 'delete', null, foodDeleteVersion(exp.getEntries(), e.recordId)!);
+  }
+  // A delete that could not run stays queued as failed: say so instead of claiming the food is gone from Health.
+  if (exp.getEntries().some((e) => e.kind === FOOD_KIND && e.op === 'delete' && e.status === 'failed')) throw new Error("Couldn't remove some food from Apple Health. Allow nutrition in Health and try again, or keep it in Health.");
+}
+
 const COLUMNS = ['id', 'updated_at', 'food_name', 'consumed_at', ...FOOD_NUTRIENTS.map((n) => n[0])].join(',');
 export type FoodRow = { id: string; updated_at: string; food_name: string; consumed_at: string } & Record<FoodKey, number | string | null>;
 

@@ -104,7 +104,7 @@ describe('food', () => {
   });
   it('formats totals, lower bounds and unknowns, and never shows no food as 0', () => {
     expect(foodText(out[0].food, now)).toBe('at least 1,850 kcal, protein 80.3 g, carbs 0 g, fat 60 g, today');
-    expect(foodText({ state: 'no_data' }, now)).toBe('No food logged');
+    expect(foodText({ state: 'no_data' }, now)).toBe('No food logged this week');
     expect(foodText({ state: 'not_shared' }, now)).toBe('Not shared');
     const none = { value: null, incomplete: true };
     expect(foodText({ state: 'recorded', date: '2026-10-25', energy: none, protein: none, carbs: none, fat: none }, now)).toBe('Logged, amounts unknown, yesterday');

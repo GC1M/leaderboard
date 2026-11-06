@@ -19,7 +19,7 @@ alter table public.metric_shares add constraint metric_shares_metric_check
 
 -- Daily totals for members who share food with this group, on each entry's own local_date. A nutrient is null
 -- when no entry that day knew it, and *_incomplete says some entries did not, so the total is a lower bound.
--- At most 31 days per call.
+-- A range is at most 31 days, both ends included.
 create function public.group_food(p_group_id uuid, p_from date, p_to date)
 returns table (
   user_id uuid, local_date date,
@@ -30,7 +30,7 @@ begin
   if not public.is_group_member(p_group_id) then
     raise exception 'not a member of this group';
   end if;
-  if p_from is null or p_to is null or p_from > p_to or p_to - p_from > 31 then
+  if p_from is null or p_to is null or p_from > p_to or p_to - p_from > 30 then
     raise exception 'invalid date range' using errcode = '22023';
   end if;
   return query
@@ -49,7 +49,9 @@ grant execute on function public.group_food(uuid, date, date) to authenticated;
 
 -- Delete food history (#49): every food entry, recipe (and its ingredients) and custom food (and its
 -- portions) of the caller. Provider foods are shared by everyone and stay. Sharing choices stay, so a
--- member who shares food then simply has no data. Security invoker: row level security limits each delete to
+-- member who shares food then simply has no data. The record of which entries were saved to Apple Health goes too:
+-- it points at entries that no longer exist, and removing the Health samples themselves runs by their own
+-- metadata on the device, not by this record. Security invoker: row level security limits each delete to
 -- the caller's own rows.
 create function public.delete_my_food_history() returns void
 language plpgsql security invoker set search_path = '' as $$
@@ -58,6 +60,7 @@ begin
   delete from public.food_entries where user_id = auth.uid();
   delete from public.food_recipes where user_id = auth.uid();
   delete from public.foods where user_id = auth.uid() and provider = 'custom';
+  delete from public.health_exports where user_id = auth.uid() and kind = 'food';
 end $$;
 
 revoke execute on function public.delete_my_food_history() from public, anon;

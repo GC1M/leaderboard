@@ -25,6 +25,6 @@ test('shows each member\'s workout summary, or why there is none', async () => {
   expect(out).toContain('Workouts: No recent workouts');
   expect(out).toContain('Food: 0 kcal, carbs at least 5 g, fat 1 g, jan 3');
   expect(out).toContain('Food: Not shared');
-  expect(out).toContain('Food: No food logged');
+  expect(out).toContain('Food: No food logged this week');
   expect(out).not.toContain('Food: 0 kcal, protein');
 });

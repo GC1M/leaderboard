@@ -4,7 +4,7 @@ import { AccessibilityInfo, Keyboard, Platform } from 'react-native';
 
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton } from '@/components/ui';
 import { alert } from '@/lib/alert';
-import { FOOD_KIND, foodDeleteVersion } from '@/lib/health/food-export';
+import { exportedFood, settleFoodExport } from '@/lib/health/food-export';
 import { useHealthExport, useHealthSync } from '@/lib/health/sync';
 import { NAME_MAX, deleteAccount, deleteFoodHistory, getDisplayName, updateDisplayName } from '@/lib/profile';
 import { supabase } from '@/lib/supabase';
@@ -67,36 +67,46 @@ export default function Profile() {
       ],
     );
 
-  // Entries this app saved to Apple Health, if any. The user chooses whether they go too: the delete is queued
-  // through the #48 export queue, which removes them from Health once it runs (HealthKit only lets an app delete its own samples).
-  const exported = healthExport.entries.filter((e) => e.kind === FOOD_KIND && e.op !== 'delete' && e.status === 'success');
+  // Food this app saved to Apple Health. The user chooses whether it goes too (see settleFoodExport); the entries are
+  // read when the button is pressed, not from this render.
+  const exported = exportedFood(healthExport.entries).length;
+  const count = (n: number) => `${n} ${n === 1 ? 'entry was' : 'entries were'} saved to Apple Health`;
   const deleteFood = (fromHealth: boolean) =>
     run(async () => {
       await deleteFoodHistory();
-      if (fromHealth) for (const e of exported) await healthExport.enqueue(FOOD_KIND, e.recordId, 'delete', null, foodDeleteVersion(healthExport.entries, e.recordId)!);
+      await settleFoodExport(healthExport, fromHealth);
+    });
+  // Health deletes must run while the account still exists, so they come first; if they fail the account stays.
+  const removeAccount = (fromHealth: boolean) =>
+    run(async () => {
+      if (fromHealth) await settleFoodExport(healthExport, true);
+      await deleteAccount();
     });
 
   const confirmDeleteFood = () =>
     alert(
       'Delete food history?',
       `This deletes every food entry, recipe and custom food you saved, on your account and in your groups. Your sharing choices stay, so groups you share food with will see no food logged. ${
-        exported.length ? `${exported.length} ${exported.length === 1 ? 'entry was' : 'entries were'} saved to Apple Health: choose whether to remove ${exported.length === 1 ? 'it' : 'them'} from Health too. ` : ''
+        exported ? `${count(exported)}: choose whether to remove ${exported === 1 ? 'it' : 'them'} from Health too. ` : ''
       }This can't be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        ...(exported.length ? [{ text: 'Delete and Remove from Health', style: 'destructive' as const, onPress: () => deleteFood(true) }] : []),
-        { text: exported.length ? 'Delete, Keep in Health' : 'Delete Food History', style: 'destructive', onPress: () => deleteFood(false) },
+        ...(exported ? [{ text: 'Delete and Remove from Health', style: 'destructive' as const, onPress: () => deleteFood(true) }] : []),
+        { text: exported ? 'Delete, Keep in Health' : 'Delete Food History', style: 'destructive', onPress: () => deleteFood(false) },
       ],
     );
 
   const confirmDelete = () =>
     alert(
       'Delete your account?',
-      "This deletes your profile, your steps, sleep, weight, workouts and templates, your food entries and recipes, your sharing choices and your memberships. Groups you own are deleted for everyone in them. This can't be undone.",
+      `This deletes your profile, your steps, sleep, weight, workouts and templates, your food entries and recipes, your sharing choices and your memberships. Groups you own are deleted for everyone in them. ${
+        exported ? `${count(exported)}: choose whether to remove ${exported === 1 ? 'it' : 'them'} from Health too. ` : ''
+      }This can't be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         // The session ends after the delete, and the route guard takes over from there.
-        { text: 'Delete Account', style: 'destructive', onPress: () => run(deleteAccount) },
+        ...(exported ? [{ text: 'Delete Account and Remove from Health', style: 'destructive' as const, onPress: () => removeAccount(true) }] : []),
+        { text: exported ? 'Delete Account, Keep in Health' : 'Delete Account', style: 'destructive', onPress: () => removeAccount(false) },
       ],
     );
 

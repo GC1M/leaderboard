@@ -49,7 +49,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
     body: [
       'Stop Health Imports (on Summary) stops reading Apple Health. Data already uploaded stays until you delete it.',
       'Delete Imported Health Data (in Profile) stops imports and deletes every step, sleep, and weight record that came from Apple Health. Manual entries, groups, and sharing choices stay. Nothing is uploaded again until you reconnect Apple Health, which starts a fresh import.',
-      'Delete Food History (in Profile) deletes every food entry, recipe, and custom food you saved, and the food changes waiting on this iPhone. Your sharing choices stay. You choose whether food this app saved to Apple Health is removed too; if you keep it, you can delete it in the Health app.',
+      'Delete Food History (in Profile) deletes every food entry, recipe, and custom food you saved, and the food changes waiting on this iPhone. Your sharing choices stay. You choose whether food this app saved to Apple Health is removed too; if you keep it, you can delete it in the Health app. The same choice appears when you turn off "Save food to Apple Health" and when you delete your account.',
       'Delete Account (in Profile) deletes your account, everything above, your memberships, and groups you own.',
       'Deleted data may remain in our hosting provider’s database backups until they expire.',
       'To change what Leaderboard can read, open the Health app, tap your profile picture, then Apps, then Leaderboard. Stopping imports here does not change those permissions.',

@@ -1,5 +1,5 @@
 begin;
-select plan(35);
+select plan(44);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-0000-0000-0000000000a9', 'alice@x.com', '{"full_name":"Alice"}'),
@@ -63,8 +63,17 @@ select results_eq($$select user_id, local_date::text, energy_kcal, protein_g, ca
   'the group gets daily totals only, by local_date (03:00 UTC Nov 3 is Nov 2 in Chicago), with unknown carbs flagged incomplete');
 select is((select count(*)::int from group_food((select id from g1), '2026-11-04', '2026-11-10')), 0, 'a day without entries has no row (no data, not 0)');
 select throws_ok($$select * from group_food((select id from g1), '2026-11-02', '2026-11-01')$$, '22023', null, 'from after to is an error');
-select throws_ok($$select * from group_food((select id from g1), '2026-01-01', '2026-11-01')$$, '22023', null, 'a range over 31 days is an error');
+select throws_ok($$select * from group_food((select id from g1), '2026-10-01', '2026-11-01')$$, '22023', null, 'a range of 32 days is an error');
+select lives_ok($$select * from group_food((select id from g1), '2026-10-02', '2026-11-01')$$, 'a range of 31 days, both ends included, is allowed');
+select throws_ok($$select * from group_food((select id from g1), null, '2026-11-01')$$, '22023', null, 'a null range is an error');
 select throws_ok($$select * from group_food((select id from g2), '2026-10-25', '2026-11-10')$$, 'not a member of this group', 'being in one group gives no access to another group''s food');
+
+-- food is not a ranking input: the steps leaderboard and group_steps are the same with food shared
+reset role;
+insert into daily_metrics (user_id, date, metric, value, source) values ('00000000-0000-0000-0000-0000000000a9', current_date, 'steps', 1000, 'healthkit');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000b9');
+select results_eq($$select value from group_leaderboard((select id from g1), 'steps', 'day') where display_name = 'Alice'$$, $$values (1000::numeric)$$, 'the leaderboard ranks steps only, whatever food is shared');
+select results_eq($$select steps from group_steps((select id from g1), current_date - 1, current_date)$$, $$values (1000::numeric)$$, 'group_steps carries no food');
 
 -- direct reads by a group-mate, even the owner and even while alice shares
 select is((select count(*)::int from food_entries), 0, 'a group-mate cannot read food entries');
@@ -112,11 +121,27 @@ delete from group_members where group_id = (select id from g1) and user_id = aut
 reset role;
 select is((select count(*)::int from metric_shares where user_id = '00000000-0000-0000-0000-0000000000a9' and group_id = (select id from g1)), 0, 'leaving a group removes its shares');
 
+-- removal by the owner takes the food share with it
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000a9');
+select join_group((select invite_code from g1));
+select lives_ok($$insert into metric_shares (group_id, user_id, metric) values ((select id from g1), auth.uid(), 'food')$$, 'member shares food again after rejoining');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000b9');
+select lives_ok($$select remove_member((select id from g1), '00000000-0000-0000-0000-0000000000a9')$$, 'owner removes the member');
+reset role;
+select is((select count(*)::int from metric_shares where user_id = '00000000-0000-0000-0000-0000000000a9' and group_id = (select id from g1) and metric = 'food'), 0,
+  'removal drops the food share');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000b9');
+select is((select count(*)::int from group_food((select id from g1), '2026-10-25', '2026-11-10')), 0, 'a removed member''s food is no longer returned');
+
 -- food cannot be a competition metric
 select is((select bool_or(pg_get_constraintdef(oid) like '%food%') from pg_constraint where conrelid = 'public.competitions'::regclass and contype = 'c'),
   false, 'competitions cannot be about food');
 
 -- delete food history
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000a9');
+reset role;
+insert into health_exports (user_id, kind, record_id, sync_version, device_id) values
+  ('00000000-0000-0000-0000-0000000000a9', 'food', 'e1', 1, gen_random_uuid()), ('00000000-0000-0000-0000-0000000000a9', 'workout', 'w1', 1, gen_random_uuid());
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000a9');
 select lives_ok($$select delete_my_food_history()$$, 'member deletes their food history');
 reset role;
@@ -124,6 +149,7 @@ select is((select count(*)::int from food_entries where user_id = '00000000-0000
   + (select count(*)::int from food_recipes where user_id = '00000000-0000-0000-0000-0000000000a9')
   + (select count(*)::int from foods where user_id = '00000000-0000-0000-0000-0000000000a9'), 0, 'entries, recipes and custom foods are gone');
 select is((select count(*)::int from food_recipe_ingredients), 0, 'recipe ingredients are gone');
+select is((select string_agg(kind, ',') from health_exports where user_id = '00000000-0000-0000-0000-0000000000a9'), 'workout', 'the Health export record of food goes, other kinds stay');
 select is((select count(*)::int from food_entries where user_id = '00000000-0000-0000-0000-0000000000c9'), 1, 'someone else''s food is untouched');
 
 -- account deletion removes everything
