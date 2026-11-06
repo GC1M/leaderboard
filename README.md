@@ -144,6 +144,39 @@ Run on a signed physical-device build with real Health data, after the Phase 1 c
 - [ ] The privacy page matches what the app reads, saves to Health, stores and shares
 - [ ] Account deletion removes workouts, templates and exported-record mappings; sign-out then another account shows none of the first account's data
 
+## Phase 4 regression checklist (food, issue #50)
+
+Run on a signed physical-device build with Apple Health, after the Phase 1 and 2 checklists. CI covers the arithmetic, the edge function, RLS and the API; the audit is in `docs/food/validation.md`. The Health write checks are in `docs/food/health-export.md` and `docs/food/validation.md`.
+
+**Search and log**
+- [ ] Search "banana": USDA foods list with the USDA attribution and the estimate note; open one, log 150 g and then 1 portion; the calories match the per-100 g value scaled by the grams
+- [ ] A nutrient the food does not report shows "Unknown", not 0, on the food screen and in the diary
+- [ ] Offline (airplane mode), search: saved foods show with "Showing saved results" or a clear error, and Add a Custom Food still works
+- [ ] Add a custom food with only calories; log it; the diary tags it Custom and the other nutrients are Unknown
+
+**Diary**
+- [ ] Edit an entry's amount: the nutrients scale from that entry, and a later edit of the food does not change it. Change its meal and time: it moves to the right meal and day
+- [ ] Mark an entry as an estimate: the Estimate tag shows
+- [ ] Delete an entry while offline: it asks for a connection and nothing is lost. Log offline: the entry shows Not synced, and syncs once online, exactly once
+- [ ] A day with no entries says "No food logged", never 0 kcal. A day with an unknown nutrient shows "At least" totals
+- [ ] History 7, 30 and 90 days: days with food show totals, days without are skipped
+
+**Recipes**
+- [ ] Create a recipe with a cooked weight and 4 servings; per serving and per 100 g are right, and an ingredient missing a nutrient is flagged
+- [ ] Log 1 serving, then edit the recipe: the diary entry does not change. Logging by grams works only when a cooked weight was entered
+- [ ] A reusable meal (1 serving, no cooked weight) logs as a whole
+
+**Sharing and deletion**
+- [ ] Group Info: Food is off after joining; turning it on shows only daily totals to members; turning it off hides it at once. The owner cannot turn it on for you
+- [ ] Leaving a group stops sharing; rejoining does not turn it back on
+- [ ] Profile, Delete Food History: entries, recipes and custom foods are gone, sharing choices stay, and the group shows no food
+- [ ] Delete Account: food, recipes and shares are gone; another account on the device shows none of it
+
+**Apple Health on and off**
+- [ ] With "Save food to Apple Health" on, a logged food appears in Health with the right units; edit and delete update it (steps in `docs/food/health-export.md`)
+- [ ] Turn it off, choose Keep, then On again: nothing is written twice. Turn it off, choose Remove: the samples go
+- [ ] Delete Food History and Delete Account offer Remove from Health or Keep in Health, and do what they say
+
 ## Competition rules (version 1, issue #43)
 
 These are the defaults the server enforces (`supabase/migrations/20261107*_competition_*.sql`). The app shows the same rules on the create, detail and standings screens.
