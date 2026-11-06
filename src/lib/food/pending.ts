@@ -6,16 +6,18 @@ import { secureStorage } from '@/lib/secure-storage';
 import { supabase } from '@/lib/supabase';
 
 type Cols = Record<string, unknown>;
+// A purge deletes whatever the server holds under a client id: used when an entry that never showed as synced is
+// deleted, in case a send landed anyway.
 // A log is the full row (upserted on client_id, so a retry never makes a second entry). An edit is the changed
 // columns of an existing entry (one UPDATE, so grams, portion and nutrients always change together).
 // `permanent`: the server refused it for good (bad data, not allowed), so it is not retried until the user edits or discards it.
 type Status = { error?: string; permanent?: boolean };
-export type PendingOp = ({ kind: 'log'; clientId: string; row: Cols } | { kind: 'edit'; id: string; patch: Cols }) & Status;
+export type PendingOp = ({ kind: 'log'; clientId: string; row: Cols } | { kind: 'edit'; id: string; patch: Cols } | { kind: 'purge'; clientId: string }) & Status;
 
 const key = (uid: string) => `food-pending-${uid}`;
-const opKey = (o: PendingOp) => (o.kind === 'log' ? `log:${o.clientId}` : `edit:${o.id}`);
+const opKey = (o: PendingOp) => (o.kind === 'edit' ? `edit:${o.id}` : `${o.kind}:${o.clientId}`);
 const same = (a: PendingOp, b: PendingOp) => opKey(a) === opKey(b);
-const content = (o: PendingOp) => JSON.stringify(o.kind === 'log' ? o.row : o.patch);
+const content = (o: PendingOp) => JSON.stringify(o.kind === 'log' ? o.row : o.kind === 'edit' ? o.patch : null);
 export const SYNC_FAILED = "Couldn't sync. Check your connection and retry.";
 export const SYNC_REFUSED = "This entry can't be saved. Edit it or discard it.";
 export const ENTRY_GONE = 'This entry was deleted on another device.';
@@ -23,7 +25,7 @@ export const ENTRY_GONE = 'This entry was deleted on another device.';
 export async function loadPending(uid: string): Promise<PendingOp[]> {
   try {
     const v: unknown = JSON.parse((await secureStorage.getItem(key(uid))) ?? '[]');
-    return Array.isArray(v) ? v.filter((o) => o && (o.kind === 'log' ? typeof o.clientId === 'string' : o.kind === 'edit' && typeof o.id === 'string')) : [];
+    return Array.isArray(v) ? v.filter((o) => o && (o.kind === 'edit' ? typeof o.id === 'string' : (o.kind === 'log' || o.kind === 'purge') && typeof o.clientId === 'string')) : [];
   } catch {
     return [];
   }
@@ -42,11 +44,12 @@ function mutate(uid: string, change: (ops: PendingOp[]) => PendingOp[]): Promise
   });
 }
 
-// A newer edit of the same entry merges over the older one; a newer log of the same client id replaces it.
+// A newer edit of the same entry merges over the older one, unless the older was refused (its fields are what
+// the server rejected, so they must not carry over); a newer log of the same client id replaces it.
 export const enqueue = (uid: string, op: PendingOp) =>
   mutate(uid, (ops) => {
     const old = ops.find((o) => same(o, op));
-    const merged: PendingOp = old?.kind === 'edit' && op.kind === 'edit' ? { ...op, patch: { ...old.patch, ...op.patch } } : op;
+    const merged: PendingOp = old?.kind === 'edit' && op.kind === 'edit' && !old.permanent ? { ...op, patch: { ...old.patch, ...op.patch } } : op;
     return [...ops.filter((o) => !same(o, op)), { ...merged, error: undefined, permanent: undefined }];
   });
 
@@ -73,6 +76,10 @@ async function send(uid: string, op: PendingOp): Promise<Outcome> {
     // Last write wins on (user_id, client_id), so resending the same entry changes nothing.
     const r = await supabase.from('food_entries').upsert({ ...op.row, user_id: uid, client_id: op.clientId } as never, { onConflict: 'user_id,client_id' });
     return r.error ? fail(r) : { done: true };
+  }
+  if (op.kind === 'purge') {
+    const d = await supabase.from('food_entries').delete().eq('client_id', op.clientId);
+    return d.error ? fail(d) : { done: true };
   }
   const r = await supabase.from('food_entries').update(op.patch as never).eq('id', op.id).select('id');
   if (r.error) return fail(r);

@@ -13,11 +13,13 @@ const mockEq = jest.fn();
 const mockUpdate = jest.fn();
 const mockMaybe = jest.fn();
 const mockSession = jest.fn();
+const mockDelete = jest.fn();
 jest.mock('@/lib/supabase', () => ({
   supabase: {
     auth: { getSession: () => mockSession() },
     from: () => ({
       upsert: (...a: unknown[]) => mockUpsert(...a),
+      delete: () => ({ eq: (...a: unknown[]) => mockDelete(...a) }),
       update: (...a: unknown[]) => { mockUpdate(...a); return { eq: (...e: unknown[]) => ({ select: () => mockEq(...e) }) }; },
       select: () => ({ eq: () => ({ maybeSingle: () => mockMaybe() }) }),
     }),
@@ -29,6 +31,7 @@ beforeEach(() => {
   mockStore.clear();
   jest.clearAllMocks();
   mockUpsert.mockResolvedValue({ error: null });
+  mockDelete.mockResolvedValue({ error: null });
   mockEq.mockResolvedValue({ error: null, data: [{ id: 'e1' }] });
   mockMaybe.mockResolvedValue({ error: null, data: { id: 'e1' } });
   mockSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
@@ -215,4 +218,44 @@ test('clearFoodPending removes the account queue', async () => {
   await enqueue('u1', log);
   await clearFoodPending('u1');
   expect(await loadPending('u1')).toEqual([]);
+});
+
+describe('purge', () => {
+  test('deletes by client id, and is retried on the next flush when it fails', async () => {
+    await enqueue('u1', { kind: 'purge', clientId: 'c1' });
+    mockDelete.mockResolvedValueOnce({ status: 0, error: { message: 'offline' } });
+    expect(await flushPending('u1')).toBe(1);
+    expect(await loadPending('u1')).toHaveLength(1);
+    expect(await flushPending('u1')).toBe(0);
+    expect(mockDelete).toHaveBeenCalledWith('client_id', 'c1');
+    expect(await loadPending('u1')).toEqual([]);
+  });
+
+  test('queued behind a send in flight, it runs after that send, so the entry cannot come back', async () => {
+    await enqueue('u1', log);
+    const calls: string[] = [];
+    let release: () => void = () => {};
+    mockUpsert.mockImplementationOnce(() => new Promise((r) => { release = () => { calls.push('upsert'); r({ error: null }); }; }));
+    mockDelete.mockImplementationOnce(async () => { calls.push('delete'); return { error: null }; });
+    const inFlight = flushPending('u1');
+    await new Promise((r) => setTimeout(r, 0));
+    await discard('u1', log);
+    await enqueue('u1', { kind: 'purge', clientId: 'c1' });
+    const purge = flushPending('u1');
+    release();
+    await inFlight;
+    expect(await purge).toBe(0);
+    expect(calls).toEqual(['upsert', 'delete']);
+  });
+});
+
+test('a new edit replaces a refused one instead of merging its refused fields', async () => {
+  await enqueue('u1', { kind: 'edit', id: 'e1', patch: { grams: 1e9, meal: 'dinner' } });
+  mockEq.mockResolvedValueOnce({ status: 400, error: { code: '23514', message: 'x' }, data: null });
+  await flushPending('u1');
+  await enqueue('u1', { kind: 'edit', id: 'e1', patch: { grams: 50 } });
+  expect(await loadPending('u1')).toEqual([{ kind: 'edit', id: 'e1', patch: { grams: 50 } }]);
+  // A transient failure still merges.
+  await enqueue('u1', { kind: 'edit', id: 'e1', patch: { meal: 'lunch' } });
+  expect((await loadPending('u1'))[0]).toMatchObject({ patch: { grams: 50, meal: 'lunch' } });
 });
