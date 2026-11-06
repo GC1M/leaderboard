@@ -2,13 +2,23 @@
 // the food's nutrients) plus servings and an optional cooked weight. Totals are estimates: a nutrient unknown
 // in any ingredient makes that total incomplete (a lower bound), never a silent 0. Applying a recipe to a day
 // logs one entry holding a copy of the scaled totals, so later recipe edits never reach it.
-import { MAX_GRAMS, MAX_PORTION_COUNT } from './log';
+import { MAX_GRAMS, MAX_PORTION_COUNT, type Quantity, resolveQuantity } from './log';
 import { NUTRIENT_NAMES } from './format';
+import type { Food } from './search';
 import { NUTRIENT_KEYS, type NutrientKey, type NutrientTotals, type Nutrients, scaleNutrients, scaleSnapshot, sumNutrients } from './nutrition';
 
 export type Ingredient = { foodId: string | null; name: string; grams: number; per100g: Nutrients };
 // servings: how many servings it makes (a reusable meal is 1). yieldG: total cooked weight, null if not weighed.
 export type Recipe = { id: string | null; name: string; notes: string | null; servings: number; yieldG: number | null; ingredients: Ingredient[] };
+
+// An ingredient from a picked food and an amount in grams or in one of its portions (needs a gram weight).
+// Null when the amount is not usable. `note` keeps the portion as read-only context; the saved amount is grams.
+export function ingredientFromFood(food: Food, q: Quantity): (Ingredient & { note?: string }) | null {
+  const r = resolveQuantity(q);
+  if (!r) return null;
+  const note = r.portionLabel ? `${Math.round((r.portionCount ?? 0) * 100) / 100} x ${r.portionLabel}` : undefined;
+  return { foodId: food.id, name: food.name, grams: r.grams, per100g: food.per100g, note };
+}
 
 export const ingredientGrams = (r: Pick<Recipe, 'ingredients'>) => r.ingredients.reduce((a, i) => a + i.grams, 0);
 // The weight a gram amount or per-100 g value refers to: the cooked weight when given, else the raw ingredients.
@@ -29,11 +39,14 @@ export function recipeCaveats(r: Recipe, incomplete: readonly NutrientKey[]): st
   return out;
 }
 
+// The largest nutrient amounts a food entry may hold (the food_entries column checks).
+const ENTRY_CAPS: Nutrients = { energy_kcal: 1e6, protein_g: 1e5, carbs_g: 1e5, fat_g: 1e5, fiber_g: 1e5, sugars_g: 1e5, sat_fat_g: 1e5, sodium_mg: 1e8 };
+
 export type RecipeQuantity = { mode: 'servings'; count: number } | { mode: 'grams'; amount: number };
 export type RecipePortion = { grams: number; portionLabel: string | null; portionCount: number | null; fraction: number };
 
 export const recipeAmountMessage = (mode: RecipeQuantity['mode']) =>
-  mode === 'grams' ? 'Enter an amount above 0 and up to 100,000 g.' : 'Enter a number of servings above 0. The total can be up to 100,000 g.';
+  `${mode === 'grams' ? 'Enter an amount above 0 and up to 100,000 g.' : 'Enter a number of servings above 0. The total can be up to 100,000 g.'} The nutrient totals must also stay within what an entry can hold.`;
 
 // What part of the recipe is eaten: N servings, or grams of the cooked yield (needs a cooked weight). Null when unusable.
 export function resolveRecipePortion(r: Recipe, q: RecipeQuantity): RecipePortion | null {
@@ -55,6 +68,8 @@ export function recipeSnapshot(r: Recipe, q: RecipeQuantity): (RecipePortion & {
   const { totals, incomplete } = recipeTotals(r);
   const nutrients = scaleSnapshot(totals, 1, p.fraction);
   for (const k of incomplete) nutrients[k] = null;
+  // Too much for an entry row: the server would refuse it for good, so refuse it here.
+  if (NUTRIENT_KEYS.some((k) => (nutrients[k] ?? 0) > (ENTRY_CAPS[k] ?? 0))) return null;
   return { ...p, nutrients, incomplete };
 }
 

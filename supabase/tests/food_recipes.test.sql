@@ -1,5 +1,5 @@
 begin;
-select plan(29);
+select plan(36);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000a7', 'alice@x.com'),
@@ -46,6 +46,14 @@ select throws_ok($$insert into food_recipes (user_id, name) values (auth.uid(), 
 select throws_ok($$insert into food_recipe_ingredients (recipe_id, position, grams, food_name) values ((select id from r), 5, 0, 'Bad')$$, '23514', null, 'ingredient grams must be positive');
 select throws_ok($$insert into food_recipe_ingredients (recipe_id, position, grams, food_name, protein_g) values ((select id from r), 5, 10, 'Bad', 101)$$, '23514', null, 'more than 100 g per 100 g is rejected');
 
+-- NaN and Infinity compare above every bound, so the column checks reject them through the RPC too.
+select throws_ok($$select save_food_recipe(null, '{"name":"Bad","servings":"NaN"}'::jsonb)$$, '23514', null, 'NaN servings are rejected');
+select throws_ok($$select save_food_recipe(null, '{"name":"Bad","servings":1,"yield_g":"Infinity"}'::jsonb)$$, '23514', null, 'an infinite cooked weight is rejected');
+select throws_ok($$select save_food_recipe(null, '{"name":"Bad","servings":1,"ingredients":[{"food_name":"x","grams":"NaN"}]}'::jsonb)$$, '23514', null, 'NaN ingredient grams are rejected');
+select throws_ok($$select save_food_recipe(null, '{"name":"Bad","servings":1,"ingredients":[{"food_name":"x","grams":1,"energy_kcal":"Infinity"}]}'::jsonb)$$, '23514', null, 'an infinite ingredient nutrient is rejected');
+select throws_ok($$select save_food_recipe(null, jsonb_build_object('name', 'Big', 'servings', 1, 'ingredients',
+  (select jsonb_agg(jsonb_build_object('food_name', 'x', 'grams', 1)) from generate_series(1, 101))))$$, '23514', null, 'more than 100 ingredients are rejected');
+
 -- Recipe entries: provider recipe, no provider id, no food; the entry is its own snapshot.
 select lives_ok($$insert into food_entries (id, user_id, client_id, meal, consumed_at, timezone, grams, portion_label, portion_count, food_name, provider, energy_kcal)
   values ('00000000-0000-0000-0000-00000000a7e1', auth.uid(), gen_random_uuid(), 'lunch', now(), 'UTC', 250, 'serving', 1, 'Rice bowl', 'recipe', 270)$$,
@@ -74,6 +82,11 @@ select is_empty($$delete from food_recipe_ingredients returning 1$$, 'another us
 select throws_ok($$select save_food_recipe((select id from r), '{"name":"x","servings":1}'::jsonb)$$, 'P0001', null, 'another user cannot save over a recipe');
 select throws_ok($$insert into food_recipe_ingredients (recipe_id, position, grams, food_name) values ((select id from r), 9, 1, 'x')$$, '42501', null, 'an ingredient cannot be added to another user''s recipe');
 select throws_ok($$insert into food_recipes (user_id, name) values ('00000000-0000-0000-0000-0000000000a7', 'x')$$, '42501', null, 'a recipe cannot be created for another user');
+
+-- Signed-out clients can do nothing with recipes.
+select set_config('role', 'anon', true);
+select throws_ok($$select save_food_recipe(null, '{"name":"x","servings":1}'::jsonb)$$, '42501', null, 'anon cannot save a recipe');
+select throws_ok($$select count(*) from food_recipes$$, '42501', null, 'anon cannot read recipes');
 
 -- Account deletion cascades.
 reset role;

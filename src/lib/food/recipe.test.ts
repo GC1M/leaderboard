@@ -1,7 +1,9 @@
 import { buildEdit, entryFromRow } from './diary';
 import { emptyNutrients } from './nutrition';
-import { per100g, perServing, recipeCaveats, recipePayload, type Recipe, recipeSnapshot, recipeTotals, resolveRecipePortion, validateRecipe } from './recipe';
+import { ingredientFromFood, per100g, perServing, recipeCaveats, recipePayload, type Recipe, recipeSnapshot, recipeTotals, resolveRecipePortion, validateRecipe } from './recipe';
 import { logRecipe } from './recipes';
+import { blankForm, formChanged, toForm, toRecipe } from './recipe-form';
+import type { Food } from './search';
 
 const mockEnqueue = jest.fn();
 const mockFlush = jest.fn();
@@ -109,4 +111,54 @@ describe('logging a recipe', () => {
     mockFlush.mockResolvedValue(1);
     expect(await logRecipe({ recipe: recipe(), quantity: { mode: 'grams', amount: 100 }, meal: 'dinner', consumedAt: new Date(), clientId: 'c4' })).toBe(false);
   });
+});
+
+const apple: Food = {
+  id: 'a1', name: 'Apple, raw', brand: null, provider: 'usda_fdc', providerId: '1', sourceDataType: 'SR Legacy', sourceVersion: '2018',
+  per100g: n({ energy_kcal: 52 }), portions: [{ id: 'p1', label: 'medium', gramWeight: 182 }],
+};
+
+test('an ingredient can be added in grams or by portion, saved as grams, and unusable amounts are refused', () => {
+  expect(ingredientFromFood(apple, { mode: 'grams', amount: 150 })).toMatchObject({ foodId: 'a1', name: 'Apple, raw', grams: 150, note: undefined });
+  expect(ingredientFromFood(apple, { mode: 'portion', portion: apple.portions[0], count: 2 })).toMatchObject({ grams: 364, note: '2 x medium' });
+  expect(ingredientFromFood(apple, { mode: 'portion', portion: { id: 'p', label: 'pinch', gramWeight: 0 }, count: 1 })).toBeNull();
+  expect(ingredientFromFood(apple, { mode: 'grams', amount: 0 })).toBeNull();
+  expect(ingredientFromFood(apple, { mode: 'grams', amount: 100001 })).toBeNull();
+});
+
+test('portions stay within the entry caps or are refused', () => {
+  const big = { ...rice, grams: 100000, per100g: n({ energy_kcal: 900 }) };
+  const cases: [Recipe, Parameters<typeof resolveRecipePortion>[1]][] = [
+    [recipe({ yieldG: 0.001, servings: 1000 }), { mode: 'servings', count: 100000 }], // tiny yield, many servings
+    [recipe({ yieldG: 0.001 }), { mode: 'grams', amount: 100000 }], // all of a tiny yield
+    [recipe({ yieldG: 100000, servings: 1 }), { mode: 'servings', count: 100000 }], // huge amount
+    [recipe({ yieldG: null, servings: 1, ingredients: [big, { ...big }] }), { mode: 'servings', count: 1 }], // over 100,000 g
+    [recipe({ yieldG: 1, servings: 1, ingredients: [big, { ...big }, { ...big }, { ...big }, { ...big }, { ...big }, { ...big }, { ...big }, { ...big }, { ...big }, { ...big }, { ...big }] }), { mode: 'grams', amount: 1 }], // energy total over 1,000,000 kcal
+    [recipe({ yieldG: 0.5, servings: 1000 }), { mode: 'servings', count: 100000 }],
+  ];
+  for (const [r, q] of cases) {
+    const s = recipeSnapshot(r, q);
+    if (!s) continue; // refused on the device
+    expect(s.grams).toBeLessThanOrEqual(100000);
+    expect(s.portionCount ?? 0).toBeLessThanOrEqual(100000);
+    expect(s.nutrients.energy_kcal ?? 0).toBeLessThanOrEqual(1000000);
+  }
+  // The last of these is within every cap, so it must still be allowed.
+  expect(recipeSnapshot(recipe({ yieldG: 0.5, servings: 1000 }), { mode: 'servings', count: 100000 })?.grams).toBe(50);
+  // The ones above the caps are refused outright.
+  expect(recipeSnapshot(cases[2][0], cases[2][1])).toBeNull();
+  expect(recipeSnapshot(cases[3][0], cases[3][1])).toBeNull();
+  expect(recipeSnapshot(cases[4][0], cases[4][1])).toBeNull();
+});
+
+test('the editor form round-trips a recipe and detects changes', () => {
+  const f = toForm(recipe(), false);
+  expect(formChanged(f, toForm(recipe(), false))).toBe(false);
+  expect(toRecipe(f)).toMatchObject({ name: 'Rice bowl', servings: 2, yieldG: 500, ingredients: [{ grams: 300 }, { grams: 100 }] });
+  expect(formChanged(f, { ...f, name: 'Other' })).toBe(true);
+  expect(formChanged(f, { ...f, lines: f.lines.map((l, i) => (i ? { ...l, amount: '150' } : l)) })).toBe(true);
+  expect(formChanged(f, { ...f, lines: f.lines.map((l) => ({ ...l, note: 'x' })) })).toBe(false); // a note is display only
+  expect(toRecipe({ ...f, servings: 'abc', yieldG: ' ' })).toMatchObject({ servings: Number.NaN, yieldG: null });
+  expect(formChanged(blankForm, toForm(recipe(), true))).toBe(true);
+  expect(toForm(recipe(), true).name).toBe('Rice bowl copy');
 });

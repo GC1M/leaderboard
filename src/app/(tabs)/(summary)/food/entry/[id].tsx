@@ -182,6 +182,7 @@ export default function EntryDetail() {
       <Button label="Save Changes" busy={busy} disabled={!quantity} onPress={save} />
       <Button plain danger label="Delete Entry" disabled={busy} onPress={remove} />
       <Text style={[styles.caption, { color: c.inkSoft }]}>{ESTIMATE_NOTE}</Text>
+      {entry.provider === 'recipe' && <Text style={[styles.caption, { color: c.inkSoft }]}>This is a saved copy of a recipe. Its amount is based on the cooked weight entered for the recipe, or on the raw ingredient weight when none was entered. Values missing from any ingredient are saved as unknown.</Text>}
       {entry.provider === 'usda_fdc' && <Text style={[styles.caption, { color: c.inkSoft }]}>{FDC_ATTRIBUTION}</Text>}
     </Screen>
   );
