@@ -428,3 +428,11 @@ describe('permissions', () => {
     expect(rows.get('food:e1')).toMatchObject({ status: 'failed', reason: 'permission', writtenTypes: before });
   });
 });
+
+test('a recipe entry (provider recipe, no food id) exports as one food like any other entry', () => {
+  // The export reads only name, time and nutrients from food_entries; provider and food_id play no part.
+  const entry = { provider: 'recipe', food_id: null, food_name: ' Rice bowl ', consumed_at: '2026-11-08T18:00:00Z', energy_kcal: 295, protein_g: 4.55, sodium_mg: null };
+  const p = foodPayload({ name: entry.food_name, consumedAt: entry.consumed_at, nutrients: { ...ALL, energy_kcal: entry.energy_kcal, protein_g: entry.protein_g, sodium_mg: entry.sodium_mg } });
+  expect(p).toMatchObject({ name: 'Rice bowl', at: '2026-11-08T18:00:00.000Z', nutrients: { energy_kcal: 295, protein_g: 4.55 } });
+  expect(p.nutrients.sodium_mg).toBeUndefined(); // unknown is left out, never written as 0
+});
