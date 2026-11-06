@@ -40,14 +40,6 @@ export async function saveRecipe(id: string | null, recipe: Recipe): Promise<str
   return data;
 }
 
-// A copy named "<name> copy"; independent of the original.
-export async function duplicateRecipe(id: string): Promise<string> {
-  const r = await getRecipe(id);
-  if (!r) throw new Error("That recipe doesn't exist anymore.");
-  const suffix = ' copy';
-  return saveRecipe(null, { ...r, id: null, name: `${r.name.slice(0, 200 - suffix.length)}${suffix}` });
-}
-
 // Entries logged from it keep their own copy.
 export async function deleteRecipe(id: string): Promise<void> {
   const { error } = await supabase.from('food_recipes').delete().eq('id', id);

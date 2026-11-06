@@ -176,6 +176,47 @@ describe('removeEntry', () => {
   });
 });
 
+describe('removeEntry and the Health export', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('tells the export about the deleted id right after the server delete, before the queue is cleaned, even with a queued edit', async () => {
+    const order: string[] = [];
+    mockDeleteEq.mockImplementation(async () => { order.push('server'); return { error: null }; });
+    mockDiscard.mockImplementation(async () => { order.push('discard'); });
+    await removeEntry('u1', entryFromRow(row(), 'edit'), async (id) => { order.push(`export:${id}`); });
+    expect(order).toEqual(['server', 'export:e1', 'discard', 'discard']);
+  });
+
+  test('does not queue a Health delete when the server delete fails', async () => {
+    mockDeleteEq.mockResolvedValue({ error: { message: 'x' } });
+    const onRemoved = jest.fn();
+    await expect(removeEntry('u1', entry(), onRemoved)).rejects.toThrow();
+    expect(onRemoved).not.toHaveBeenCalled();
+  });
+
+  test('an entry that looked unsynced but reached the server is found by client id and its Health copy is queued before the flush', async () => {
+    const order: string[] = [];
+    mockLookup.mockResolvedValue({ data: { id: 'x9' } });
+    mockEnqueue.mockImplementation(async () => void order.push('purge queued'));
+    mockFlush.mockImplementation(async () => { order.push('flush'); return 0; });
+    const onRemoved = jest.fn(async (id: string) => void order.push(`export:${id}`));
+    await removeEntry('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'), onRemoved);
+    expect(order).toEqual(['purge queued', 'export:x9', 'flush']);
+    mockEnqueue.mockReset();
+    mockFlush.mockReset();
+  });
+
+  test('an unsynced entry the server never had, or an offline lookup, has nothing to remove from Health', async () => {
+    const onRemoved = jest.fn(async () => {});
+    mockFlush.mockResolvedValue(0);
+    mockLookup.mockResolvedValueOnce({ data: null });
+    await removeEntry('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'), onRemoved);
+    mockLookup.mockRejectedValueOnce(new Error('offline'));
+    await removeEntry('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'), onRemoved);
+    expect(onRemoved).not.toHaveBeenCalled();
+  });
+});
+
 describe('loadDay', () => {
   beforeEach(() => jest.clearAllMocks());
 

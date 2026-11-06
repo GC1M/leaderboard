@@ -97,8 +97,20 @@ grant execute on function public.save_food_recipe(uuid, jsonb) to authenticated;
 
 -- Recipe entries: provider = 'recipe' with no provider id and no food (the entry is its own snapshot).
 -- Only usda_fdc rows carry a provider id; custom and recipe rows never do.
-alter table public.food_entries drop constraint food_entries_provider_check;
-alter table public.food_entries drop constraint food_entries_check1;
+-- The two old checks (the provider list, and custom = no provider id) were created without chosen names, so they
+-- are found by definition rather than by the generated name.
+do $$
+declare c record;
+begin
+  for c in
+    select conname from pg_constraint
+    where conrelid = 'public.food_entries'::regclass and contype = 'c'
+      and ((pg_get_constraintdef(oid) like '%provider = ''custom''::text%' and pg_get_constraintdef(oid) like '%provider_id IS NULL%')
+        or pg_get_constraintdef(oid) like '%ARRAY[''usda_fdc''::text, ''custom''::text]%')
+  loop
+    execute format('alter table public.food_entries drop constraint %I', c.conname);
+  end loop;
+end $$;
 alter table public.food_entries add constraint food_entries_provider_check check (provider in ('usda_fdc', 'custom', 'recipe'));
 alter table public.food_entries add constraint food_entries_provider_id_match check ((provider = 'usda_fdc') = (provider_id is not null));
 alter table public.food_entries add constraint food_entries_recipe_no_food check (provider <> 'recipe' or food_id is null);

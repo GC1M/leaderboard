@@ -22,7 +22,7 @@ export default function Recipes() {
 
   return (
     <Screen title="Recipes and Meals" back>
-      <Button label="New Recipe" onPress={() => router.push('/food/recipes/new')} />
+      <Button label="New Recipe or Meal" onPress={() => router.push('/food/recipes/new')} />
       {error ? (
         <View>
           <ErrorText>{error}</ErrorText>
