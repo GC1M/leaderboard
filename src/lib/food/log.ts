@@ -52,32 +52,30 @@ export type LogInput = { food: Food; quantity: Quantity; meal: Meal; consumedAt:
 export async function logFood({ food, quantity, meal, consumedAt, clientId, isEstimated = false }: LogInput): Promise<boolean> {
   const r = resolveQuantity(quantity);
   if (!r) throw new Error(amountMessage(quantity.mode));
+  return logEntry(clientId, consumedAt, {
+    client_id: clientId,
+    food_id: food.id,
+    meal,
+    grams: r.grams,
+    portion_label: r.portionLabel,
+    portion_count: r.portionCount,
+    is_estimated: isEstimated,
+    food_name: food.name,
+    food_brand: food.brand,
+    provider: food.provider,
+    provider_id: food.providerId,
+    source_data_type: food.sourceDataType,
+    source_version: food.sourceVersion,
+    ...scaleNutrients(food.per100g, r.grams),
+  });
+}
+
+// Saves one entry row on this device and sends it (see logFood). Shared by foods and recipes.
+export async function logEntry(clientId: string, consumedAt: Date, row: Record<string, unknown>): Promise<boolean> {
   if (!Number.isFinite(consumedAt.getTime())) throw new Error('Choose a valid time.');
   // The stored session, not a network call, so logging works offline.
   const { data: auth } = await supabase.auth.getSession();
   if (!auth.session) throw new Error('Sign in to log food.');
-  const n = scaleNutrients(food.per100g, r.grams);
-  await enqueue(auth.session.user.id, {
-    kind: 'log',
-    clientId,
-    row: {
-      client_id: clientId,
-      food_id: food.id,
-      meal,
-      consumed_at: consumedAt.toISOString(),
-      timezone: deviceTimezone(),
-      grams: r.grams,
-      portion_label: r.portionLabel,
-      portion_count: r.portionCount,
-      is_estimated: isEstimated,
-      food_name: food.name,
-      food_brand: food.brand,
-      provider: food.provider,
-      provider_id: food.providerId,
-      source_data_type: food.sourceDataType,
-      source_version: food.sourceVersion,
-      ...n,
-    },
-  });
+  await enqueue(auth.session.user.id, { kind: 'log', clientId, row: { ...row, consumed_at: consumedAt.toISOString(), timezone: deviceTimezone() } });
   return (await flushPending(auth.session.user.id)) === 0;
 }

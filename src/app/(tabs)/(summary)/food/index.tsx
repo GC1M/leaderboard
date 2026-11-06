@@ -90,6 +90,7 @@ export default function FoodSearch() {
         secondary
         onPress={() => router.push({ pathname: '/food/custom', params: q ? { name: q } : {} })}
       />
+      <Button label="Recipes and Meals" secondary onPress={() => router.push('/food/recipes')} />
       <Text style={[styles.caption, { color: c.inkSoft }]}>{ESTIMATE_NOTE}</Text>
       <Text style={[styles.caption, { color: c.inkSoft }]}>{FDC_ATTRIBUTION}</Text>
     </Screen>

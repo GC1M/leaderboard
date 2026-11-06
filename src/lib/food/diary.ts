@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { deviceTimezone } from '@/lib/timezone';
 
 import { amountMessage, MEALS, type Meal, type Quantity, resolveQuantity } from './log';
-import { emptyNutrients, NUTRIENT_KEYS, type NutrientKey, type NutrientTotals, type Nutrients, sumNutrients } from './nutrition';
+import { emptyNutrients, NUTRIENT_KEYS, type NutrientKey, type NutrientTotals, type Nutrients, scaleSnapshot, sumNutrients } from './nutrition';
 import { discard, enqueue, flushPending, loadPending, type PendingOp } from './pending';
 
 export type Entry = {
@@ -24,7 +24,7 @@ export type Entry = {
   isEstimated: boolean;
   name: string;
   brand: string | null;
-  provider: 'usda_fdc' | 'custom';
+  provider: 'usda_fdc' | 'custom' | 'recipe';
   providerId: string | null;
   sourceDataType: string | null;
   sourceVersion: string | null;
@@ -97,13 +97,6 @@ export function groupDay(entries: readonly Entry[]): Day {
 }
 
 export const SUMMARY_KEYS = ['energy_kcal', 'protein_g', 'carbs_g', 'fat_g'] as const satisfies readonly NutrientKey[];
-
-// The snapshot of an entry whose food is gone, scaled to a new amount. Unknown stays unknown.
-export function scaleSnapshot(n: Nutrients, from: number, to: number): Nutrients {
-  const out = emptyNutrients();
-  for (const k of NUTRIENT_KEYS) out[k] = n[k] == null ? null : (n[k] * to) / from;
-  return out;
-}
 
 export type EditInput = { quantity?: Quantity; meal?: Meal; consumedAt?: Date; isEstimated?: boolean };
 

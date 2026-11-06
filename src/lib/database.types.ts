@@ -233,6 +233,52 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"food_recipe_ingredients": {
+                  Row: {
+                    "carbs_g": number | null,"energy_kcal": number | null,"fat_g": number | null,"fiber_g": number | null,"food_id": string | null,"food_name": string,"grams": number,"id": string,"position": number,"protein_g": number | null,"recipe_id": string,"sat_fat_g": number | null,"sodium_mg": number | null,"sugars_g": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "carbs_g"?: number | null,"energy_kcal"?: number | null,"fat_g"?: number | null,"fiber_g"?: number | null,"food_id"?: string | null,"food_name": string,"grams": number,"id"?: string,"position": number,"protein_g"?: number | null,"recipe_id": string,"sat_fat_g"?: number | null,"sodium_mg"?: number | null,"sugars_g"?: number | null
+                  }
+                  Update: {
+                    "carbs_g"?: number | null,"energy_kcal"?: number | null,"fat_g"?: number | null,"fiber_g"?: number | null,"food_id"?: string | null,"food_name"?: string,"grams"?: number,"id"?: string,"position"?: number,"protein_g"?: number | null,"recipe_id"?: string,"sat_fat_g"?: number | null,"sodium_mg"?: number | null,"sugars_g"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "food_recipe_ingredients_food_id_fkey"
+      columns: ["food_id"]
+isOneToOne: false
+      referencedRelation: "foods"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "food_recipe_ingredients_recipe_id_fkey"
+      columns: ["recipe_id"]
+isOneToOne: false
+      referencedRelation: "food_recipes"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"food_recipes": {
+                  Row: {
+                    "id": string,"name": string,"notes": string | null,"servings": number,"updated_at": string,"user_id": string,"yield_g": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "id"?: string,"name": string,"notes"?: string | null,"servings"?: number,"updated_at"?: string,"user_id": string,"yield_g"?: number | null
+                  }
+                  Update: {
+                    "id"?: string,"name"?: string,"notes"?: string | null,"servings"?: number,"updated_at"?: string,"user_id"?: string,"yield_g"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "food_recipes_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"food_search_log": {
                   Row: {
                     "searched_at": string,"user_id": string
@@ -677,6 +723,9 @@ isOneToOne: false
                            },
 "remove_member":
 { Args: { "p_group_id": string,"p_user_id": string }; Returns: undefined
+                           },
+"save_food_recipe":
+{ Args: { "p_id": string,"p_recipe": Json }; Returns: string
                            },
 "save_manual_workout":
 { Args: { "p_id": string,"p_workout": Json }; Returns: string
