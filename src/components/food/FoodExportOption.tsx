@@ -24,7 +24,7 @@ export function useFoodExport() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const latest = useRef({ on, entries: exp.entries, enqueue: exp.enqueue });
-  latest.current = { on, entries: exp.entries, enqueue: exp.enqueue };
+  useEffect(() => { latest.current = { on, entries: exp.entries, enqueue: exp.enqueue }; });
   const running = useRef<Promise<void> | null>(null);
   useEffect(() => {
     let live = true;
