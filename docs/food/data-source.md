@@ -83,9 +83,17 @@ Checked on 2026-11-06 against the OpenAPI spec (https://fdc.nal.usda.gov/api-spe
 - Constraint change: `provider_id` is set only for `usda_fdc` entries (custom and recipe entries have none), and a recipe entry has no `food_id`.
 - Recipe entries are tagged "Recipe" in the diary, and default to the "Estimate" tag. Account deletion cascades through profiles to recipes, ingredients and entries.
 
+## Licensing and attribution
+
+- USDA FoodData Central data is CC0 1.0 (public domain dedication). Storing it in `public.foods`, serving it to the app and keeping copies in entries and recipe ingredients needs no permission and has no share-alike or other condition. The FDC API terms ask for a credit and a private key, and set the rate limit above. Credit is requested, not required, and we give it anyway.
+- Only the nutrient values, names, portion weights, brand text and `source_data_type`/`source_version` are kept. We do not claim USDA endorses the app, and we say the numbers are estimates.
+- Custom foods and recipes are the user's own data. They are private, never shared with a group (groups only get daily totals), and deleted with the user.
+- No other database is used today. If Open Food Facts is added, its ODbL (database) and DbCL (contents) terms apply to that data: attribution, share-alike for derived databases, and a custom User-Agent. That needs its own attribution line, a per-provider `provider` value and a review of the cache before any row is stored.
+- Licence terms were last read on 2026-11-06 (see Sources). Re-check them when the provider changes.
+
 ## Attribution the UI must show
 
-On food search and detail screens, and in any history view showing a USDA food:
+On the food search screen, the food detail screen, and the entry screen of a logged USDA food. The diary list and the 7/30/90-day history show names and totals only and do not repeat it; the entry opens to the screen that does:
 
 > Nutrition data from the U.S. Department of Agriculture, Agricultural Research Service. FoodData Central. fdc.nal.usda.gov.
 

@@ -186,6 +186,32 @@ async function main() {
     eq(ok(await b.client.rpc('group_workouts', range), 'group_workouts after revoke'), [], 'group_workouts after A revokes');
   });
 
+  await step('food: log, daily totals, share to the group, a member reads it, revoke hides it', async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    const range = { p_group_id: group.id, p_from: day, p_to: day };
+    const logged = ok(await a.client.from('food_entries').insert({
+      user_id: a.id, client_id: randomUUID(), meal: 'lunch', consumed_at: new Date().toISOString(), timezone: 'UTC', grams: 200, food_name: 'Smoke Rice', provider: 'custom',
+      energy_kcal: 260, protein_g: 5.4, fat_g: 0.6,
+    }).select('id, local_date').single(), 'log a food entry');
+    eq(logged.local_date, day, 'the server sets local_date from consumed_at and timezone');
+    // Carbs were not entered: the total is unknown (null), flagged incomplete, never 0.
+    const totals = ok(await a.client.rpc('food_daily_totals', { p_from: day, p_to: day }), 'food_daily_totals');
+    eq(totals.map((t) => [t.entries, Number(t.energy_kcal), t.carbs_g, t.carbs_g_incomplete]), [[1, 260, null, true]], 'own daily totals');
+    eq(ok(await b.client.rpc('group_food', range), 'group_food before sharing'), [], 'group_food before A shares');
+
+    ok(await a.client.from('metric_shares').upsert({ group_id: group.id, user_id: a.id, metric: 'food' }, { ignoreDuplicates: true }), 'share food');
+    const rows = ok(await b.client.rpc('group_food', range), 'group_food after sharing');
+    eq(rows.map((r) => [r.user_id, r.local_date, Number(r.energy_kcal), r.carbs_g]), [[a.id, day, 260, null]], 'the member reads the daily total');
+    check(!Object.keys(rows[0]).some((k) => /name|grams|meal|client_id/.test(k)), 'group_food exposes only daily totals');
+    eq(ok(await b.client.from('food_entries').select('id'), 'B reads food entries').length, 0, 'B can read A food entries');
+
+    ok(await a.client.from('metric_shares').delete().match({ group_id: group.id, user_id: a.id, metric: 'food' }), 'revoke food share');
+    eq(ok(await b.client.rpc('group_food', range), 'group_food after revoke'), [], 'group_food after A revokes');
+    eq(await adminCount('food_entries', a.id), 1, 'revoking does not delete the entries');
+    ok(await a.client.rpc('delete_my_food_history'), 'delete_my_food_history');
+    eq(await adminCount('food_entries', a.id), 0, 'entries left after delete_my_food_history');
+  });
+
   await step('anonymous (signed-out) clients cannot read or write workout data', async () => {
     for (const table of ['workouts', 'workout_exercises', 'workout_sets', 'exercises', 'workout_templates', 'workout_template_exercises', 'workout_template_sets', 'metric_shares', 'profiles', 'groups']) {
       const { data, error } = await anon.from(table).select('*').limit(1);
