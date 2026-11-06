@@ -32,6 +32,7 @@ export type Entry = {
   // Not on the server yet: a new entry or an edit waiting to sync, with why the last try failed.
   pending: 'log' | 'edit' | null;
   syncError: string | null;
+  updatedAt: string | null; // server row version, used as the Apple Health export version
 };
 
 type Row = Partial<Tables<'food_entries'>>;
@@ -62,6 +63,7 @@ export function entryFromRow(r: Row, pending: Entry['pending'] = null, syncError
     nutrients,
     pending,
     syncError,
+    updatedAt: r.updated_at ?? null,
   };
 }
 
@@ -136,21 +138,26 @@ export async function saveEdit(uid: string, entry: Entry, input: EditInput): Pro
   }
   return (await flushPending(uid)) === 0;
 }
-
 // A synced entry is deleted on the server (a confirmed online action) and its queued changes dropped. An entry
 // that never showed as synced is removed locally right away, even offline; a queued purge then deletes any copy
 // the server got from a send in flight, and is retried on the next flush if it fails. Flushes run one at a time,
 // so the purge always runs after the send it might undo.
-export async function removeEntry(uid: string, entry: Entry): Promise<void> {
+// `onRemoved` queues the Health delete for the server row, right after the server delete (or, for an entry that looked
+// unsynced, after the purge is queued: its server row may exist and may already be in Health, found here by client id).
+export async function removeEntry(uid: string, entry: Entry, onRemoved?: (id: string) => Promise<void>): Promise<void> {
   if (!entry.id) {
+    const found = onRemoved ? await supabase.from('food_entries').select('id').eq('client_id', entry.clientId).maybeSingle().then((r) => r.data?.id ?? null, () => null) : null;
     // Purge first: if the app stops between the two, the entry is hidden and deleted rather than briefly lost from the queue.
     await enqueue(uid, { kind: 'purge', clientId: entry.clientId });
     await discard(uid, { kind: 'log', clientId: entry.clientId, row: {} });
+    if (found) await onRemoved?.(found);
     await flushPending(uid).catch(() => 0);
     return;
   }
   const { error } = await supabase.from('food_entries').delete().eq('id', entry.id);
   if (error) throw new Error("Couldn't delete that entry. A connection is needed to delete. Try again.");
+  // Straight after the server delete, so the Health copy is queued (and kept on the phone) before anything can interrupt.
+  await onRemoved?.(entry.id);
   await discard(uid, { kind: 'edit', id: entry.id, patch: {} });
   await discard(uid, { kind: 'log', clientId: entry.clientId, row: {} });
 }

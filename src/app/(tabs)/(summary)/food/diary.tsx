@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
 
 import { EntryRow } from '@/components/food/EntryRow';
+import { FoodExportOption, useFoodExport } from '@/components/food/FoodExportOption';
 import { DateField } from '@/components/inputs';
 import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -34,6 +35,8 @@ export default function Diary() {
   const [retrying, setRetrying] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  const foodExport = useFoodExport();
+  const { sync } = foodExport;
   const load = useCallback(async () => {
     // Retry anything waiting to sync first, so the day shows what the server now has.
     await flushPending(uid);
@@ -42,7 +45,8 @@ export default function Diary() {
     const r = await loadDay(uid, date);
     setEntries(r.entries);
     setError(r.error);
-  }, [uid, date]);
+    void sync();
+  }, [uid, date, sync]);
   useFocusEffect(useCallback(() => { setEntries(null); void load(); }, [load]));
 
   const retry = async () => {
@@ -68,6 +72,7 @@ export default function Diary() {
         {!isToday && <Button plain label="Today" onPress={() => setDate(localDateKey(new Date()))} />}
       </View>
       <DateField label="Day" mode="date" value={dateFromKey(date)} onChange={(d) => setDate(localDateKey(d))} />
+      <FoodExportOption choice={foodExport} />
       <ErrorText>{error}</ErrorText>
       {notice && <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: c.inkSoft }]}>{notice}</Text>}
       {waiting.length > 0 && (

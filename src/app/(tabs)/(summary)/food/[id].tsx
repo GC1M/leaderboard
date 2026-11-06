@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Switch, Text, View } from 'react-native';
 
+import { useFoodExport } from '@/components/food/FoodExportOption';
 import { Segmented } from '@/components/history/Segmented';
 import { DateField, DropdownField, NumberField } from '@/components/inputs';
 import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
@@ -35,6 +36,7 @@ export default function FoodDetail() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logged, setLogged] = useState<'synced' | 'saved' | null>(null);
+  const { sync } = useFoodExport();
 
   useEffect(() => {
     let live = true;
@@ -75,7 +77,9 @@ export default function FoodDetail() {
     setBusy(true);
     setError(null);
     try {
-      setLogged((await logFood({ food, quantity, meal, consumedAt: when, clientId, isEstimated: estimate })) ? 'synced' : 'saved');
+      const synced = await logFood({ food, quantity, meal, consumedAt: when, clientId, isEstimated: estimate });
+      setLogged(synced ? 'synced' : 'saved');
+      if (synced) void sync();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't log that food. Try again.");
     }
