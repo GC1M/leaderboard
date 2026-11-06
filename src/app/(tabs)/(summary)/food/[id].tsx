@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Switch, Text, View } from 'react-native';
 
 import { Segmented } from '@/components/history/Segmented';
 import { DateField, DropdownField, NumberField } from '@/components/inputs';
@@ -9,6 +9,7 @@ import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/com
 import { formatNutrient } from '@/lib/food/format';
 import { amountMessage, consumedNutrients, defaultMeal, logFood, MEALS, type Meal, type Quantity } from '@/lib/food/log';
 import { ESTIMATE_NOTE, FDC_ATTRIBUTION, type Food, getFood } from '@/lib/food/search';
+import { localDateKey } from '@/lib/health/dates';
 import { decimalValue } from '@/lib/numeric-input';
 import { useTheme } from '@/theme';
 
@@ -27,12 +28,13 @@ export default function FoodDetail() {
   const [portionId, setPortionId] = useState('');
   const [count, setCount] = useState('1');
   const [meal, setMeal] = useState<Meal>(() => defaultMeal(new Date()));
+  const [estimate, setEstimate] = useState(false);
   const [when, setWhen] = useState(() => new Date());
   // One id per screen visit: logging again after a failed save, with the same or changed values, updates one entry.
   const [clientId] = useState(() => Crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [logged, setLogged] = useState(false);
+  const [logged, setLogged] = useState<'synced' | 'saved' | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -73,8 +75,7 @@ export default function FoodDetail() {
     setBusy(true);
     setError(null);
     try {
-      await logFood({ food, quantity, meal, consumedAt: when, clientId });
-      setLogged(true);
+      setLogged((await logFood({ food, quantity, meal, consumedAt: when, clientId, isEstimated: estimate })) ? 'synced' : 'saved');
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't log that food. Try again.");
     }
@@ -87,7 +88,9 @@ export default function FoodDetail() {
         <Text accessibilityLiveRegion="polite" style={[styles.body, { color: c.ink }]}>
           {`${food.name} was added to ${MEALS.find((m) => m.value === meal)?.label.toLowerCase()}. Calories: ${formatNutrient('energy_kcal', nutrients?.energy_kcal ?? null)}.`}
         </Text>
-        <Button label="Log Another Food" onPress={() => router.replace('/food')} />
+        {logged === 'saved' && <Text style={[styles.body, { color: c.danger }]}>Saved on this device but not synced yet. It stays in your diary marked Not synced, and you can retry there.</Text>}
+        <Button label="View Diary" onPress={() => router.replace({ pathname: '/food/diary', params: { date: localDateKey(when) } })} />
+        <Button plain label="Log Another Food" onPress={() => router.replace('/food')} />
         <Button plain label="Done" onPress={() => router.replace('/')} />
         <Text style={[styles.caption, { color: c.inkSoft }]}>{ESTIMATE_NOTE}</Text>
       </Screen>
@@ -122,6 +125,10 @@ export default function FoodDetail() {
       )}
       <Segmented label="Meal" options={MEALS} value={meal} onChange={setMeal} />
       <DateField label="When" value={when} onChange={setWhen} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Text style={[styles.body, { color: c.ink, flex: 1 }]}>Mark as an estimate</Text>
+        <Switch accessibilityLabel="Mark as an estimate" value={estimate} onValueChange={setEstimate} />
+      </View>
       <Section title="For this amount" footer={nutrients ? undefined : amountMessage(mode === 'portion' && portion ? 'portion' : 'grams')}>
         <Row label="Calories" value={nutrients ? formatNutrient('energy_kcal', nutrients.energy_kcal) : '-'} />
         <Row label="Protein" value={nutrients ? formatNutrient('protein_g', nutrients.protein_g) : '-'} />

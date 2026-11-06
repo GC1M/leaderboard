@@ -613,6 +613,11 @@ isOneToOne: false
 "finalize_competition":
 { Args: { "p_id": string }; Returns: undefined
                            },
+"food_daily_totals":
+{ Args: { "p_from": string,"p_to": string }; Returns: {
+              "carbs_g": number,"carbs_g_incomplete": boolean,"energy_kcal": number,"energy_kcal_incomplete": boolean,"entries": number,"fat_g": number,"fat_g_incomplete": boolean,"local_date": string,"protein_g": number,"protein_g_incomplete": boolean
+            }[]
+                           },
 "food_search_allow":
 { Args: { "p_global_limit": number,"p_limit": number,"p_user": string }; Returns: boolean
                            },

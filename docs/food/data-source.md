@@ -79,7 +79,7 @@ On food search and detail screens, and in any history view showing a USDA food:
 
 > Nutrition data from the U.S. Department of Agriculture, Agricultural Research Service. FoodData Central. fdc.nal.usda.gov.
 
-Custom foods are labeled "Custom food" and logged amounts of them "Your estimate". All values are labeled as estimates.
+Custom foods are labeled "Custom food" in search and on the food screen. In the diary, entries of a custom food carry the tag "Custom", and entries the user marks as a guess carry the tag "Estimate" (`is_estimated`; the log and entry screens have a "Mark as an estimate" switch). Entries not yet on the server carry "Not synced". All values are labeled as estimates.
 
 ## Sources
 

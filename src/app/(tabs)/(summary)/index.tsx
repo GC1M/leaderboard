@@ -7,6 +7,7 @@ import { HealthSyncStatus } from '@/components/HealthSyncStatus';
 import { WeekChart } from '@/components/steps/WeekChart';
 import { Button, ErrorText, Icon, Screen, Section, Skeleton, styles as ui } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { getDailyTotals } from '@/lib/food/diary';
 import { listMyGroups, type MyGroup } from '@/lib/groups';
 import { lastNDates, localDateKey, readingDateLabel } from '@/lib/health/dates';
 import { dateFromKey, formatSleep, formatWeight } from '@/lib/health/format';
@@ -27,6 +28,8 @@ type Card = MyGroup & { standing: Standing | null };
 type Latest<T> = T | null | undefined | 'error';
 type Sleep = { date: string; value: number };
 type Weight = { kg: number; measuredAt: string };
+// Today's food: null when nothing is logged (not 0 kcal); kcal is null when no logged food had calories.
+type Food = { kcal: number | null; atLeast: boolean };
 
 export default function Summary() {
   const c = useTheme();
@@ -38,6 +41,7 @@ export default function Summary() {
   const [sleep, setSleep] = useState<Latest<Sleep>>();
   const [weight, setWeight] = useState<Latest<Weight>>();
   const [workouts, setWorkouts] = useState<Latest<WeekTotals>>();
+  const [food, setFood] = useState<Latest<Food>>();
   const [unit] = useWeightUnit();
   const [cards, setCards] = useState<Card[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,9 +56,11 @@ export default function Summary() {
       // One group failing (e.g. you were just removed) shouldn't blank the whole summary.
       const boards = await Promise.allSettled(groups.map((g) => getLeaderboard(g.id, 'steps', 'day')));
       // Sleep, weight and workouts fail on their own: an error shows on that card, not on the whole summary.
-      const [sl, wt, wo] = await Promise.allSettled([getMyRecentSleep(me, 30), getMyLatestWeight(me), listWorkoutsSince(historyStart(1))]);
+      const todayKey = localDateKey(new Date());
+      const [sl, wt, wo, fd] = await Promise.allSettled([getMyRecentSleep(me, 30), getMyLatestWeight(me), listWorkoutsSince(historyStart(1)), getDailyTotals(todayKey, todayKey)]);
       setSleep(sl.status === 'fulfilled' ? (sl.value[sl.value.length - 1] ?? null) : 'error');
       setWeight(wt.status === 'fulfilled' ? wt.value : 'error');
+      setFood(fd.status === 'fulfilled' ? (fd.value[0] ? { kcal: fd.value[0].energy_kcal, atLeast: fd.value[0].kcalIncomplete } : null) : 'error');
       setWorkouts(wo.status === 'fulfilled' ? weeklyTotals(wo.value, 1)[0] : 'error');
       setSteps(s);
       setCards(groups.map((g, i) => ({ ...g, standing: boards[i].status === 'fulfilled' ? myStanding(boards[i].value, me) : null })));
@@ -120,11 +126,11 @@ export default function Summary() {
           <MetricCard
             title="Food"
             icon={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }}
-            value={null}
-            when={null}
-            empty="Search and log food"
-            state="empty"
-            onPress={() => router.push('/food')}
+            value={typeof food === 'object' && food ? (food.kcal === null ? 'Unknown' : `${food.atLeast ? 'At least ' : ''}${Math.round(food.kcal)} kcal`) : null}
+            when="Today"
+            empty="No food logged"
+            state={food === 'error' ? 'error' : typeof food === 'object' && food ? 'ok' : 'empty'}
+            onPress={() => router.push('/food/diary')}
           />
           <MetricCard
             title="Workouts"
