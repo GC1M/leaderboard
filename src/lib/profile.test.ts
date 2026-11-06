@@ -38,5 +38,6 @@ test('deleteAccount signs out locally only after the server delete succeeds', as
   expect(mockDeleteJournal).toHaveBeenCalledWith('me');
   expect(mockRemoveItem).toHaveBeenCalledWith('health-connection-me');
   expect(mockRemoveItem).toHaveBeenCalledWith('template-drafts-me');
+  expect(mockRemoveItem).toHaveBeenCalledWith('food-pending-me');
   expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
 });

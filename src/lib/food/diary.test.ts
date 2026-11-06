@@ -2,23 +2,22 @@ import { buildEdit, type Entry, entryFromRow, groupDay, historyDays, loadDay, me
 import { emptyNutrients } from './nutrition';
 import type { Food } from './search';
 
-const mockGetFood = jest.fn();
 const mockEnqueue = jest.fn();
 const mockFlush = jest.fn();
 const mockLoad = jest.fn();
 const mockDiscard = jest.fn();
 const mockRows = jest.fn();
 const mockDeleteEq = jest.fn();
+const mockIn = jest.fn();
 jest.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
-      select: () => ({ eq: () => ({ order: () => mockRows() }) }),
+      select: () => ({ eq: () => ({ order: () => mockRows() }), in: (...a: unknown[]) => mockIn(...a) }),
       delete: () => ({ eq: (...a: unknown[]) => mockDeleteEq(...a) }),
     }),
   },
 }));
 jest.mock('@/lib/timezone', () => ({ deviceTimezone: () => 'America/Chicago' }));
-jest.mock('./search', () => ({ getFood: (...a: unknown[]) => mockGetFood(...a) }));
 jest.mock('./pending', () => ({
   enqueue: (...a: unknown[]) => mockEnqueue(...a),
   flushPending: (...a: unknown[]) => mockFlush(...a),
@@ -70,25 +69,26 @@ describe('mergePending', () => {
 });
 
 describe('buildEdit', () => {
-  test('a new amount recomputes grams, portion and every nutrient from the source food together', () => {
-    const p = buildEdit(entry(), { quantity: { mode: 'portion', portion: food.portions[0], count: 2 } }, food);
-    expect(p).toMatchObject({ grams: 300, portion_label: 'cup', portion_count: 2, energy_kcal: 600, protein_g: 12, carbs_g: null });
+  test('a new amount scales the entry snapshot, not the food: later edits of the food never reach a logged entry', () => {
+    // Logged at 130 kcal per 100 g. The food has since been changed to 200 kcal per 100 g; the entry still scales its own 130.
+    const p = buildEdit(entry(), { quantity: { mode: 'portion', portion: food.portions[0], count: 2 } });
+    expect(p).toMatchObject({ grams: 300, portion_label: 'cup', portion_count: 2, energy_kcal: 390, protein_g: 8.1, carbs_g: null });
   });
 
-  test('without the source food the stored snapshot is scaled and unknown stays unknown', () => {
-    const p = buildEdit(entry(), { quantity: { mode: 'grams', amount: 250 } }, null);
+  test('unknown stays unknown and a recorded zero stays zero', () => {
+    const p = buildEdit(entry(), { quantity: { mode: 'grams', amount: 250 } });
     expect(p).toMatchObject({ grams: 250, portion_label: null, portion_count: null, energy_kcal: 325, protein_g: 6.75, carbs_g: null, fat_g: 0 });
   });
 
   test('meal, time and estimate edits change only their columns; the time takes the device timezone', () => {
-    expect(buildEdit(entry(), { meal: 'dinner', isEstimated: true, consumedAt: new Date('2026-11-06T18:00:00Z') }, null)).toEqual({ meal: 'dinner', is_estimated: true });
-    expect(buildEdit(entry(), { consumedAt: new Date('2026-11-07T01:00:00Z') }, null)).toEqual({ consumed_at: '2026-11-07T01:00:00.000Z', timezone: 'America/Chicago' });
-    expect(buildEdit(entry(), { meal: 'lunch', isEstimated: false }, null)).toEqual({});
+    expect(buildEdit(entry(), { meal: 'dinner', isEstimated: true, consumedAt: new Date('2026-11-06T18:00:00Z') })).toEqual({ meal: 'dinner', is_estimated: true });
+    expect(buildEdit(entry(), { consumedAt: new Date('2026-11-07T01:00:00Z') })).toEqual({ consumed_at: '2026-11-07T01:00:00.000Z', timezone: 'America/Chicago' });
+    expect(buildEdit(entry(), { meal: 'lunch', isEstimated: false })).toEqual({});
   });
 
   test('rejects an unusable amount or time', () => {
-    expect(() => buildEdit(entry(), { quantity: { mode: 'grams', amount: 0 } }, null)).toThrow('amount');
-    expect(() => buildEdit(entry(), { consumedAt: new Date(Number.NaN) }, null)).toThrow('valid time');
+    expect(() => buildEdit(entry(), { quantity: { mode: 'grams', amount: 0 } })).toThrow('amount');
+    expect(() => buildEdit(entry(), { consumedAt: new Date(Number.NaN) })).toThrow('valid time');
   });
 });
 
@@ -96,16 +96,14 @@ describe('saveEdit', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFlush.mockResolvedValue(0);
-    mockGetFood.mockResolvedValue(food);
   });
 
-  test('queues one edit of the entry from the source food, then syncs', async () => {
+  test('queues one edit of the entry scaled from its own snapshot, then syncs', async () => {
     expect(await saveEdit('u1', entry(), { quantity: { mode: 'grams', amount: 50 } })).toBe(true);
-    expect(mockEnqueue).toHaveBeenCalledWith('u1', { kind: 'edit', id: 'e1', patch: expect.objectContaining({ grams: 50, energy_kcal: 100 }) });
+    expect(mockEnqueue).toHaveBeenCalledWith('u1', { kind: 'edit', id: 'e1', patch: expect.objectContaining({ grams: 50, energy_kcal: 65 }) });
   });
 
-  test('falls back to scaling the snapshot when the food cannot be read, and reports a failed sync', async () => {
-    mockGetFood.mockRejectedValue(new Error('offline'));
+  test('reports a failed sync as false, with the same patch queued', async () => {
     mockFlush.mockResolvedValue(1);
     expect(await saveEdit('u1', entry(), { quantity: { mode: 'grams', amount: 50 } })).toBe(false);
     expect(mockEnqueue.mock.calls[0][1].patch.energy_kcal).toBe(65);
@@ -131,29 +129,36 @@ test('history skips days with no known total instead of drawing zeros', () => {
 describe('removeEntry', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  test('deletes the row by id and drops any queued edit of it', async () => {
+  test('deletes the row by id and drops its queued edit and any queued log of the same client id', async () => {
     mockDeleteEq.mockResolvedValue({ error: null });
     await removeEntry('u1', entry());
     expect(mockDeleteEq).toHaveBeenCalledWith('id', 'e1');
     expect(mockDiscard).toHaveBeenCalledWith('u1', expect.objectContaining({ kind: 'edit', id: 'e1' }));
+    expect(mockDiscard).toHaveBeenCalledWith('u1', expect.objectContaining({ kind: 'log', clientId: 'c1' }));
   });
 
-  test('a failed delete throws and keeps the queue; an entry that never synced is only dropped locally', async () => {
+  test('a failed delete throws, says a connection is needed, and keeps the queue', async () => {
     mockDeleteEq.mockResolvedValue({ error: { message: 'secret' } });
-    await expect(removeEntry('u1', entry())).rejects.toThrow("Couldn't delete that entry. Try again.");
+    await expect(removeEntry('u1', entry())).rejects.toThrow('A connection is needed to delete');
     expect(mockDiscard).not.toHaveBeenCalled();
-    mockDeleteEq.mockClear();
+  });
+
+  test('an entry that never synced is deleted by client id too, in case an earlier send landed, then dropped from the queue', async () => {
+    mockDeleteEq.mockResolvedValue({ error: null });
     await removeEntry('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'));
-    expect(mockDeleteEq).not.toHaveBeenCalled();
+    expect(mockDeleteEq).toHaveBeenCalledWith('client_id', 'c9');
     expect(mockDiscard).toHaveBeenCalledWith('u1', expect.objectContaining({ kind: 'log', clientId: 'c9' }));
   });
 });
 
 describe('loadDay', () => {
+  beforeEach(() => jest.clearAllMocks());
+
   test('keeps this day only, shows saved entries when the server fails, and reports the error', async () => {
-    mockLoad.mockResolvedValue([{ kind: 'log', clientId: 'c2', row: row({ id: undefined, client_id: 'c2' }) }, { kind: 'log', clientId: 'c3', row: row({ id: undefined, client_id: 'c3', consumed_at: '2026-11-20T12:00:00' }) }]);
+    mockLoad.mockResolvedValue([{ kind: 'log', clientId: 'c2', row: row({ id: undefined, client_id: 'c2', local_date: undefined }) }, { kind: 'log', clientId: 'c3', row: row({ id: undefined, client_id: 'c3', local_date: undefined, consumed_at: '2026-11-20T12:00:00' }) }]);
     mockRows.mockResolvedValue({ data: null, error: { message: 'offline' } });
-    const r = await loadDay('u1', entryFromRow(row({ consumed_at: '2026-11-06T18:00:00Z' }), 'log').localDate);
+    const day = entryFromRow(row({ id: undefined, local_date: undefined }), 'log').localDate;
+    const r = await loadDay('u1', day);
     expect(r.entries.map((e) => e.clientId)).toEqual(['c2']);
     expect(r.error).toContain('Pull down');
   });
@@ -163,4 +168,23 @@ describe('loadDay', () => {
     mockRows.mockResolvedValue({ data: [row()], error: null });
     expect(await loadDay('u1', '2026-11-06')).toMatchObject({ error: null, entries: [{ id: 'e1' }] });
   });
+
+  test('an edit that moves an entry to another day leaves the old day and appears on the new one', async () => {
+    const moved = new Date(2026, 10, 9, 12).toISOString();
+    mockLoad.mockResolvedValue([{ kind: 'edit', id: 'e1', patch: { consumed_at: moved, timezone: 'America/Chicago' } }]);
+    mockRows.mockResolvedValue({ data: [row()], error: null });
+    expect((await loadDay('u1', '2026-11-06')).entries).toEqual([]);
+    expect(mockIn).not.toHaveBeenCalled();
+    mockRows.mockResolvedValue({ data: [], error: null });
+    mockIn.mockResolvedValue({ data: [row()], error: null });
+    const r = await loadDay('u1', '2026-11-09');
+    expect(mockIn).toHaveBeenCalledWith('id', ['e1']);
+    expect(r.entries).toMatchObject([{ id: 'e1', localDate: '2026-11-09', pending: 'edit' }]);
+  });
+});
+
+test('a queued edit that does not change the time keeps the server local date', () => {
+  // The entry was logged in another timezone, so its day is not the one this device would compute.
+  const r = row({ consumed_at: '2026-11-06T03:00:00Z', timezone: 'Asia/Tokyo', local_date: '2026-11-06' });
+  expect(mergePending([r], [{ kind: 'edit', id: 'e1', patch: { grams: 50 } }])[0].localDate).toBe('2026-11-06');
 });

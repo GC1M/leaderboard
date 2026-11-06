@@ -1,7 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Switch, Text, View } from 'react-native';
 
 import { Segmented } from '@/components/history/Segmented';
 import { DateField, DropdownField, NumberField } from '@/components/inputs';
@@ -28,6 +28,7 @@ export default function FoodDetail() {
   const [portionId, setPortionId] = useState('');
   const [count, setCount] = useState('1');
   const [meal, setMeal] = useState<Meal>(() => defaultMeal(new Date()));
+  const [estimate, setEstimate] = useState(false);
   const [when, setWhen] = useState(() => new Date());
   // One id per screen visit: logging again after a failed save, with the same or changed values, updates one entry.
   const [clientId] = useState(() => Crypto.randomUUID());
@@ -74,7 +75,7 @@ export default function FoodDetail() {
     setBusy(true);
     setError(null);
     try {
-      setLogged((await logFood({ food, quantity, meal, consumedAt: when, clientId })) ? 'synced' : 'saved');
+      setLogged((await logFood({ food, quantity, meal, consumedAt: when, clientId, isEstimated: estimate })) ? 'synced' : 'saved');
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't log that food. Try again.");
     }
@@ -124,6 +125,10 @@ export default function FoodDetail() {
       )}
       <Segmented label="Meal" options={MEALS} value={meal} onChange={setMeal} />
       <DateField label="When" value={when} onChange={setWhen} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Text style={[styles.body, { color: c.ink, flex: 1 }]}>Mark as an estimate</Text>
+        <Switch accessibilityLabel="Mark as an estimate" value={estimate} onValueChange={setEstimate} />
+      </View>
       <Section title="For this amount" footer={nutrients ? undefined : amountMessage(mode === 'portion' && portion ? 'portion' : 'grams')}>
         <Row label="Calories" value={nutrients ? formatNutrient('energy_kcal', nutrients.energy_kcal) : '-'} />
         <Row label="Protein" value={nutrients ? formatNutrient('protein_g', nutrients.protein_g) : '-'} />

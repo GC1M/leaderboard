@@ -15,7 +15,7 @@ jest.mock('expo-router', () => ({
 }));
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/lib/auth', () => ({ useAuth: () => ({ session: { user: { id: 'u1' } } }) }));
-jest.mock('@/lib/food/pending', () => ({ flushPending: (...a: unknown[]) => mockFlush(...a) }));
+jest.mock('@/lib/food/pending', () => ({ flushPending: (...a: unknown[]) => mockFlush(...a), takeNotices: () => [] }));
 jest.mock('@/lib/food/diary', () => ({ ...jest.requireActual('@/lib/food/diary'), loadDay: (...a: unknown[]) => mockLoadDay(...a) }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
@@ -74,7 +74,18 @@ test('an entry waiting to sync is marked Not synced, with the failure and a retr
   expect(mockLoadDay).toHaveBeenCalled();
 });
 
-test('a load error still shows the error with whatever is saved on the device', async () => {
+test('a failed load with nothing to show does not read as an empty day, and offers Try Again', async () => {
   mockLoadDay.mockResolvedValue({ entries: [], error: "Couldn't load your food. Pull down to try again." });
-  expect(dump(await render())).toContain("Couldn't load your food");
+  const c = await render();
+  const text = dump(c);
+  expect(text).toContain("Couldn't load your food");
+  expect(text).not.toContain('No food logged');
+  mockLoadDay.mockResolvedValue({ entries: [], error: null });
+  await act(async () => c.queryAll((n: any) => n.props.accessibilityLabel === 'Try Again' && n.props.onClick)[0].props.onClick());
+  expect(dump(c)).toContain('No food logged');
+});
+
+test('a failed load still shows entries saved on the device', async () => {
+  mockLoadDay.mockResolvedValue({ entries: [entry({ id: undefined }, 'log')], error: "Couldn't load your food. Pull down to try again." });
+  expect(label(await render(), 'Granola')).toContain('Not synced');
 });

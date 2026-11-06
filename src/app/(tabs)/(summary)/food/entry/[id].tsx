@@ -154,7 +154,7 @@ export default function EntryDetail() {
         {NUTRIENT_KEYS.map((k, i) => <Row key={k} label={NAMES[k]} value={formatNutrient(k, entry.nutrients[k])} last={i === NUTRIENT_KEYS.length - 1} />)}
       </Section>
       <Section title="Source">
-        <Row label="Provider" value={entry.provider === 'custom' ? 'Custom food (your estimate)' : 'USDA FoodData Central'} wrap />
+        <Row label="Provider" value={entry.provider === 'custom' ? 'Custom food' : 'USDA FoodData Central'} wrap />
         {entry.sourceDataType && <Row label="Data type" value={entry.sourceDataType} wrap />}
         {entry.sourceVersion && <Row label="Source version" value={entry.sourceVersion} wrap />}
         <Row label="Logged" value={when(entry)} wrap last />
