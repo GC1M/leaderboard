@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { groupDay, type Entry, loadDay, SUMMARY_KEYS } from '@/lib/food/diary';
 import { formatNutrient } from '@/lib/food/format';
 import { flushPending, takeNotices } from '@/lib/food/pending';
-import { ESTIMATE_NOTE } from '@/lib/food/search';
+import { ESTIMATE_NOTE, FDC_ATTRIBUTION } from '@/lib/food/search';
 import { localDateKey, startOfLocalDay } from '@/lib/health/dates';
 import { dateFromKey } from '@/lib/health/format';
 import type { NutrientKey, NutrientTotals } from '@/lib/food/nutrition';
@@ -20,6 +20,8 @@ const LABELS: Record<(typeof SUMMARY_KEYS)[number], string> = { energy_kcal: 'Ca
 // A total built from some unknown values is a lower bound, so it says "At least".
 const total = (t: NutrientTotals, k: NutrientKey) => `${t.incomplete.includes(k) && t.totals[k] !== null ? 'At least ' : ''}${formatNutrient(k, t.totals[k])}`;
 const incomplete = (t: NutrientTotals) => SUMMARY_KEYS.some((k) => t.incomplete.includes(k));
+// Mid-sentence, "Unknown" and "At least" start lower case.
+const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 // One day of food by meal, with totals. A day with no entries is "No food logged", never 0 kcal.
 export default function Diary() {
@@ -32,6 +34,7 @@ export default function Diary() {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState<{ count: number; error: string | null }>({ count: 0, error: null });
   const [retrying, setRetrying] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -45,6 +48,7 @@ export default function Diary() {
     const r = await loadDay(uid, date);
     setEntries(r.entries);
     setError(r.error);
+    setWaiting(r.waiting);
     void sync();
   }, [uid, date, sync]);
   useFocusEffect(useCallback(() => { setEntries(null); void load(); }, [load]));
@@ -56,7 +60,6 @@ export default function Diary() {
   };
 
   const day = entries ? groupDay(entries) : null;
-  const waiting = entries?.filter((e) => e.pending) ?? [];
   const shift = (days: number) => setDate(localDateKey(startOfLocalDay(dateFromKey(date), -days)));
   const isToday = date === localDateKey(new Date());
 
@@ -75,19 +78,31 @@ export default function Diary() {
       <FoodExportOption choice={foodExport} />
       <ErrorText>{error}</ErrorText>
       {notice && <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: c.inkSoft }]}>{notice}</Text>}
-      {waiting.length > 0 && (
+      {waiting.count > 0 && (
         <View style={{ gap: 4 }}>
           <Text accessibilityLiveRegion="polite" style={[styles.body, { color: c.danger }]}>
-            {`${waiting.length} ${waiting.length === 1 ? 'change is' : 'changes are'} not synced yet. ${waiting.find((e) => e.syncError)?.syncError ?? ''}`.trim()}
+            {`${waiting.count} ${waiting.count === 1 ? 'change is' : 'changes are'} not synced yet. ${waiting.error ?? ''}`.trim()}
           </Text>
           <Button plain label="Retry Sync" busy={retrying} onPress={retry} />
         </View>
       )}
       {!day ? (
         !error && <Skeleton label="Loading food diary" />
+      ) : error ? (
+        // The day's synced entries are unknown, so no totals: they would leave those entries out and read low.
+        // Only the entries saved on this device show. An empty list must not read as "No food logged" either.
+        <>
+          {day.count > 0 && (
+            <Section title="Saved on this iPhone" footer="Day totals show once your food loads.">
+              {entries!.map((e, i) => (
+                <EntryRow key={e.clientId} entry={e} last={i === entries!.length - 1} onPress={() => router.push({ pathname: '/food/entry/[id]', params: { id: e.id ?? e.clientId } })} />
+              ))}
+            </Section>
+          )}
+          <Button plain label="Try Again" busy={retrying} onPress={retry} />
+        </>
       ) : day.count === 0 ? (
-        // If the load failed, an empty list says nothing about the day, so it must not read as "No food logged".
-        error ? <Button plain label="Try Again" busy={retrying} onPress={retry} /> : <Text style={[styles.body, { color: c.inkSoft }]}>No food logged</Text>
+        <Text style={[styles.body, { color: c.inkSoft }]}>No food logged</Text>
       ) : (
         <>
           <Section title="Day total" footer={incomplete(day) ? 'Some foods have unknown values, so these totals are incomplete and may be low.' : undefined}>
@@ -97,7 +112,7 @@ export default function Diary() {
             <Section
               key={m.meal}
               title={`${m.label}, ${total(m, 'energy_kcal')}`}
-              footer={`Protein ${total(m, 'protein_g')}, carbs ${total(m, 'carbs_g')}, fat ${total(m, 'fat_g')}${incomplete(m) ? '. Incomplete: some values are unknown.' : ''}`}
+              footer={`Protein ${lower(total(m, 'protein_g'))}, carbs ${lower(total(m, 'carbs_g'))}, fat ${lower(total(m, 'fat_g'))}${incomplete(m) ? '. Incomplete: some values are unknown.' : ''}`}
             >
               {m.entries.map((e, i) => (
                 <EntryRow key={e.clientId} entry={e} last={i === m.entries.length - 1} onPress={() => router.push({ pathname: '/food/entry/[id]', params: { id: e.id ?? e.clientId } })} />
@@ -110,6 +125,7 @@ export default function Diary() {
       <Button plain label="Recipes and Meals" onPress={() => router.push('/food/recipes')} />
       <Button plain label="History" onPress={() => router.push('/food/history')} />
       <Text style={[styles.caption, { color: c.inkSoft }]}>{ESTIMATE_NOTE}</Text>
+      {entries?.some((e) => e.provider === 'usda_fdc') && <Text style={[styles.caption, { color: c.inkSoft }]}>{FDC_ATTRIBUTION}</Text>}
     </Screen>
   );
 }

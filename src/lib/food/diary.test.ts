@@ -247,6 +247,14 @@ describe('loadDay', () => {
     expect(mockIn).toHaveBeenCalledWith('id', ['e1']);
     expect(r.entries).toMatchObject([{ id: 'e1', localDate: '2026-11-09', pending: 'edit' }]);
   });
+
+  test('counts every queued change, even ones with no entry to show while the server fails', async () => {
+    mockLoad.mockResolvedValue([{ kind: 'edit', id: 'e1', patch: { grams: 150 }, error: 'Couldn\'t sync.' }, { kind: 'purge', clientId: 'c7' }]);
+    mockRows.mockResolvedValue({ data: null, error: { message: 'offline' } });
+    const r = await loadDay('u1', '2026-11-06');
+    expect(r.entries).toEqual([]);
+    expect(r.waiting).toEqual({ count: 2, error: 'Couldn\'t sync.' });
+  });
 });
 
 test('a queued edit that does not change the time keeps the server local date', () => {

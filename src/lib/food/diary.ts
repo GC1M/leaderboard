@@ -166,8 +166,10 @@ export async function discardPending(uid: string, entry: Entry): Promise<void> {
   await (entry.id ? discard(uid, { kind: 'edit', id: entry.id, patch: {} }) : discard(uid, { kind: 'log', clientId: entry.clientId, row: {} }));
 }
 
-// One day's entries. If the server cannot be reached the queued entries still show, with an error.
-export async function loadDay(uid: string, date: string): Promise<{ entries: Entry[]; error: string | null }> {
+// One day's entries. If the server cannot be reached the queued entries still show, with an error. `waiting`
+// counts every change on this device not synced yet, on any day: a queued edit or delete has no entry to tag
+// while the server's rows cannot load.
+export async function loadDay(uid: string, date: string): Promise<{ entries: Entry[]; error: string | null; waiting: { count: number; error: string | null } }> {
   const ops = await loadPending(uid);
   const { data, error } = await supabase.from('food_entries').select('*').eq('local_date', date).order('consumed_at');
   let rows = error ? [] : (data ?? []);
@@ -176,7 +178,11 @@ export async function loadDay(uid: string, date: string): Promise<{ entries: Ent
   const moved = ops.flatMap((o) => (o.kind === 'edit' && typeof o.patch.consumed_at === 'string' && localDateKey(new Date(o.patch.consumed_at)) === date && !have.has(o.id) ? [o.id] : []));
   if (!error && moved.length) rows = [...rows, ...((await supabase.from('food_entries').select('*').in('id', moved)).data ?? [])];
   const entries = mergePending(rows, ops).filter((e) => e.localDate === date);
-  return { entries, error: error ? "Couldn't load your food. Pull down to try again." : null };
+  return {
+    entries,
+    error: error ? "Couldn't load your food. Pull down to try again." : null,
+    waiting: { count: ops.length, error: ops.find((o) => o.error)?.error ?? null },
+  };
 }
 
 // One entry by id, or by client id for one that has not synced (or has synced since the link was made).
