@@ -49,11 +49,11 @@ describe('logFood', () => {
     mockUpsert.mockResolvedValue({ error: null });
   });
 
-  test('inserts the identity copy, resolved grams, snapshot, meal and device time zone, ignoring a repeat client id', async () => {
+  test('upserts the identity copy, resolved grams, snapshot, meal and device time zone on (user_id, client_id)', async () => {
     await logFood(input);
     const [table, row, opts] = mockUpsert.mock.calls[0];
     expect(table).toBe('food_entries');
-    expect(opts).toEqual({ onConflict: 'user_id,client_id', ignoreDuplicates: true });
+    expect(opts).toEqual({ onConflict: 'user_id,client_id' });
     expect(row).toMatchObject({
       user_id: 'me', client_id: 'c-1', food_id: 'f1', meal: 'lunch', consumed_at: '2026-11-06T18:00:00.000Z', timezone: 'America/Chicago',
       grams: 236, portion_label: 'medium', portion_count: 2, is_estimated: false,
@@ -63,8 +63,17 @@ describe('logFood', () => {
     expect(row.energy_kcal).toBeCloseTo(210.04, 2);
   });
 
+  test('a retry with changed values sends the same client id and conflict key, with identity columns unchanged', async () => {
+    await logFood(input);
+    await logFood({ ...input, quantity: { mode: 'portion', portion: food.portions[0], count: 3 }, meal: 'dinner' });
+    const [a, b] = mockUpsert.mock.calls.map((c) => c[1]);
+    expect([b.user_id, b.client_id]).toEqual([a.user_id, a.client_id]);
+    for (const k of ['food_id', 'food_name', 'food_brand', 'provider', 'provider_id', 'source_data_type', 'source_version']) expect(b[k]).toEqual(a[k]);
+    expect(b).toMatchObject({ grams: 354, meal: 'dinner', portion_count: 3 });
+  });
+
   test('rejects a bad amount or time before any write', async () => {
-    await expect(logFood({ ...input, quantity: { mode: 'grams', amount: 0 } })).rejects.toThrow('Enter an amount from 0 to 100,000 g');
+    await expect(logFood({ ...input, quantity: { mode: 'grams', amount: 0 } })).rejects.toThrow('Enter an amount above 0 and up to 100,000 g.');
     await expect(logFood({ ...input, consumedAt: new Date(Number.NaN) })).rejects.toThrow('valid time');
     expect(mockUpsert).not.toHaveBeenCalled();
   });

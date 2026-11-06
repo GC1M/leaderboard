@@ -1,6 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { Segmented } from '@/components/history/Segmented';
@@ -28,9 +28,8 @@ export default function FoodDetail() {
   const [count, setCount] = useState('1');
   const [meal, setMeal] = useState<Meal>(() => defaultMeal(new Date()));
   const [when, setWhen] = useState(() => new Date());
-  // Retrying the same values reuses the id, so a repeat cannot create a second entry. Any change to the amount,
-  // portion, meal or time is a new intended save and gets a new id.
-  const attempt = useRef({ sig: '', id: '' });
+  // One id per screen visit: logging again after a failed save, with the same or changed values, updates one entry.
+  const [clientId] = useState(() => Crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logged, setLogged] = useState(false);
@@ -71,12 +70,10 @@ export default function FoodDetail() {
 
   const log = async () => {
     if (!quantity) return;
-    const sig = JSON.stringify([quantity.mode === 'grams' ? [quantity.amount] : [quantity.portion.id, quantity.count], meal, when.getTime()]);
-    if (attempt.current.sig !== sig) attempt.current = { sig, id: Crypto.randomUUID() };
     setBusy(true);
     setError(null);
     try {
-      await logFood({ food, quantity, meal, consumedAt: when, clientId: attempt.current.id });
+      await logFood({ food, quantity, meal, consumedAt: when, clientId });
       setLogged(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't log that food. Try again.");
