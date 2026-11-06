@@ -4,13 +4,15 @@ import { AccessibilityInfo, Keyboard, Platform } from 'react-native';
 
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton } from '@/components/ui';
 import { alert } from '@/lib/alert';
-import { useHealthSync } from '@/lib/health/sync';
+import { FOOD_KIND, foodDeleteVersion } from '@/lib/health/food-export';
+import { useHealthExport, useHealthSync } from '@/lib/health/sync';
 import { NAME_MAX, deleteAccount, deleteFoodHistory, getDisplayName, updateDisplayName } from '@/lib/profile';
 import { supabase } from '@/lib/supabase';
 
 export default function Profile() {
   const router = useRouter();
   const health = useHealthSync();
+  const healthExport = useHealthExport();
   const [saved, setSaved] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,13 +67,25 @@ export default function Profile() {
       ],
     );
 
+  // Entries this app saved to Apple Health, if any. The user chooses whether they go too: the delete is queued
+  // through the #48 export queue, which removes them from Health once it runs (HealthKit only lets an app delete its own samples).
+  const exported = healthExport.entries.filter((e) => e.kind === FOOD_KIND && e.op !== 'delete' && e.status === 'success');
+  const deleteFood = (fromHealth: boolean) =>
+    run(async () => {
+      await deleteFoodHistory();
+      if (fromHealth) for (const e of exported) await healthExport.enqueue(FOOD_KIND, e.recordId, 'delete', null, foodDeleteVersion(healthExport.entries, e.recordId)!);
+    });
+
   const confirmDeleteFood = () =>
     alert(
       'Delete food history?',
-      "This deletes every food entry, recipe and custom food you saved, on your account and in your groups. Your sharing choices stay, so groups you share food with will see no food logged. Food that Leaderboard saved to Apple Health stays there: to remove it, open the Health app, tap Browse, then Nutrition, and delete it from there. This can't be undone.",
+      `This deletes every food entry, recipe and custom food you saved, on your account and in your groups. Your sharing choices stay, so groups you share food with will see no food logged. ${
+        exported.length ? `${exported.length} ${exported.length === 1 ? 'entry was' : 'entries were'} saved to Apple Health: choose whether to remove ${exported.length === 1 ? 'it' : 'them'} from Health too. ` : ''
+      }This can't be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete Food History', style: 'destructive', onPress: () => run(deleteFoodHistory) },
+        ...(exported.length ? [{ text: 'Delete and Remove from Health', style: 'destructive' as const, onPress: () => deleteFood(true) }] : []),
+        { text: exported.length ? 'Delete, Keep in Health' : 'Delete Food History', style: 'destructive', onPress: () => deleteFood(false) },
       ],
     );
 
