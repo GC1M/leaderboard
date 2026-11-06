@@ -118,6 +118,15 @@ export default function Summary() {
             onPress={() => router.push('/weight')}
           />
           <MetricCard
+            title="Food"
+            icon={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }}
+            value={null}
+            when={null}
+            empty="Search and log food"
+            state="empty"
+            onPress={() => router.push('/food')}
+          />
+          <MetricCard
             title="Workouts"
             icon={{ ios: 'dumbbell.fill', android: 'fitness_center', web: 'fitness_center' }}
             value={typeof workouts === 'object' && workouts?.count ? totalsParts(workouts, distanceUnit)[0] : null}

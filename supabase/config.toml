@@ -410,6 +410,12 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Food search (#45). Needs a signed-in user. FDC_API_KEY is a function secret: locally in
+# supabase/functions/.env (gitignored), hosted via `supabase secrets set FDC_API_KEY=...`.
+[functions.food-search]
+enabled = true
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327
