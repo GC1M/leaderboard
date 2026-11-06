@@ -15,7 +15,8 @@ jest.mock('expo-router', () => ({
 }));
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/lib/timezone', () => ({ deviceTimezone: () => 'UTC' }));
-jest.mock('expo-crypto', () => ({ randomUUID: () => 'client-1' }));
+let mockUuid = 0;
+jest.mock('expo-crypto', () => ({ randomUUID: () => `client-${++mockUuid}` }));
 jest.mock('@/lib/food/search', () => ({ ...jest.requireActual('@/lib/food/search'), getFood: (...a: unknown[]) => mockGetFood(...a) }));
 jest.mock('@/lib/food/log', () => ({ ...jest.requireActual('@/lib/food/log'), logFood: (...a: unknown[]) => mockLog(...a) }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -41,6 +42,7 @@ const row = (c: any, label: string) => c.queryAll((n: any) => n.props.accessibil
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockUuid = 0;
   mockGetFood.mockResolvedValue(banana);
   mockLog.mockResolvedValue(undefined);
 });
@@ -92,6 +94,27 @@ test('a failed save keeps the form and retries with the same client id', async (
   await click(c, 'Log Food');
   expect(mockLog.mock.calls.map((a) => a[0].clientId)).toEqual(['client-1', 'client-1']);
   expect(JSON.stringify(c)).toContain('was added to');
+});
+
+test('an edited retry is a new save with a new id, an unchanged retry keeps the id', async () => {
+  mockLog.mockRejectedValue(new Error('fail'));
+  const c = await render();
+  await click(c, 'Breakfast');
+  await click(c, 'Log Food');
+  await click(c, 'Log Food');
+  await type(c, 'Amount (g)', '120');
+  await click(c, 'Log Food');
+  await click(c, 'Lunch');
+  await click(c, 'Log Food');
+  await click(c, 'Log Food');
+  expect(mockLog.mock.calls.map((a) => a[0].clientId)).toEqual(['client-1', 'client-1', 'client-2', 'client-3', 'client-3']);
+});
+
+test('says so when a shown nutrient is unknown, and uses the bounds message for a bad amount', async () => {
+  const c = await render();
+  expect(JSON.stringify(c)).toContain('Some values are unknown for this food.');
+  await type(c, 'Amount (g)', '0');
+  expect(JSON.stringify(c)).toContain('Enter an amount from 0 to 100,000 g');
 });
 
 test('portions are only offered when the food has one with a gram weight', async () => {

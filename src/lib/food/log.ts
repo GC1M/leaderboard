@@ -15,6 +15,9 @@ export const MEALS = [
 export type Meal = (typeof MEALS)[number]['value'];
 
 export const MAX_GRAMS = 100000;
+export const MAX_PORTION_COUNT = 100000;
+export const amountMessage = (mode: Quantity['mode']) =>
+  mode === 'grams' ? 'Enter an amount from 0 to 100,000 g' : 'Enter a number of portions from 0 to 100,000, up to 100,000 g in total';
 
 export function defaultMeal(at: Date): Meal {
   const h = at.getHours();
@@ -26,6 +29,7 @@ export type ResolvedQuantity = { grams: number; portionLabel: string | null; por
 
 // Null when the amount is not usable: not a positive number, over the limit, or a portion without a gram weight.
 export function resolveQuantity(q: Quantity): ResolvedQuantity | null {
+  if (q.mode === 'portion' && q.count > MAX_PORTION_COUNT) return null;
   const grams = q.mode === 'grams' ? q.amount : portionToGrams(q.count, q.portion.gramWeight);
   if (grams == null || !Number.isFinite(grams) || grams <= 0 || grams > MAX_GRAMS) return null;
   return q.mode === 'grams' ? { grams, portionLabel: null, portionCount: null } : { grams, portionLabel: q.portion.label, portionCount: q.count };
@@ -42,7 +46,7 @@ export type LogInput = { food: Food; quantity: Quantity; meal: Meal; consumedAt:
 // Saving the same clientId twice never makes a second entry, so a retry after a failed save is safe.
 export async function logFood({ food, quantity, meal, consumedAt, clientId }: LogInput): Promise<void> {
   const r = resolveQuantity(quantity);
-  if (!r) throw new Error('Enter an amount more than 0.');
+  if (!r) throw new Error(amountMessage(quantity.mode));
   if (!Number.isFinite(consumedAt.getTime())) throw new Error('Choose a valid time.');
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error('Sign in to log food.');

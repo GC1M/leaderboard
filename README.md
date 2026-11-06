@@ -53,10 +53,10 @@ Sign-in: email OTP and Google (when configured) are the supported methods for th
 Food search calls USDA FoodData Central from the `food-search` edge function (`supabase/functions/food-search/`). The FDC key lives only on the server as the function secret `FDC_API_KEY`. It is never in the app bundle, `.env`, or git.
 
 1. Get a free key at https://fdc.nal.usda.gov/api-key-signup (1,000 requests per hour per key).
-2. Local: copy `supabase/functions/.env.example` to `supabase/functions/.env` (gitignored), set `FDC_API_KEY=`, then run `npx supabase@2.122.0 functions serve` next to the local stack.
+2. Local: copy `supabase/functions/.env.example` to `supabase/functions/.env` (gitignored), set `FDC_API_KEY=`, then run `npx supabase@2.122.0 functions serve`. This needs Docker and the local stack (`supabase start`) to be running.
 3. Hosted: `npx supabase@2.122.0 secrets set FDC_API_KEY=<key>` and `npx supabase@2.122.0 functions deploy food-search`.
 
-Without the key the function answers `not_configured`; the app then shows saved foods and still lets you add a custom food. Each search makes two FDC calls (search, then details for the portions).
+Without the key the function answers `not_configured`; the app then shows saved foods and still lets you add a custom food. Each search makes two FDC calls (search, then details for the portions), so each user is limited to 60 searches per rolling hour (`food_search_allow`, table `food_search_log`); over that the function answers `rate_limited`. If FDC fails, the function returns matching foods already cached, flagged `fromCache`.
 
 ## Apple Health needs a native build
 

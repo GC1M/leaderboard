@@ -1,14 +1,12 @@
 // Nutrition math for food logging (#44). Pure functions, no I/O. Stored units: grams, kcal, mg.
 // A null nutrient is unknown, never zero: scaling keeps it null and sums flag it as incomplete.
 
-export const NUTRIENT_KEYS = ['energy_kcal', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugars_g', 'sat_fat_g', 'sodium_mg'] as const;
-export type NutrientKey = (typeof NUTRIENT_KEYS)[number];
-export type Nutrients = Record<NutrientKey, number | null>;
+// Keys, types and the kJ to kcal conversion are defined in the edge function's shared folder (it cannot
+// import from src/) and re-exported here. Only kcal is ever stored.
+import { KJ_PER_KCAL, NUTRIENT_KEYS, type NutrientKey, type Nutrients } from '../../../supabase/functions/_shared/nutrients';
 
-// The one place the energy conversion is defined. Only kcal is ever stored.
-export const KJ_PER_KCAL = 4.184;
+export { KJ_PER_KCAL, kjToKcal, NUTRIENT_KEYS, type NutrientKey, type Nutrients } from '../../../supabase/functions/_shared/nutrients';
 export const kcalToKj = (kcal: number) => kcal * KJ_PER_KCAL;
-export const kjToKcal = (kj: number) => kj / KJ_PER_KCAL;
 
 export type MassUnit = 'g' | 'oz' | 'lb';
 const GRAMS_PER_UNIT: Record<MassUnit, number> = { g: 1, oz: 28.349523125, lb: 453.59237 };

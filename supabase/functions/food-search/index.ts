@@ -1,12 +1,15 @@
 // Food search (#45): signed-in users only. Calls USDA FoodData Central with FDC_API_KEY (a function secret,
 // never sent to the app), caches normalized foods and portions in public.foods / food_portions with the
 // service role, and returns the cached rows. Parsing lives in ../_shared/fdc.ts so Jest can test it.
+// Each user gets SEARCHES_PER_HOUR searches per rolling hour (food_search_allow), because the FDC key is shared.
+// If FDC fails, matching rows already in the cache are returned with `fromCache: true` and the failure code.
 // eslint-disable-next-line import/no-unresolved -- Deno npm: specifier
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-import { detailUrl, failureFor, normalizeFood, parseSearchParams, searchResult, searchUrl, type FailureCode, type RawFood } from '../_shared/fdc.ts';
+import { cacheItems, detailUrl, failureFor, orderedResponse, parseSearchParams, portionRows, searchResult, searchUrl, type FailureCode, type RawFood } from '../_shared/fdc.ts';
 
 const TIMEOUT_MS = 8000;
+const SEARCHES_PER_HOUR = 60;
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -21,18 +24,17 @@ class FdcError extends Error {
   }
 }
 
+const isTimeout = (e: unknown) => e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError');
+
+// The timeout signal covers the body read too, so a stall there is a timeout as well.
 async function fdcGet(url: string): Promise<unknown> {
-  let res: Response;
   try {
-    res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-  } catch (e) {
-    throw new FdcError(e instanceof DOMException && (e.name === 'TimeoutError' || e.name === 'AbortError') ? 'timeout' : 0);
-  }
-  if (!res.ok) throw new FdcError(res.status);
-  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!res.ok) throw new FdcError(res.status);
     return await res.json();
-  } catch {
-    throw new FdcError(0);
+  } catch (e) {
+    if (e instanceof FdcError) throw e;
+    throw new FdcError(isTimeout(e) ? 'timeout' : 0);
   }
 }
 
@@ -53,47 +55,59 @@ Deno.serve(async (req) => {
   const parsed = parseSearchParams(await req.json().catch(() => null));
   if (!parsed.ok) return fail('bad_request', parsed.message, 400);
 
+  const admin = createClient(url, service);
+  const { data: allowed, error: limitError } = await admin.rpc('food_search_allow', { p_user: user.user.id, p_limit: SEARCHES_PER_HOUR });
+  if (limitError) {
+    console.error('search limit check failed', limitError.code);
+    return fail('cache_error', 'Could not check the search limit.', 500);
+  }
+  if (!allowed) return fail('rate_limited', 'You have searched a lot. Try again in a few minutes.', 429);
+
   let raw: RawFood[] = [];
+  let order: string[] = [];
   let totalHits = 0;
   try {
     const found = searchResult(await fdcGet(searchUrl(parsed.params, apiKey)));
     totalHits = found.totalHits;
+    order = found.ids.map(String);
     if (found.ids.length > 0) {
       const detail = await fdcGet(detailUrl(found.ids, apiKey));
-      const list = Array.isArray(detail) ? (detail as RawFood[]) : [];
-      raw = found.ids.map((id) => list.find((f) => f?.fdcId === id)).filter((f): f is RawFood => !!f);
+      raw = Array.isArray(detail) ? (detail as RawFood[]) : [];
     }
   } catch (e) {
     const f = failureFor(e instanceof FdcError ? e.status : 0);
     console.error('fdc failure', f.code, e instanceof FdcError ? e.status : '');
-    return fail(f.code, f.message, f.httpStatus);
+    // Fall back to foods already cached whose name matches.
+    const pattern = `%${parsed.params.query.replace(/[\\%_]/g, '\\$&')}%`;
+    const { data: cached } = await admin.from('foods').select('*, food_portions(*)').eq('provider', 'usda_fdc').ilike('name', pattern).limit(20);
+    if (!cached || cached.length === 0) return fail(f.code, f.message, f.httpStatus);
+    const portions = cached.flatMap((c) => c.food_portions ?? []);
+    return reply({
+      foods: orderedResponse(cached, portions, []),
+      page: 1,
+      totalHits: cached.length,
+      fromCache: true,
+      failure: f.code,
+    });
   }
 
-  const items = raw.map(normalizeFood).filter((x) => x !== null);
+  const items = cacheItems(raw);
   if (items.length === 0) return reply({ foods: [], page: parsed.params.page, totalHits });
 
-  // Upsert by provider + provider_id, so a repeat search refreshes the cached values and keeps the same ids.
-  const admin = createClient(url, service);
+  // Upsert by provider + provider_id in a fixed order, so a repeat search refreshes the values and keeps the same ids.
   const { data: foods, error } = await admin.from('foods').upsert(items.map((i) => i.food), { onConflict: 'provider,provider_id' }).select();
   if (error) {
     console.error('food cache write failed', error.code);
     return fail('cache_error', 'Could not save the search results.', 500);
   }
-  const idByProvider = new Map(foods.map((f) => [f.provider_id, f.id]));
-  const portionRows = items.flatMap((i) => i.portions.map((p) => ({ ...p, food_id: idByProvider.get(i.food.provider_id)! })));
-  const { data: portions, error: portionError } = portionRows.length
-    ? await admin.from('food_portions').upsert(portionRows, { onConflict: 'food_id,label' }).select()
+  const rows = portionRows(items, foods);
+  const { data: portions, error: portionError } = rows.length
+    ? await admin.from('food_portions').upsert(rows, { onConflict: 'food_id,label' }).select()
     : { data: [], error: null };
   if (portionError) {
     console.error('portion cache write failed', portionError.code);
     return fail('cache_error', 'Could not save the search results.', 500);
   }
 
-  // Keep FDC's relevance order.
-  const ordered = items.map((i) => foods.find((f) => f.provider_id === i.food.provider_id)!);
-  return reply({
-    foods: ordered.map((f) => ({ ...f, food_portions: (portions ?? []).filter((p) => p.food_id === f.id) })),
-    page: parsed.params.page,
-    totalHits,
-  });
+  return reply({ foods: orderedResponse(foods, portions ?? [], order), page: parsed.params.page, totalHits });
 });

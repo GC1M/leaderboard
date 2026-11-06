@@ -25,6 +25,7 @@ describe('resolveQuantity', () => {
     for (const amount of [0, -5, Number.NaN, Number.POSITIVE_INFINITY, MAX_GRAMS + 1]) expect(resolveQuantity({ mode: 'grams', amount })).toBeNull();
     expect(resolveQuantity({ mode: 'portion', portion: { id: 'p', label: 'pinch', gramWeight: 0 }, count: 1 })).toBeNull();
     expect(resolveQuantity({ mode: 'portion', portion: food.portions[0], count: 0 })).toBeNull();
+    expect(resolveQuantity({ mode: 'portion', portion: { id: 'p', label: 'g', gramWeight: 0.0001 }, count: 100001 })).toBeNull();
   });
 });
 
@@ -63,7 +64,7 @@ describe('logFood', () => {
   });
 
   test('rejects a bad amount or time before any write', async () => {
-    await expect(logFood({ ...input, quantity: { mode: 'grams', amount: 0 } })).rejects.toThrow('Enter an amount');
+    await expect(logFood({ ...input, quantity: { mode: 'grams', amount: 0 } })).rejects.toThrow('Enter an amount from 0 to 100,000 g');
     await expect(logFood({ ...input, consumedAt: new Date(Number.NaN) })).rejects.toThrow('valid time');
     expect(mockUpsert).not.toHaveBeenCalled();
   });

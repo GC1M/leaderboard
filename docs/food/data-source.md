@@ -56,7 +56,14 @@ Checked on 2026-11-06 against the OpenAPI spec (https://fdc.nal.usda.gov/api-spe
 - Branded serving: `servingSize` with `servingSizeUnit`, which is `GRM` in live data (the spec example says `g`), plus `householdServingFullText` such as `3/4 cup (20g)`. It is used as a portion only when the unit is a mass unit. `brandName` and `brandOwner` carry the brand.
 - Nutrient numbers confirmed: 208 kcal, 268 kJ, 957 and 958 (names "Energy (Atwater General Factors)" and "Energy (Atwater Specific Factors)", ids 2047 and 2048), 203, 204, 205, 291, 269 (SR Legacy, Branded), 269.3 (Foundation), 606, 307.
 - Errors: 429 `OVER_RATE_LIMIT`, and 403 `API_KEY_INVALID` for a bad key.
-- Search covers Foundation, SR Legacy and Branded. Survey (FNDDS) and Experimental foods are not searched yet.
+- Search covers Foundation, SR Legacy and Branded. Survey (FNDDS) and Experimental foods are not searched yet. Results list Foundation and SR Legacy foods before Branded ones.
+- Known gap: Branded nutrients are per 100 of the serving unit. A Branded food measured in ml (`servingSizeUnit` such as `MLT`, or no unit) is per 100 ml, so it is skipped (not cached, not returned) until a density source exists.
+
+## Request limits and fallback
+
+- The key is shared and allows 1,000 requests per hour, and a search makes 2. Each user may make 60 searches per rolling hour; the edge function checks this with `food_search_allow` (table `food_search_log`, service role only, deleted with the account) and answers 429 `rate_limited` beyond it.
+- The app searches only from 3 characters, after a 700 ms pause or when the user submits.
+- When FDC answers 429, times out or errors, the function returns matching foods already in the cache with `fromCache: true` and a `failure` code, and the app says it is showing saved results. With no cached match it returns the error code, and the app still offers a custom food.
 
 ## Estimates, logging and history
 

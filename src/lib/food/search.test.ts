@@ -53,8 +53,13 @@ describe('searchFoods', () => {
     mockInvoke.mockResolvedValue({ data: { foods: [row()], page: 2, totalHits: 40 }, error: null });
     const r = await searchFoods('almonds', 2);
     expect(mockInvoke).toHaveBeenCalledWith('food-search', { body: { query: 'almonds', page: 2, pageSize: 20 } });
-    expect(r).toMatchObject({ page: 2, totalHits: 40 });
+    expect(r).toMatchObject({ page: 2, totalHits: 40, fromCache: false, failure: null });
     expect(r.foods[0].name).toBe('Almonds');
+  });
+
+  test('a cached fallback is flagged with the failure that caused it', async () => {
+    mockInvoke.mockResolvedValue({ data: { foods: [row()], fromCache: true, failure: 'rate_limited' }, error: null });
+    expect(await searchFoods('almonds')).toMatchObject({ fromCache: true, failure: 'rate_limited', page: 1 });
   });
 
   test('an error body code becomes a typed failure with a clear message', async () => {

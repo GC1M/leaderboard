@@ -1,13 +1,13 @@
 import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { Segmented } from '@/components/history/Segmented';
 import { DateField, DropdownField, NumberField } from '@/components/inputs';
 import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { formatNutrient } from '@/lib/food/format';
-import { consumedNutrients, defaultMeal, logFood, MEALS, type Meal, type Quantity } from '@/lib/food/log';
+import { amountMessage, consumedNutrients, defaultMeal, logFood, MEALS, type Meal, type Quantity } from '@/lib/food/log';
 import { ESTIMATE_NOTE, FDC_ATTRIBUTION, type Food, getFood } from '@/lib/food/search';
 import { decimalValue } from '@/lib/numeric-input';
 import { useTheme } from '@/theme';
@@ -28,8 +28,9 @@ export default function FoodDetail() {
   const [count, setCount] = useState('1');
   const [meal, setMeal] = useState<Meal>(() => defaultMeal(new Date()));
   const [when, setWhen] = useState(() => new Date());
-  // One id per screen visit: logging again after a failed save cannot create a second entry.
-  const [clientId] = useState(() => Crypto.randomUUID());
+  // Retrying the same values reuses the id, so a repeat cannot create a second entry. Any change to the amount,
+  // portion, meal or time is a new intended save and gets a new id.
+  const attempt = useRef({ sig: '', id: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logged, setLogged] = useState(false);
@@ -70,10 +71,12 @@ export default function FoodDetail() {
 
   const log = async () => {
     if (!quantity) return;
+    const sig = JSON.stringify([quantity.mode === 'grams' ? [quantity.amount] : [quantity.portion.id, quantity.count], meal, when.getTime()]);
+    if (attempt.current.sig !== sig) attempt.current = { sig, id: Crypto.randomUUID() };
     setBusy(true);
     setError(null);
     try {
-      await logFood({ food, quantity, meal, consumedAt: when, clientId });
+      await logFood({ food, quantity, meal, consumedAt: when, clientId: attempt.current.id });
       setLogged(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't log that food. Try again.");
@@ -122,12 +125,15 @@ export default function FoodDetail() {
       )}
       <Segmented label="Meal" options={MEALS} value={meal} onChange={setMeal} />
       <DateField label="When" value={when} onChange={setWhen} />
-      <Section title="For this amount" footer={nutrients ? undefined : 'Enter an amount more than 0.'}>
+      <Section title="For this amount" footer={nutrients ? undefined : amountMessage(mode === 'portion' && portion ? 'portion' : 'grams')}>
         <Row label="Calories" value={nutrients ? formatNutrient('energy_kcal', nutrients.energy_kcal) : '-'} />
         <Row label="Protein" value={nutrients ? formatNutrient('protein_g', nutrients.protein_g) : '-'} />
         <Row label="Carbs" value={nutrients ? formatNutrient('carbs_g', nutrients.carbs_g) : '-'} />
         <Row label="Fat" value={nutrients ? formatNutrient('fat_g', nutrients.fat_g) : '-'} last />
       </Section>
+      {nutrients && [nutrients.energy_kcal, nutrients.protein_g, nutrients.carbs_g, nutrients.fat_g].some((v) => v === null) && (
+        <Text style={[styles.caption, { color: c.inkSoft }]}>Some values are unknown for this food.</Text>
+      )}
       <ErrorText>{error}</ErrorText>
       <Button label="Log Food" busy={busy} disabled={!nutrients} onPress={log} />
       <Text style={[styles.caption, { color: c.inkSoft }]}>{ESTIMATE_NOTE}</Text>

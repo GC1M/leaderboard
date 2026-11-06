@@ -1,8 +1,11 @@
 import {
+  cacheItems,
   detailUrl,
   failureFor,
   normalizeFood,
   normalizePortions,
+  orderedResponse,
+  portionRows,
   parseSearchParams,
   searchResult,
   searchUrl,
@@ -72,6 +75,19 @@ describe('normalizeFood', () => {
     expect(portions).toEqual([{ label: '3/4 cup (20g)', gram_weight: 20 }]);
   });
 
+  test('a publicationDate already in ISO form is kept as source_version', () => {
+    expect(normalizeFood({ ...sr, publicationDate: '2019-04-01' })!.food.source_version).toBe('2019-04-01');
+    expect(normalizeFood({ ...sr, publicationDate: '2019-04-01T00:00:00Z' })!.food.source_version).toBe('2019-04-01');
+    expect(normalizeFood({ ...sr, publicationDate: 'garbage' })!.food.source_version).toBeNull();
+  });
+
+  test('a Branded food measured in ml (per 100 ml, not per 100 g) or with no unit is skipped', () => {
+    expect(normalizeFood({ ...branded, servingSizeUnit: 'MLT' })).toBeNull();
+    expect(normalizeFood({ ...branded, servingSizeUnit: 'ml' })).toBeNull();
+    expect(normalizeFood({ ...branded, servingSizeUnit: undefined })).toBeNull();
+    expect(normalizeFood({ ...branded, servingSizeUnit: 'g' })).not.toBeNull();
+  });
+
   test('brand falls back to the brand owner', () => {
     expect(normalizeFood({ ...branded, brandName: undefined })!.food.brand).toBe('General Mills');
   });
@@ -122,9 +138,10 @@ describe('normalizePortions', () => {
 
 describe('request building and failures', () => {
   test('parseSearchParams bounds the query, page and page size', () => {
+    expect(parseSearchParams({ query: 'ab' }).ok).toBe(false);
     expect(parseSearchParams({ query: '  cheddar   cheese ' })).toEqual({ ok: true, params: { query: 'cheddar cheese', page: 1, pageSize: 20 } });
     expect(parseSearchParams({ query: 'rice', page: 3, pageSize: 5 })).toEqual({ ok: true, params: { query: 'rice', page: 3, pageSize: 5 } });
-    for (const bad of [null, 'x', {}, { query: 'a' }, { query: 'x'.repeat(101) }, { query: 5 }, { query: 'rice', page: 0 }, { query: 'rice', page: 51 }, { query: 'rice', page: 1.5 }, { query: 'rice', pageSize: 21 }, { query: 'rice', pageSize: '5' }]) {
+    for (const bad of [null, 'x', {}, { query: 'a' }, { query: 'ab' }, { query: 'x'.repeat(101) }, { query: 5 }, { query: 'rice', page: 0 }, { query: 'rice', page: 51 }, { query: 'rice', page: 1.5 }, { query: 'rice', pageSize: 21 }, { query: 'rice', pageSize: '5' }]) {
       expect(parseSearchParams(bad).ok).toBe(false);
     }
   });
@@ -152,5 +169,32 @@ describe('request building and failures', () => {
     expect(failureFor(403)).toMatchObject({ code: 'not_configured', httpStatus: 503 });
     expect(failureFor(500)).toMatchObject({ code: 'provider_error', httpStatus: 502 });
     expect(failureFor(0)).toMatchObject({ code: 'provider_error' });
+  });
+});
+
+describe('cache writes and response order', () => {
+  test('cacheItems drops repeated ids and sorts by provider_id', () => {
+    const items = cacheItems([{ ...branded, fdcId: 30 }, { ...sr, fdcId: 5 }, { ...sr, fdcId: 30, description: 'dup' }, { ...sr, fdcId: undefined }, { ...foundation, fdcId: 12 }]);
+    expect(items.map((i) => [i.food.provider_id, i.food.name])).toEqual([['5', sr.description], ['12', foundation.description], ['30', branded.description]]);
+  });
+
+  test('portionRows maps food ids, drops unknown foods and sorts by food id then label', () => {
+    const items = cacheItems([{ ...sr, fdcId: 5 }, { ...foundation, fdcId: 12 }]);
+    const rows = portionRows(items, [{ id: 'b', provider_id: '5', source_data_type: 'SR Legacy' }, { id: 'a', provider_id: '12', source_data_type: 'Foundation' }]);
+    expect(rows.map((r) => `${r.food_id}:${r.label}`)).toEqual(['a:serving', 'b:1.5 oz', 'b:cup', 'b:slice']);
+    expect(portionRows(items, [])).toEqual([]);
+  });
+
+  test('orderedResponse puts Foundation and SR Legacy before Branded and keeps FDC order inside each group', () => {
+    const stored = [
+      { id: 'b1', provider_id: '1', source_data_type: 'Branded' },
+      { id: 's1', provider_id: '2', source_data_type: 'SR Legacy' },
+      { id: 'f1', provider_id: '3', source_data_type: 'Foundation' },
+      { id: 'b2', provider_id: '4', source_data_type: 'Branded' },
+      { id: 's2', provider_id: '5', source_data_type: 'SR Legacy' },
+    ];
+    const out = orderedResponse(stored, [{ food_id: 's1', label: 'cup', gram_weight: 1 }], ['1', '2', '3', '4', '5']);
+    expect(out.map((f) => f.id)).toEqual(['f1', 's1', 's2', 'b1', 'b2']);
+    expect(out[1].food_portions).toEqual([{ food_id: 's1', label: 'cup', gram_weight: 1 }]);
   });
 });

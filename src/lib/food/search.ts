@@ -79,14 +79,15 @@ async function failureCode(error: { name?: string; context?: unknown }): Promise
   }
 }
 
-export type SearchPage = { foods: Food[]; page: number; totalHits: number };
+// fromCache: the food database failed (`failure` says how) and these are matching foods already saved on our server.
+export type SearchPage = { foods: Food[]; page: number; totalHits: number; fromCache: boolean; failure: SearchFailure | null };
 
 export async function searchFoods(query: string, page = 1): Promise<SearchPage> {
   const { data, error } = await supabase.functions.invoke('food-search', { body: { query, page, pageSize: 20 } });
   if (error) throw new FoodSearchError(await failureCode(error));
-  const d = data as { foods?: FoodRow[]; page?: number; totalHits?: number } | null;
+  const d = data as { foods?: FoodRow[]; page?: number; totalHits?: number; fromCache?: boolean; failure?: SearchFailure } | null;
   if (!d || !Array.isArray(d.foods)) throw new FoodSearchError('unknown');
-  return { foods: d.foods.map(foodFromRow), page: d.page ?? page, totalHits: d.totalHits ?? d.foods.length };
+  return { foods: d.foods.map(foodFromRow), page: d.page ?? page, totalHits: d.totalHits ?? d.foods.length, fromCache: d.fromCache === true, failure: d.failure ?? null };
 }
 
 // What is already in the cache plus your own custom foods. RLS limits this to foods you may see.
