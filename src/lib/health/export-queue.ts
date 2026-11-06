@@ -12,6 +12,7 @@ export type ExportEntry = {
   reason?: 'permission' | 'error';
   attempts: number;
   sampleUuid?: string | null;
+  writtenTypes?: number; // bit mask of the sample types a writer with `intent` has written or may have written
   attemptVersion?: number; // last sync version a writer with attemptVersions used, saved before the write so it only grows
 };
 export interface ExportStore {
@@ -27,6 +28,11 @@ export interface ExportWriter {
   // HealthKit ignores a save whose sync version is not above the one it holds, and a crash can leave a half-finished
   // write there. This writer's save() reads entry.attemptVersion, which is higher on every attempt.
   attemptVersions?: boolean;
+  // Bit mask of the types this save will write. The queue saves it (added to what an earlier save wrote) before the
+  // write, so a crash cannot leave samples this entry does not know about, and sets it exactly once the write succeeds.
+  intent?(entry: ExportEntry): number;
+  // Turning the kind off also drops a delete stuck on a permission the user withdrew (otherwise it waits for a re-grant).
+  dropRevokedDeletes?: boolean;
   save(entry: ExportEntry): Promise<string | null>; // must tag the sample with exportMetadata(); returns the Health sample uuid
   remove(entry: ExportEntry): Promise<void>; // must delete only samples this app saved
 }
@@ -82,6 +88,7 @@ export function createExportQueue(deps: ExportDependencies) {
     if (!writer) return update(entry, { status: 'failed', reason: 'error' }, token);
     if (!(writer.writeTypes ?? [writer.writeType]).some((t) => deps.access(t) === 'granted')) return update(entry, { status: 'failed', reason: 'permission' }, token);
     let attempt = entry.attemptVersion;
+    let written = entry.writtenTypes;
     try {
       await account(token);
       if (entry.op === 'delete') {
@@ -101,20 +108,21 @@ export function createExportQueue(deps: ExportDependencies) {
       const done = known !== null && known.syncVersion >= entry.version;
       let uuid = entry.sampleUuid ?? null;
       if (!done) {
-        if (writer.attemptVersions) {
-          attempt = Math.max(entry.version, (entry.attemptVersion ?? 0) + 1, Date.now());
-          await update(entry, { attemptVersion: attempt }, token);
-        }
-        uuid = await writer.save({ ...entry, attemptVersion: attempt });
+        if (writer.attemptVersions) attempt = Math.max(entry.version, (entry.attemptVersion ?? 0) + 1, Date.now());
+        const intended = writer.intent?.(entry);
+        if (intended !== undefined) written = (entry.writtenTypes ?? 0) | intended;
+        if (writer.attemptVersions || intended !== undefined) await update(entry, { attemptVersion: attempt, writtenTypes: written }, token);
+        uuid = await writer.save({ ...entry, attemptVersion: attempt, writtenTypes: written });
+        if (intended !== undefined) written = intended;
       }
       await account(token);
       // A failure after the save retries with the same sync identifier and version, which replaces rather than duplicates.
       if (!done) await deps.mapping.record(entry.kind, entry.recordId, uuid, entry.version);
-      await update(entry, { status: 'success', reason: undefined, payload: null, sampleUuid: uuid, attemptVersion: attempt }, token);
+      await update(entry, { status: 'success', reason: undefined, payload: null, sampleUuid: uuid, attemptVersion: attempt, writtenTypes: written }, token);
     } catch (e) {
       if (!alive || epoch !== token) throw e;
       // A writer can say a type it wrote earlier is no longer allowed, which only the user can fix.
-      await update(entry, { status: 'failed', reason: (e as { reason?: string }).reason === 'permission' ? 'permission' : 'error', attempts: entry.attempts + 1, attemptVersion: attempt }, token);
+      await update(entry, { status: 'failed', reason: (e as { reason?: string }).reason === 'permission' ? 'permission' : 'error', attempts: entry.attempts + 1, attemptVersion: attempt, writtenTypes: written }, token);
     }
   };
   // ponytail: failed entries retry on every process() call (launch, foreground, enqueue), no backoff timer.
@@ -152,17 +160,17 @@ export function createExportQueue(deps: ExportDependencies) {
       await account(epoch);
       const previous = state.entries.find((e) => e.kind === kind && e.recordId === recordId);
       if (previous && previous.version >= version) return; // duplicate or stale edit
-      const entry: ExportEntry = { kind, recordId, op, payload, version, status: 'pending', attempts: 0, sampleUuid: previous?.sampleUuid, attemptVersion: previous?.attemptVersion };
+      const entry: ExportEntry = { kind, recordId, op, payload, version, status: 'pending', attempts: 0, sampleUuid: previous?.sampleUuid, attemptVersion: previous?.attemptVersion, writtenTypes: previous?.writtenTypes };
       await deps.store.put(entry);
       emit([...state.entries.filter((e) => e !== previous), entry]);
       return process();
     },
     process,
     // The user turned exports off for this kind: drop saves that haven't reached Health. Deletes stay so
-    // earlier exports are still cleaned up.
+    // earlier exports are still cleaned up, except (for writers that say so) one stuck on a permission the user withdrew.
     async discard(kind: string) {
       if (flight) await flight;
-      const drop = state.entries.filter((e) => e.kind === kind && e.op === 'save' && e.status !== 'success');
+      const drop = state.entries.filter((e) => e.kind === kind && e.status !== 'success' && (e.op === 'save' || (e.reason === 'permission' && deps.writers[kind]?.dropRevokedDeletes)));
       for (const e of drop) await deps.store.remove(e.kind, e.recordId);
       emit(state.entries.filter((e) => !drop.includes(e)));
     },

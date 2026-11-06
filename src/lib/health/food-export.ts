@@ -1,6 +1,5 @@
 import type { SampleForSaving } from '@kingstinct/react-native-healthkit';
 
-import { secureStorage } from '@/lib/secure-storage';
 import { supabase } from '@/lib/supabase';
 
 import { localDateKey, startOfLocalDay } from './dates';
@@ -46,13 +45,18 @@ export function foodPayload(f: FoodFields): FoodPayload {
 
 export const EXPORT_DAYS = 90; // how far back synced entries are exported
 
-// The export version of a row. updated_at moves on every edit; the count of allowed nutrient types is the low digit, so
-// allowing more types later is a higher version and re-saves the entry. (Revoking lowers it: nothing is re-saved.)
-export const foodVersion = (updatedAt: string | null | undefined, allowed: number) => {
+// Bit i of a mask is FOOD_NUTRIENTS[i]: one byte says which nutrient types are allowed, or were written.
+const bit = (i: number) => 1 << i;
+export const allowedFoodMask = () => FOOD_NUTRIENTS.reduce((m, n, i) => (getHealthWriteAccess(n[1]) === 'granted' ? m | bit(i) : m), 0);
+
+// The export version of a row: updated_at in ms times 256 plus the allowed-type mask (about 4.5e14 today, under 2^53).
+// updated_at moves on every edit, and a different allowed set is a different version, so allowing a type, or swapping
+// which are allowed, saves the entry again. A smaller mask at the same updated_at is a lower version: nothing is re-saved.
+export const foodVersion = (updatedAt: string | null | undefined, allowedMask: number) => {
   const ms = updatedAt ? Date.parse(updatedAt) : NaN;
-  return Number.isFinite(ms) ? ms * 16 + allowed : null;
+  return Number.isFinite(ms) ? ms * 256 + allowedMask : null;
 };
-export const allowedFoodTypes = () => FOOD_WRITE_TYPES.filter((t) => getHealthWriteAccess(t) === 'granted').length;
+const versionMs = (version: number) => Math.floor(version / 256);
 
 // A delete must beat every earlier version of that entry, whatever this device's clock says.
 export const foodDeleteVersion = (known: readonly ExportEntry[], id: string, now = Date.now()) => {
@@ -71,26 +75,32 @@ export async function fetchRecentFoodRows(now = new Date()): Promise<FoodRow[]> 
 }
 
 // The rows not already queued at their version: the whole idempotency of the backfill.
-export function pendingFoodSaves(rows: readonly FoodRow[], known: readonly ExportEntry[], allowed: number) {
+export function pendingFoodSaves(rows: readonly FoodRow[], known: readonly ExportEntry[], allowedMask: number) {
   return rows.flatMap((r) => {
-    const version = foodVersion(r.updated_at, allowed);
+    const version = foodVersion(r.updated_at, allowedMask);
     if (version === null || known.some((e) => e.kind === FOOD_KIND && e.recordId === r.id && e.op === 'save' && e.version >= version)) return [];
     const nutrients = Object.fromEntries(FOOD_NUTRIENTS.map(([k]) => [k, r[k] === null ? null : Number(r[k])])) as Record<FoodKey, number | null>;
     return [{ id: r.id, version, payload: foodPayload({ name: r.food_name, consumedAt: r.consumed_at, nutrients }) }];
   });
 }
 
-// Which nutrient types each entry was written with (this device only). A type allowed then and revoked now means the
-// old sample cannot be replaced or removed from here, so the write fails as a permission problem instead of duplicating it.
-const WRITTEN_KEY = 'food-export-written';
-const readWritten = async (): Promise<Record<string, string[]>> => {
-  try { return JSON.parse((await secureStorage.getItem(WRITTEN_KEY)) ?? '{}'); } catch { return {}; }
-};
-const setWritten = async (id: string, types: string[] | null) => {
-  const all = await readWritten();
-  if (types) all[id] = types; else delete all[id];
-  try { await secureStorage.setItem(WRITTEN_KEY, JSON.stringify(all)); } catch { /* the check is skipped next time */ }
-};
+// Exported entries whose server row is gone: deleted on another device, or the app stopped before its delete was queued.
+// Only entries last exported inside the window are checked, so the check stays small. A row that is merely outside the
+// fetched window still exists, so the server is asked about the rest by id (ids only) before anything is deleted.
+export async function deletedFoodIds(rows: readonly { id: string }[], known: readonly ExportEntry[], now = Date.now()): Promise<string[]> {
+  const have = new Set(rows.map((r) => r.id));
+  const since = now - EXPORT_DAYS * 86400000;
+  const ids = known.filter((e) => e.kind === FOOD_KIND && e.op === 'save' && versionMs(e.version) >= since && !have.has(e.recordId)).map((e) => e.recordId);
+  const gone: string[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const { data, error } = await supabase.from('food_entries').select('id').in('id', chunk);
+    if (error) throw new Error("Couldn't check your food against Apple Health.");
+    const found = new Set(data.map((r) => r.id));
+    gone.push(...chunk.filter((id) => !found.has(id)));
+  }
+  return gone;
+}
 
 const need = () => {
   const hk = loadHealthKit();
@@ -98,11 +108,13 @@ const need = () => {
   return hk;
 };
 const granted = (type: HealthWriteType) => getHealthWriteAccess(type) === 'granted';
+const maskOf = (types: readonly string[]) => FOOD_NUTRIENTS.reduce((m, n, i) => (types.includes(n[1]) ? m | bit(i) : m), 0);
 
 // Deletes this entry's correlation and members. HealthKit only lets an app delete its own samples.
 // ponytail: the correlation type itself cannot be authorized, so its delete is best effort; the members are what Health shows.
 async function removeFood(e: ExportEntry) {
-  if (((await readWritten())[e.recordId] ?? []).some((t) => !granted(t as HealthWriteType))) {
+  // writtenTypes covers every type this entry was, or may have been, saved with.
+  if ((e.writtenTypes ?? 0) & ~allowedFoodMask()) {
     throw Object.assign(new Error('Allow saving every nutrient this food was saved with, or remove it in the Health app.'), { reason: 'permission' });
   }
   await removeExportedSample(CORRELATION, e.kind, e.recordId).catch(() => {});
@@ -113,6 +125,8 @@ export const foodWriter: ExportWriter = {
   writeType: FOOD_NUTRIENTS[0][1],
   writeTypes: FOOD_WRITE_TYPES,
   attemptVersions: true,
+  dropRevokedDeletes: true,
+  intent: (e) => maskOf(FOOD_NUTRIENTS.filter(([k, t]) => (e.payload as FoodPayload).nutrients[k] !== undefined && granted(t)).map((n) => n[1])),
   async save(e: ExportEntry) {
     const p = e.payload as FoodPayload;
     const at = new Date(p.at);
@@ -123,17 +137,12 @@ export const foodWriter: ExportWriter = {
     });
     // A retry or an edit first removes what an earlier save wrote, so correlation members are never doubled.
     await removeFood(e);
-    await setWritten(e.recordId, []);
     if (members.length === 0) return null;
     // The sync version is the queue's attempt version, above every earlier attempt: HealthKit ignores a save that is not.
     const sample = await need().saveCorrelationSample(CORRELATION, members, at, at, { ...exportMetadata(e.kind, e.recordId, e.attemptVersion ?? e.version), [FOOD_NAME_KEY]: p.name });
-    await setWritten(e.recordId, members.map((m) => ('quantityType' in m ? m.quantityType : '')));
     return sample?.uuid ?? null;
   },
-  async remove(e: ExportEntry) {
-    await removeFood(e);
-    await setWritten(e.recordId, null);
-  },
+  remove: removeFood,
 };
 
 // Registered at import so a queued entry retries after restart without opening the screen that made it.
