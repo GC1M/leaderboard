@@ -233,6 +233,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"food_search_log": {
+                  Row: {
+                    "searched_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "searched_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "searched_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "food_search_log_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"foods": {
                   Row: {
                     "brand": string | null,"carbs_g": number | null,"energy_kcal": number | null,"fat_g": number | null,"fiber_g": number | null,"id": string,"name": string,"protein_g": number | null,"provider": string,"provider_id": string | null,"sat_fat_g": number | null,"sodium_mg": number | null,"source_data_type": string | null,"source_version": string | null,"sugars_g": number | null,"updated_at": string,"user_id": string | null
@@ -592,6 +612,9 @@ isOneToOne: false
                            },
 "finalize_competition":
 { Args: { "p_id": string }; Returns: undefined
+                           },
+"food_search_allow":
+{ Args: { "p_global_limit": number,"p_limit": number,"p_user": string }; Returns: boolean
                            },
 "gen_invite_code":
 { Args: Record<PropertyKey, never>; Returns: string

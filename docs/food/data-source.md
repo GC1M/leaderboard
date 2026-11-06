@@ -16,7 +16,7 @@ Nutrition values are estimates with visible provenance. They are not medical adv
 | Portion gram weights | Yes: `foodPortions` with `gramWeight` on Foundation/SR Legacy/FNDDS; Branded has `servingSize` plus `householdServingFullText` | Mostly a free-text `serving_size` string, weights not reliably structured | Measures with gram weights |
 | Key handling | Key must stay private (leaked keys are deactivated), so calls go through our server | No key | Key and app id, server side |
 
-Nutritionix was also considered, but its pricing page could not be fetched (HTTP 402), so its numbers are not recorded here. The `foodPortions`/`gramWeight` field names come from FDC's published API schema, not from the pages fetched above, so #45 should confirm them against the OpenAPI spec.
+Nutritionix was also considered, but its pricing page could not be fetched (HTTP 402), so its numbers are not recorded here. The `foodPortions`/`gramWeight` field names were confirmed in #45 against the FDC OpenAPI spec and live responses (see "FDC fields confirmed in #45" below).
 
 ## Why FDC
 
@@ -27,7 +27,7 @@ Nutritionix was also considered, but its pricing page could not be fetched (HTTP
 
 ## Strategy
 
-- The FDC key lives only in server code (an edge function or service role path, built in #45). It is never shipped in the app or committed.
+- The FDC key lives only in the `food-search` edge function (`supabase/functions/food-search/`, built in #45) as the secret `FDC_API_KEY`. It is never shipped in the app or committed. Setup is in the README.
 - Foods fetched from FDC are cached in `public.foods` (`provider = 'usda_fdc'`) by the server only. Clients read the cache and cannot write it.
 - Each cached row stores `source_data_type` (Foundation, SR Legacy, Branded, ...) and `source_version` (the FDC release or publication date) so history can say where a value came from.
 - If FDC fails, the app searches the cache and the user's custom foods, and always lets the user enter a custom food.
@@ -36,14 +36,34 @@ Nutritionix was also considered, but its pricing page could not be fetched (HTTP
 
 ## Mapping FDC nutrients to our columns
 
-The server maps FDC nutrient numbers (confirm against the FDC nutrient list in #45) to per-100 g columns. Energy precedence for `energy_kcal`:
+The server maps FDC nutrient numbers to per-100 g columns (`supabase/functions/_shared/fdc.ts`). Energy precedence for `energy_kcal`:
 
 1. Energy in kcal (nutrient number 208, id 1008).
-2. Atwater Specific Factors energy (957/2047 and 958/2048 are the Atwater General and Specific kcal values; use the specific one, then the general one) when it is the only kcal value, as with some Foundation foods.
-3. Energy in kJ (268, id 1062) divided by 4.184 (`kjToKcal` in `src/lib/food/nutrition.ts`).
-4. Otherwise NULL. Never 0 and never computed from macros.
+2. Atwater Specific Factors energy (number 958, id 2048), when there is no 208. Foundation foods usually carry only 957 and 958.
+3. Atwater General Factors energy (number 957, id 2047), when there is neither 208 nor 958.
+4. Energy in kJ (268, id 1062) divided by 4.184 (`kjToKcal` in `src/lib/food/nutrition.ts`).
+5. Otherwise NULL. Never 0 and never computed from macros.
 
-Every other nutrient follows the same rule: a missing value is NULL, a reported 0 is 0.
+Other columns: protein 203, fat 204, carbs 205, fiber 291, sugars 269 (then 269.3, which Foundation uses), saturated fat 606 (g) and sodium 307 (mg). Every nutrient follows the same rule: a missing, wrong-unit, negative or out-of-range value is NULL, a reported 0 is 0.
+
+## FDC fields confirmed in #45
+
+Checked on 2026-11-06 against the OpenAPI spec (https://fdc.nal.usda.gov/api-spec/fdc_api.yaml, last modified 2020-04-30) and live calls to `api.nal.usda.gov/fdc/v1` for Foundation, SR Legacy and Branded foods. The spec lags the live API in places, and where they differ the live response is what the code follows.
+
+- Search (`GET /foods/search`): `query`, `dataType` (comma separated), `pageSize` (max 200), `pageNumber` (starting at 1). Each food has `fdcId`, `description`, `dataType`, `publishedDate` (ISO) and `foodNutrients[]` with `nutrientId`, `nutrientNumber`, `unitName` (uppercase, such as `KCAL`, `G`) and `value`. The spec's abridged nutrient names (`number`, `amount`) do not match this. Branded search results can list the same nutrient more than once, including per-serving values, so the server does not read nutrients from search results.
+- Details (`GET /foods?fdcIds=a,b&format=full&nutrients=...`, up to 20 ids and 25 nutrient numbers): one call returns every food, so a search costs two FDC requests. `foodNutrients[].nutrient.number` is a string, `nutrient.unitName` is lowercase (`kcal`, `kJ`, `g`, `mg`) and `amount` is per 100 g. A nutrient with no `amount` is unknown. `publicationDate` is `M/D/YYYY`.
+- `foodPortions[]` (Foundation, SR Legacy): `gramWeight` (grams for `amount` units), `amount`, `modifier` (such as `slice`, `cup`), optional `portionDescription`, and `measureUnit.name` (`undetermined` when there is no real unit; Foundation sometimes has only `RACC`, the reference serving, shown as "serving"). Branded foods return an empty `foodPortions`.
+- Branded serving: `servingSize` with `servingSizeUnit`, which is `GRM` in live data (the spec example says `g`), plus `householdServingFullText` such as `3/4 cup (20g)`. It is used as a portion only when the unit is a mass unit. `brandName` and `brandOwner` carry the brand.
+- Nutrient numbers confirmed: 208 kcal, 268 kJ, 957 and 958 (names "Energy (Atwater General Factors)" and "Energy (Atwater Specific Factors)", ids 2047 and 2048), 203, 204, 205, 291, 269 (SR Legacy, Branded), 269.3 (Foundation), 606, 307.
+- Errors: 429 `OVER_RATE_LIMIT`, and 403 `API_KEY_INVALID` for a bad key.
+- Search covers Foundation, SR Legacy and Branded. Survey (FNDDS) and Experimental foods are not searched yet. Results list Foundation and SR Legacy foods before Branded ones.
+- Known gap: Branded nutrients are per 100 of the serving unit. A Branded food measured in ml (`servingSizeUnit` such as `MLT`, or no unit) is per 100 ml, so it is skipped (not cached, not returned) until a density source exists.
+
+## Request limits and fallback
+
+- The key is shared and allows 1,000 requests per hour, and a search makes 2. Each user may make 30 searches per rolling hour and all users together 400 (about 800 FDC calls, under the 1,000 limit); the edge function checks this with `food_search_allow` (table `food_search_log`, service role only, deleted with the account) and answers 429 `rate_limited` beyond it.
+- The app searches only from 3 characters, after a 700 ms pause or when the user submits.
+- When FDC answers 429, times out or errors, the function returns matching foods already in the cache with `fromCache: true` and a `failure` code, and the app says it is showing saved results. With no cached match it returns the error code, and the app still offers a custom food.
 
 ## Estimates, logging and history
 

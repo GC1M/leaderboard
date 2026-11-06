@@ -3,9 +3,12 @@
   "compilerOptions": {
     "strict": true,
     "types": ["jest"],
+    "allowImportingTsExtensions": true,
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  // The edge function entry runs on Deno (npm: imports, Deno globals); only its shared pure code is checked here.
+  "exclude": ["node_modules", "ios", "android", "supabase/functions/*/index.ts"]
 }

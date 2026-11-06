@@ -48,6 +48,16 @@ For a hosted project, link it (`npx supabase@2.122.0 link --project-ref <ref>`) 
 
 Sign-in: email OTP and Google (when configured) are the supported methods for this milestone. Phone OTP also exists in the code (`src/app/sign-in.tsx`, `src/lib/phone.ts`); locally it uses the test numbers in `supabase/config.toml`, and real SMS needs a provider configured. Sign in with Apple is out of scope for this milestone, although the code and `app.config.ts` still contain it (`usesAppleSignIn`, `expo-apple-authentication`). Apple Health permission is separate from sign-in and is always required for the iOS health features.
 
+### Food search key (issue #45)
+
+Food search calls USDA FoodData Central from the `food-search` edge function (`supabase/functions/food-search/`). The FDC key lives only on the server as the function secret `FDC_API_KEY`. It is never in the app bundle, `.env`, or git.
+
+1. Get a free key at https://fdc.nal.usda.gov/api-key-signup (1,000 requests per hour per key).
+2. Local: copy `supabase/functions/.env.example` to `supabase/functions/.env` (gitignored), set `FDC_API_KEY=`, then run `npx supabase@2.122.0 functions serve`. This needs Docker and the local stack (`supabase start`) to be running.
+3. Hosted: `npx supabase@2.122.0 secrets set FDC_API_KEY=<key>` and `npx supabase@2.122.0 functions deploy food-search`.
+
+Without the key the function answers `not_configured`; the app then shows saved foods and still lets you add a custom food. Each search makes two FDC calls (search, then details for the portions), so each user is limited to 30 searches per rolling hour and all users together to 400 (`food_search_allow`, table `food_search_log`); over that the function answers `rate_limited`. If FDC fails, the function returns matching foods already cached, flagged `fromCache`.
+
 ## Apple Health needs a native build
 
 Expo Go is not enough. It cannot load the HealthKit module or SQLCipher, so Health shows as unavailable there (`src/lib/health/healthkit.ts`). A Health build needs:
