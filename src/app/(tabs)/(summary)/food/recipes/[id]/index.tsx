@@ -10,7 +10,7 @@ import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/com
 import { alert } from '@/lib/alert';
 import { formatNutrient, NUTRIENT_NAMES } from '@/lib/food/format';
 import { defaultMeal, MEALS, type Meal } from '@/lib/food/log';
-import { per100g, perServing, type Recipe, recipeAmountMessage, recipeCaveats, type RecipeQuantity, recipeSnapshot, recipeTotals } from '@/lib/food/recipe';
+import { per100g, perServing, type Recipe, recipeAmountError, recipeAmountMessage, recipeCaveats, type RecipeQuantity, recipeSnapshot, recipeTotals } from '@/lib/food/recipe';
 import { deleteRecipe, getRecipe, logRecipe } from '@/lib/food/recipes';
 import { ESTIMATE_NOTE } from '@/lib/food/search';
 import { SUMMARY_KEYS } from '@/lib/food/diary';
@@ -147,7 +147,7 @@ export default function RecipeDetail() {
         <Text style={[styles.body, { color: c.ink, flex: 1 }]}>Mark as an estimate</Text>
         <Switch accessibilityLabel="Mark as an estimate" value={estimate} onValueChange={setEstimate} />
       </View>
-      <Section title="For this amount" footer={snap ? undefined : recipeAmountMessage(effective)}>
+      <Section title="For this amount" footer={snap ? undefined : quantity ? recipeAmountError(recipe, quantity) : recipeAmountMessage(effective)}>
         {SUMMARY_KEYS.map((k, i) => (
           <Row key={k} label={NUTRIENT_NAMES[k]} value={snap ? (snap.nutrients[k] === null ? 'Unknown' : formatNutrient(k, snap.nutrients[k])) : '-'} last={i === SUMMARY_KEYS.length - 1} />
         ))}
