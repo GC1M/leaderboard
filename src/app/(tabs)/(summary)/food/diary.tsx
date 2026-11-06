@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
 
 import { EntryRow } from '@/components/food/EntryRow';
+import { FoodExportOption, useFoodExport } from '@/components/food/FoodExportOption';
 import { DateField } from '@/components/inputs';
 import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -48,6 +49,7 @@ export default function Diary() {
     setRetrying(false);
   };
 
+  const foodExport = useFoodExport(entries);
   const day = entries ? groupDay(entries) : null;
   const waiting = entries?.filter((e) => e.pending) ?? [];
   const shift = (days: number) => setDate(localDateKey(startOfLocalDay(dateFromKey(date), -days)));
@@ -96,6 +98,7 @@ export default function Diary() {
           ))}
         </>
       )}
+      <FoodExportOption choice={foodExport} />
       <Button label="Log Food" onPress={() => router.push('/food')} />
       <Button plain label="History" onPress={() => router.push('/food/history')} />
       <Text style={[styles.caption, { color: c.inkSoft }]}>{ESTIMATE_NOTE}</Text>

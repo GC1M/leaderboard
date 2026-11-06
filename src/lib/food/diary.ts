@@ -33,6 +33,7 @@ export type Entry = {
   // Not on the server yet: a new entry or an edit waiting to sync, with why the last try failed.
   pending: 'log' | 'edit' | null;
   syncError: string | null;
+  updatedAt: string | null; // server row version, used as the Apple Health export version
 };
 
 type Row = Partial<Tables<'food_entries'>>;
@@ -63,6 +64,7 @@ export function entryFromRow(r: Row, pending: Entry['pending'] = null, syncError
     nutrients,
     pending,
     syncError,
+    updatedAt: r.updated_at ?? null,
   };
 }
 

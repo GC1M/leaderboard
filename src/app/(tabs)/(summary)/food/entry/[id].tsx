@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Switch, Text, View } from 'react-native';
 
+import { useFoodExport } from '@/components/food/FoodExportOption';
 import { Segmented } from '@/components/history/Segmented';
 import { DateField, DropdownField, NumberField } from '@/components/inputs';
 import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
@@ -34,6 +35,7 @@ export default function EntryDetail() {
   const router = useRouter();
   const { session } = useAuth();
   const uid = session?.user.id ?? '';
+  const foodExport = useFoodExport();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [entry, setEntry] = useState<Entry | null | undefined>();
   const [food, setFood] = useState<Food | null>(null);
@@ -127,6 +129,7 @@ export default function EntryDetail() {
           setBusy(true);
           try {
             await removeEntry(uid, entry);
+            if (entry.id) await foodExport.deleted(entry.id);
             router.back();
           } catch (e) {
             setError(e instanceof Error ? e.message : "Couldn't delete that entry. Try again.");

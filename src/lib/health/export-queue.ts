@@ -21,6 +21,8 @@ export interface ExportStore {
 }
 export interface ExportWriter {
   writeType: HealthWriteType;
+  // For a writer that saves several types (food nutrients), each allowed on its own: the entry exports while any one is granted.
+  writeTypes?: readonly HealthWriteType[];
   save(entry: ExportEntry): Promise<string | null>; // must tag the sample with exportMetadata(); returns the Health sample uuid
   remove(entry: ExportEntry): Promise<void>; // must delete only samples this app saved
 }
@@ -74,7 +76,7 @@ export function createExportQueue(deps: ExportDependencies) {
   const run = async (entry: ExportEntry, token: number) => {
     const writer = deps.writers[entry.kind];
     if (!writer) return update(entry, { status: 'failed', reason: 'error' }, token);
-    if (deps.access(writer.writeType) !== 'granted') return update(entry, { status: 'failed', reason: 'permission' }, token);
+    if (!(writer.writeTypes ?? [writer.writeType]).some((t) => deps.access(t) === 'granted')) return update(entry, { status: 'failed', reason: 'permission' }, token);
     try {
       await account(token);
       if (entry.op === 'delete') {
