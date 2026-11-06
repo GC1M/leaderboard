@@ -86,7 +86,7 @@ test('logging a portion sends the resolved quantity and shows a confirmation', a
   expect(mockReplace).toHaveBeenCalledWith('/food');
 });
 
-test('a failed save keeps the form and retries with the same client id', async () => {
+test('a failed save keeps the form and can be retried', async () => {
   mockLog.mockRejectedValueOnce(new Error("Couldn't log that food. Try again."));
   const c = await render();
   await click(c, 'Log Food');
@@ -96,25 +96,23 @@ test('a failed save keeps the form and retries with the same client id', async (
   expect(JSON.stringify(c)).toContain('was added to');
 });
 
-test('an edited retry is a new save with a new id, an unchanged retry keeps the id', async () => {
+test('a retry, even with changed values, keeps one client id so it updates the same entry', async () => {
   mockLog.mockRejectedValue(new Error('fail'));
   const c = await render();
-  await click(c, 'Breakfast');
-  await click(c, 'Log Food');
   await click(c, 'Log Food');
   await type(c, 'Amount (g)', '120');
   await click(c, 'Log Food');
   await click(c, 'Lunch');
   await click(c, 'Log Food');
-  await click(c, 'Log Food');
-  expect(mockLog.mock.calls.map((a) => a[0].clientId)).toEqual(['client-1', 'client-1', 'client-2', 'client-3', 'client-3']);
+  expect(mockLog.mock.calls.map((a) => a[0].clientId)).toEqual(['client-1', 'client-1', 'client-1']);
+  expect(mockUuid).toBe(1);
 });
 
 test('says so when a shown nutrient is unknown, and uses the bounds message for a bad amount', async () => {
   const c = await render();
   expect(JSON.stringify(c)).toContain('Some values are unknown for this food.');
   await type(c, 'Amount (g)', '0');
-  expect(JSON.stringify(c)).toContain('Enter an amount from 0 to 100,000 g');
+  expect(JSON.stringify(c)).toContain('Enter an amount above 0 and up to 100,000 g.');
 });
 
 test('portions are only offered when the food has one with a gram weight', async () => {

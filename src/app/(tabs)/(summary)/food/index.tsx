@@ -23,11 +23,11 @@ export default function FoodSearch() {
   const q = query.trim().replace(/\s+/g, ' ');
 
   useEffect(() => {
-    if (q.length < 3) return;
-    let live = true;
     // Typing waits for a pause; pressing search on the keyboard goes straight away.
     const delay = now.current ? 0 : 700;
     now.current = false;
+    if (q.length < 3) return;
+    let live = true;
     const timer = setTimeout(async () => {
       const [remote, mine] = await Promise.allSettled([searchFoods(q), searchCachedFoods(q, true)]);
       if (!live) return;
@@ -52,6 +52,12 @@ export default function FoodSearch() {
     };
   }, [q, tries]);
 
+  // Submitting searches now, unless this query's results are already shown.
+  const submit = () => {
+    if (q.length < 3 || (result?.q === q && !result.error)) return;
+    now.current = true;
+    setTries((t) => t + 1);
+  };
   const open = (f: Food) => router.push({ pathname: '/food/[id]', params: { id: f.id } });
   const shown = q.length >= 3 && result?.q === q ? result : null;
   const loading = q.length >= 3 && !shown;
@@ -67,7 +73,7 @@ export default function FoodSearch() {
 
   return (
     <Screen title="Food" back>
-      <Field label="Search foods" value={query} onChangeText={setQuery} autoFocus autoCorrect={false} returnKeyType="search" onSubmitEditing={() => { now.current = true; setTries((t) => t + 1); }} helper="Search starts after 3 letters. Try a food name, such as banana or cheddar." />
+      <Field label="Search foods" value={query} onChangeText={setQuery} autoFocus autoCorrect={false} returnKeyType="search" onSubmitEditing={submit} helper="Search starts after 3 letters. Try a food name, such as banana or cheddar." />
       {loading && <Skeleton label="Searching foods" rows={4} />}
       {shown?.error && (
         <View style={{ gap: 4 }}>

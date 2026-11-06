@@ -61,7 +61,7 @@ Checked on 2026-11-06 against the OpenAPI spec (https://fdc.nal.usda.gov/api-spe
 
 ## Request limits and fallback
 
-- The key is shared and allows 1,000 requests per hour, and a search makes 2. Each user may make 60 searches per rolling hour; the edge function checks this with `food_search_allow` (table `food_search_log`, service role only, deleted with the account) and answers 429 `rate_limited` beyond it.
+- The key is shared and allows 1,000 requests per hour, and a search makes 2. Each user may make 30 searches per rolling hour and all users together 400 (about 800 FDC calls, under the 1,000 limit); the edge function checks this with `food_search_allow` (table `food_search_log`, service role only, deleted with the account) and answers 429 `rate_limited` beyond it.
 - The app searches only from 3 characters, after a 700 ms pause or when the user submits.
 - When FDC answers 429, times out or errors, the function returns matching foods already in the cache with `fromCache: true` and a `failure` code, and the app says it is showing saved results. With no cached match it returns the error code, and the app still offers a custom food.
 

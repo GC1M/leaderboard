@@ -56,7 +56,7 @@ Food search calls USDA FoodData Central from the `food-search` edge function (`s
 2. Local: copy `supabase/functions/.env.example` to `supabase/functions/.env` (gitignored), set `FDC_API_KEY=`, then run `npx supabase@2.122.0 functions serve`. This needs Docker and the local stack (`supabase start`) to be running.
 3. Hosted: `npx supabase@2.122.0 secrets set FDC_API_KEY=<key>` and `npx supabase@2.122.0 functions deploy food-search`.
 
-Without the key the function answers `not_configured`; the app then shows saved foods and still lets you add a custom food. Each search makes two FDC calls (search, then details for the portions), so each user is limited to 60 searches per rolling hour (`food_search_allow`, table `food_search_log`); over that the function answers `rate_limited`. If FDC fails, the function returns matching foods already cached, flagged `fromCache`.
+Without the key the function answers `not_configured`; the app then shows saved foods and still lets you add a custom food. Each search makes two FDC calls (search, then details for the portions), so each user is limited to 30 searches per rolling hour and all users together to 400 (`food_search_allow`, table `food_search_log`); over that the function answers `rate_limited`. If FDC fails, the function returns matching foods already cached, flagged `fromCache`.
 
 ## Apple Health needs a native build
 

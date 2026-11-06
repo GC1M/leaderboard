@@ -614,7 +614,7 @@ isOneToOne: false
 { Args: { "p_id": string }; Returns: undefined
                            },
 "food_search_allow":
-{ Args: { "p_limit": number,"p_user": string }; Returns: boolean
+{ Args: { "p_global_limit": number,"p_limit": number,"p_user": string }; Returns: boolean
                            },
 "gen_invite_code":
 { Args: Record<PropertyKey, never>; Returns: string

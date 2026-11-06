@@ -1,7 +1,8 @@
 // Food search (#45): signed-in users only. Calls USDA FoodData Central with FDC_API_KEY (a function secret,
 // never sent to the app), caches normalized foods and portions in public.foods / food_portions with the
 // service role, and returns the cached rows. Parsing lives in ../_shared/fdc.ts so Jest can test it.
-// Each user gets SEARCHES_PER_HOUR searches per rolling hour (food_search_allow), because the FDC key is shared.
+// Each user gets SEARCHES_PER_USER_HOUR searches per rolling hour and all users together GLOBAL_SEARCHES_PER_HOUR
+// (food_search_allow), because the FDC key is shared (1,000 requests per hour, 2 per search).
 // If FDC fails, matching rows already in the cache are returned with `fromCache: true` and the failure code.
 // eslint-disable-next-line import/no-unresolved -- Deno npm: specifier
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -9,7 +10,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { cacheItems, detailUrl, failureFor, orderedResponse, parseSearchParams, portionRows, searchResult, searchUrl, type FailureCode, type RawFood } from '../_shared/fdc.ts';
 
 const TIMEOUT_MS = 8000;
-const SEARCHES_PER_HOUR = 60;
+const SEARCHES_PER_USER_HOUR = 30;
+const GLOBAL_SEARCHES_PER_HOUR = 400;
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -56,12 +58,12 @@ Deno.serve(async (req) => {
   if (!parsed.ok) return fail('bad_request', parsed.message, 400);
 
   const admin = createClient(url, service);
-  const { data: allowed, error: limitError } = await admin.rpc('food_search_allow', { p_user: user.user.id, p_limit: SEARCHES_PER_HOUR });
+  const { data: allowed, error: limitError } = await admin.rpc('food_search_allow', { p_user: user.user.id, p_limit: SEARCHES_PER_USER_HOUR, p_global_limit: GLOBAL_SEARCHES_PER_HOUR });
   if (limitError) {
     console.error('search limit check failed', limitError.code);
     return fail('cache_error', 'Could not check the search limit.', 500);
   }
-  if (!allowed) return fail('rate_limited', 'You have searched a lot. Try again in a few minutes.', 429);
+  if (!allowed) return fail('rate_limited', 'Food search is busy. Try again in a few minutes.', 429);
 
   let raw: RawFood[] = [];
   let order: string[] = [];
@@ -77,9 +79,10 @@ Deno.serve(async (req) => {
   } catch (e) {
     const f = failureFor(e instanceof FdcError ? e.status : 0);
     console.error('fdc failure', f.code, e instanceof FdcError ? e.status : '');
-    // Fall back to foods already cached whose name matches.
+    // Fall back to foods already cached whose name matches. The cache has one page only.
+    if (parsed.params.page > 1) return reply({ foods: [], page: parsed.params.page, totalHits: 0, fromCache: true, failure: f.code });
     const pattern = `%${parsed.params.query.replace(/[\\%_]/g, '\\$&')}%`;
-    const { data: cached } = await admin.from('foods').select('*, food_portions(*)').eq('provider', 'usda_fdc').ilike('name', pattern).limit(20);
+    const { data: cached } = await admin.from('foods').select('*, food_portions(*)').eq('provider', 'usda_fdc').ilike('name', pattern).order('name').limit(20);
     if (!cached || cached.length === 0) return fail(f.code, f.message, f.httpStatus);
     const portions = cached.flatMap((c) => c.food_portions ?? []);
     return reply({

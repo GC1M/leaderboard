@@ -17,7 +17,7 @@ export type Meal = (typeof MEALS)[number]['value'];
 export const MAX_GRAMS = 100000;
 export const MAX_PORTION_COUNT = 100000;
 export const amountMessage = (mode: Quantity['mode']) =>
-  mode === 'grams' ? 'Enter an amount from 0 to 100,000 g' : 'Enter a number of portions from 0 to 100,000, up to 100,000 g in total';
+  mode === 'grams' ? 'Enter an amount above 0 and up to 100,000 g.' : 'Enter a number of portions above 0. The total can be up to 100,000 g.';
 
 export function defaultMeal(at: Date): Meal {
   const h = at.getHours();
@@ -43,7 +43,9 @@ export function consumedNutrients(food: Food, q: Quantity): Nutrients | null {
 
 export type LogInput = { food: Food; quantity: Quantity; meal: Meal; consumedAt: Date; clientId: string };
 
-// Saving the same clientId twice never makes a second entry, so a retry after a failed save is safe.
+// One clientId per screen visit. Saving it again updates the same entry (last write wins), so a retry, or a retry
+// with changed values, never makes a second entry. The payload carries the unchanged identity columns, which the
+// food_entries trigger accepts because they equal the stored ones; amount, meal, time and nutrients are the edits.
 export async function logFood({ food, quantity, meal, consumedAt, clientId }: LogInput): Promise<void> {
   const r = resolveQuantity(quantity);
   if (!r) throw new Error(amountMessage(quantity.mode));
@@ -71,7 +73,7 @@ export async function logFood({ food, quantity, meal, consumedAt, clientId }: Lo
       source_version: food.sourceVersion,
       ...n,
     },
-    { onConflict: 'user_id,client_id', ignoreDuplicates: true },
+    { onConflict: 'user_id,client_id' },
   );
   if (error) throw new Error("Couldn't log that food. Try again.");
 }
