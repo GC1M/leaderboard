@@ -28,12 +28,12 @@ export interface ExportWriter {
   // HealthKit ignores a save whose sync version is not above the one it holds, and a crash can leave a half-finished
   // write there. This writer's save() reads entry.attemptVersion, which is higher on every attempt.
   attemptVersions?: boolean;
-  // Bit mask of the types this save will write. The queue saves it (added to what an earlier save wrote) before the
+  // Bit mask of the types this save will write; it may throw (with reason 'permission') before anything is recorded. The queue saves it (added to what an earlier save wrote) before the
   // write, so a crash cannot leave samples this entry does not know about, and sets it exactly once the write succeeds.
   intent?(entry: ExportEntry): number;
   // Turning the kind off also drops a delete stuck on a permission the user withdrew (otherwise it waits for a re-grant).
   dropRevokedDeletes?: boolean;
-  save(entry: ExportEntry): Promise<string | null>; // must tag the sample with exportMetadata(); returns the Health sample uuid
+  save(entry: ExportEntry, intended?: number): Promise<string | null>; // intended: the mask intent() returned, so the write uses that one snapshot; // must tag the sample with exportMetadata(); returns the Health sample uuid
   remove(entry: ExportEntry): Promise<void>; // must delete only samples this app saved
 }
 // Server-side record of what this account exported, shared by all its devices.
@@ -112,7 +112,7 @@ export function createExportQueue(deps: ExportDependencies) {
         const intended = writer.intent?.(entry);
         if (intended !== undefined) written = (entry.writtenTypes ?? 0) | intended;
         if (writer.attemptVersions || intended !== undefined) await update(entry, { attemptVersion: attempt, writtenTypes: written }, token);
-        uuid = await writer.save({ ...entry, attemptVersion: attempt, writtenTypes: written });
+        uuid = await writer.save({ ...entry, attemptVersion: attempt, writtenTypes: written }, intended);
         if (intended !== undefined) written = intended;
       }
       await account(token);

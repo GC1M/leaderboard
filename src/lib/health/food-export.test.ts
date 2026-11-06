@@ -111,7 +111,7 @@ describe('what the diary effect queues', () => {
     const rows = [server(), server({ id: 'e2' })];
     const first = pendingFoodSaves(rows, [], FULL);
     expect(first.map((s) => s.id)).toEqual(['e1', 'e2']);
-    const queued = first.map((s): ExportEntry => ({ kind: FOOD_KIND, recordId: s.id, op: 'save', payload: null, version: s.version, status: 'success', attempts: 0 }));
+    const queued = first.map((s) => entryOf(s.id, s.version, { writtenTypes: FULL }));
     expect(pendingFoodSaves(rows, queued, FULL)).toEqual([]);
   });
 
@@ -124,7 +124,7 @@ describe('what the diary effect queues', () => {
 
   it('queues a row again, at a higher version, when more nutrient types are allowed', () => {
     const [before] = pendingFoodSaves([server()], [], 0b00000011);
-    const queued = [entryOf('e1', before.version)];
+    const queued = [entryOf('e1', before.version, { writtenTypes: 0b00000011 })];
     const [after] = pendingFoodSaves([server()], queued, FULL);
     expect(after.version).toBeGreaterThan(before.version);
     expect(pendingFoodSaves([server()], queued, 0b00000001)).toEqual([]);
@@ -134,6 +134,18 @@ describe('what the diary effect queues', () => {
     const [before] = pendingFoodSaves([server()], [], 0b00000011);
     const [after] = pendingFoodSaves([server()], [entryOf('e1', before.version)], 0b00000101);
     expect(after.version).toBeGreaterThan(before.version);
+  });
+
+  it('queues a swapped grant at the same updated_at: a type allowed now and not written before, though the version is not higher', () => {
+    const [first] = pendingFoodSaves([server()], [], 0b00000010);
+    const queued = [entryOf('e1', first.version, { writtenTypes: 0b00000010 })];
+    // Allowed set changed from {protein} to {energy}: a lower mask, so a lower numeric version.
+    const [swapped] = pendingFoodSaves([server()], queued, 0b00000001);
+    expect(swapped.version).toBe(first.version + 1);
+    const again = pendingFoodSaves([server()], [entryOf('e1', swapped.version, { writtenTypes: 0b00000001 })], 0b00000001);
+    expect(again).toEqual([]);
+    // A type allowed but with no known value is never a reason to re-save.
+    expect(pendingFoodSaves([server({ fiber_g: null })], [entryOf('e1', foodVersion('2026-11-06T13:00:00.000Z', 0b00010010)!, { writtenTypes: 0b00000010 })], 0b00010010)).toEqual([]);
   });
 
   it('keeps every version below 2^53 for any date this decade and any mask', () => {
@@ -399,5 +411,20 @@ describe('permissions', () => {
     expect(rows.get('food:e1')).toMatchObject({ op: 'delete', reason: 'permission' });
     await queue.discard(FOOD_KIND);
     expect(rows.has('food:e1')).toBe(false);
+  });
+
+  it('writes only the types in the mask it was given, even if another type is allowed by then', async () => {
+    await exportWriters[FOOD_KIND]!.save({ kind: FOOD_KIND, recordId: 'e1', op: 'save', payload: foodPayload(row), version: 1, status: 'pending', attempts: 0 }, 0b00000001);
+    expect(members().map((m) => m.type)).toEqual(['HKQuantityTypeIdentifierDietaryEnergyConsumed']);
+  });
+
+  it('a permission failure before any write keeps the previous mask instead of the intended one', async () => {
+    const { queue, rows } = setup();
+    await queue.initialize();
+    await save(queue, 'e1', foodPayload({ ...row, nutrients: { ...ALL, fiber_g: null } }), 1);
+    const before = rows.get('food:e1')!.writtenTypes;
+    denied = new Set([PROTEIN]);
+    await save(queue, 'e1', foodPayload(row), 2);
+    expect(rows.get('food:e1')).toMatchObject({ status: 'failed', reason: 'permission', writtenTypes: before });
   });
 });

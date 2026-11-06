@@ -50,8 +50,8 @@ const bit = (i: number) => 1 << i;
 export const allowedFoodMask = () => FOOD_NUTRIENTS.reduce((m, n, i) => (getHealthWriteAccess(n[1]) === 'granted' ? m | bit(i) : m), 0);
 
 // The export version of a row: updated_at in ms times 256 plus the allowed-type mask (about 4.5e14 today, under 2^53).
-// updated_at moves on every edit, and a different allowed set is a different version, so allowing a type, or swapping
-// which are allowed, saves the entry again. A smaller mask at the same updated_at is a lower version: nothing is re-saved.
+// updated_at moves on every edit, and a larger allowed mask is a higher version, so the entry is saved again. A smaller
+// or swapped mask at the same updated_at is not higher, so pendingFoodSaves compares against what was written instead.
 export const foodVersion = (updatedAt: string | null | undefined, allowedMask: number) => {
   const ms = updatedAt ? Date.parse(updatedAt) : NaN;
   return Number.isFinite(ms) ? ms * 256 + allowedMask : null;
@@ -77,10 +77,18 @@ export async function fetchRecentFoodRows(now = new Date()): Promise<FoodRow[]> 
 // The rows not already queued at their version: the whole idempotency of the backfill.
 export function pendingFoodSaves(rows: readonly FoodRow[], known: readonly ExportEntry[], allowedMask: number) {
   return rows.flatMap((r) => {
-    const version = foodVersion(r.updated_at, allowedMask);
-    if (version === null || known.some((e) => e.kind === FOOD_KIND && e.recordId === r.id && e.op === 'save' && e.version >= version)) return [];
+    let version = foodVersion(r.updated_at, allowedMask);
+    if (version === null) return [];
     const nutrients = Object.fromEntries(FOOD_NUTRIENTS.map(([k]) => [k, r[k] === null ? null : Number(r[k])])) as Record<FoodKey, number | null>;
-    return [{ id: r.id, version, payload: foodPayload({ name: r.food_name, consumedAt: r.consumed_at, nutrients }) }];
+    const payload = foodPayload({ name: r.food_name, consumedAt: r.consumed_at, nutrients });
+    const k = known.find((e) => e.kind === FOOD_KIND && e.recordId === r.id && e.op === 'save');
+    if (k && k.version >= version) {
+      // Already queued at this version. Still save again if a type that can be written now was not written before, which a
+      // swapped grant at the same updated_at needs (its version is not higher). That version goes just above the old one.
+      if (k.status !== 'success' || !(allowedMask & payloadMask(payload) & ~(k.writtenTypes ?? 0))) return [];
+      version = k.version + 1;
+    }
+    return [{ id: r.id, version, payload }];
   });
 }
 
@@ -102,21 +110,27 @@ export async function deletedFoodIds(rows: readonly { id: string }[], known: rea
   return gone;
 }
 
+// Bit mask of the nutrients a payload has a known value for.
+const payloadMask = (p: FoodPayload) => FOOD_NUTRIENTS.reduce((m, n, i) => (p.nutrients[n[0]] !== undefined ? m | bit(i) : m), 0);
+
 const need = () => {
   const hk = loadHealthKit();
   if (!hk) throw new Error('Apple Health requires a native iPhone build.');
   return hk;
 };
 const granted = (type: HealthWriteType) => getHealthWriteAccess(type) === 'granted';
-const maskOf = (types: readonly string[]) => FOOD_NUTRIENTS.reduce((m, n, i) => (types.includes(n[1]) ? m | bit(i) : m), 0);
+
+// Throws when a type this entry was, or may have been, saved with is no longer allowed: its old sample could not be replaced.
+function assertNotRevoked(e: ExportEntry) {
+  if ((e.writtenTypes ?? 0) & ~allowedFoodMask()) {
+    throw Object.assign(new Error('Allow saving every nutrient this food was saved with, or remove it in the Health app.'), { reason: 'permission' });
+  }
+}
 
 // Deletes this entry's correlation and members. HealthKit only lets an app delete its own samples.
 // ponytail: the correlation type itself cannot be authorized, so its delete is best effort; the members are what Health shows.
 async function removeFood(e: ExportEntry) {
-  // writtenTypes covers every type this entry was, or may have been, saved with.
-  if ((e.writtenTypes ?? 0) & ~allowedFoodMask()) {
-    throw Object.assign(new Error('Allow saving every nutrient this food was saved with, or remove it in the Health app.'), { reason: 'permission' });
-  }
+  assertNotRevoked(e);
   await removeExportedSample(CORRELATION, e.kind, e.recordId).catch(() => {});
   for (const type of FOOD_WRITE_TYPES) if (granted(type)) await removeExportedSample(type, e.kind, e.recordId);
 }
@@ -126,14 +140,18 @@ export const foodWriter: ExportWriter = {
   writeTypes: FOOD_WRITE_TYPES,
   attemptVersions: true,
   dropRevokedDeletes: true,
-  intent: (e) => maskOf(FOOD_NUTRIENTS.filter(([k, t]) => (e.payload as FoodPayload).nutrients[k] !== undefined && granted(t)).map((n) => n[1])),
-  async save(e: ExportEntry) {
+  // The one snapshot of what this save writes: known nutrients whose type is allowed now. Checked first, so a failed check records nothing.
+  intent: (e) => {
+    assertNotRevoked(e);
+    return payloadMask(e.payload as FoodPayload) & allowedFoodMask();
+  },
+  async save(e: ExportEntry, intended = payloadMask(e.payload as FoodPayload) & allowedFoodMask()) {
     const p = e.payload as FoodPayload;
     const at = new Date(p.at);
-    // Only the nutrients the user allowed. Members carry only the record key: the correlation holds the sync identifier.
-    const members: SampleForSaving[] = FOOD_NUTRIENTS.flatMap(([k, quantityType, unit]) => {
+    // Only the nutrients in the intended mask (known, and allowed when it was taken). Members carry only the record key: the correlation holds the sync identifier.
+    const members: SampleForSaving[] = FOOD_NUTRIENTS.flatMap(([k, quantityType, unit], i) => {
       const quantity = p.nutrients[k];
-      return quantity !== undefined && granted(quantityType) ? [{ quantityType, quantity, unit, startDate: at, endDate: at, metadata: { [APP_RECORD_KEY]: `${e.kind}:${e.recordId}` } }] : [];
+      return quantity !== undefined && intended & bit(i) ? [{ quantityType, quantity, unit, startDate: at, endDate: at, metadata: { [APP_RECORD_KEY]: `${e.kind}:${e.recordId}` } }] : [];
     });
     // A retry or an edit first removes what an earlier save wrote, so correlation members are never doubled.
     await removeFood(e);
