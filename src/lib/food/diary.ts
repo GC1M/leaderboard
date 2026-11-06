@@ -164,7 +164,7 @@ export async function getEntry(uid: string, key: string): Promise<Entry | null> 
   return found ? mergePending([found], ops)[0] : null;
 }
 
-export type DayTotal = { date: string; entries: number; incomplete: boolean } & Record<(typeof SUMMARY_KEYS)[number], number | null>;
+export type DayTotal = { date: string; entries: number; incomplete: boolean; kcalIncomplete: boolean } & Record<(typeof SUMMARY_KEYS)[number], number | null>;
 
 // Daily totals from the server, which groups by each entry's own local_date. Days with no entries are absent.
 export async function getDailyTotals(from: string, to: string): Promise<DayTotal[]> {
@@ -177,6 +177,17 @@ export async function getDailyTotals(from: string, to: string): Promise<DayTotal
     protein_g: num(d.protein_g),
     carbs_g: num(d.carbs_g),
     fat_g: num(d.fat_g),
+    kcalIncomplete: d.energy_kcal_incomplete,
     incomplete: d.energy_kcal_incomplete || d.protein_g_incomplete || d.carbs_g_incomplete || d.fat_g_incomplete,
   }));
 }
+
+export async function hasFoodEntries(): Promise<boolean> {
+  const { data, error } = await supabase.from('food_entries').select('id').limit(1);
+  if (error) throw new Error("Couldn't load your nutrition history. Try again.");
+  return data.length > 0;
+}
+
+// The chart's values: one per day that has a known total. A day with no entries, or with the nutrient unknown in every entry, is a gap.
+export const historyDays = (rows: readonly DayTotal[], key: (typeof SUMMARY_KEYS)[number]) =>
+  rows.flatMap((r) => (r[key] === null ? [] : [{ date: r.date, value: r[key] as number }]));

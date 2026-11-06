@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { deviceTimezone } from '@/lib/timezone';
 
 import { portionToGrams, scaleNutrients, type Nutrients } from './nutrition';
+import { enqueue, flushPending } from './pending';
 import type { Food, Portion } from './search';
 
 export const MEALS = [
@@ -46,16 +47,20 @@ export type LogInput = { food: Food; quantity: Quantity; meal: Meal; consumedAt:
 // One clientId per screen visit. Saving it again updates the same entry (last write wins), so a retry, or a retry
 // with changed values, never makes a second entry. The payload carries the unchanged identity columns, which the
 // food_entries trigger accepts because they equal the stored ones; amount, meal, time and nutrients are the edits.
-export async function logFood({ food, quantity, meal, consumedAt, clientId }: LogInput): Promise<void> {
+// The entry is saved on this device first (see ./pending), then sent. Resolves to false when the send failed:
+// the entry is kept and shows as "Not synced" in the diary until a retry succeeds.
+export async function logFood({ food, quantity, meal, consumedAt, clientId }: LogInput): Promise<boolean> {
   const r = resolveQuantity(quantity);
   if (!r) throw new Error(amountMessage(quantity.mode));
   if (!Number.isFinite(consumedAt.getTime())) throw new Error('Choose a valid time.');
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) throw new Error('Sign in to log food.');
+  // The stored session, not a network call, so logging works offline.
+  const { data: auth } = await supabase.auth.getSession();
+  if (!auth.session) throw new Error('Sign in to log food.');
   const n = scaleNutrients(food.per100g, r.grams);
-  const { error } = await supabase.from('food_entries').upsert(
-    {
-      user_id: auth.user.id,
+  await enqueue(auth.session.user.id, {
+    kind: 'log',
+    clientId,
+    row: {
       client_id: clientId,
       food_id: food.id,
       meal,
@@ -73,7 +78,6 @@ export async function logFood({ food, quantity, meal, consumedAt, clientId }: Lo
       source_version: food.sourceVersion,
       ...n,
     },
-    { onConflict: 'user_id,client_id' },
-  );
-  if (error) throw new Error("Couldn't log that food. Try again.");
+  });
+  return (await flushPending(auth.session.user.id)) === 0;
 }

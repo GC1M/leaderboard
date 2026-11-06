@@ -9,6 +9,7 @@ import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/com
 import { formatNutrient } from '@/lib/food/format';
 import { amountMessage, consumedNutrients, defaultMeal, logFood, MEALS, type Meal, type Quantity } from '@/lib/food/log';
 import { ESTIMATE_NOTE, FDC_ATTRIBUTION, type Food, getFood } from '@/lib/food/search';
+import { localDateKey } from '@/lib/health/dates';
 import { decimalValue } from '@/lib/numeric-input';
 import { useTheme } from '@/theme';
 
@@ -32,7 +33,7 @@ export default function FoodDetail() {
   const [clientId] = useState(() => Crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [logged, setLogged] = useState(false);
+  const [logged, setLogged] = useState<'synced' | 'saved' | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -73,8 +74,7 @@ export default function FoodDetail() {
     setBusy(true);
     setError(null);
     try {
-      await logFood({ food, quantity, meal, consumedAt: when, clientId });
-      setLogged(true);
+      setLogged((await logFood({ food, quantity, meal, consumedAt: when, clientId })) ? 'synced' : 'saved');
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't log that food. Try again.");
     }
@@ -87,7 +87,9 @@ export default function FoodDetail() {
         <Text accessibilityLiveRegion="polite" style={[styles.body, { color: c.ink }]}>
           {`${food.name} was added to ${MEALS.find((m) => m.value === meal)?.label.toLowerCase()}. Calories: ${formatNutrient('energy_kcal', nutrients?.energy_kcal ?? null)}.`}
         </Text>
-        <Button label="Log Another Food" onPress={() => router.replace('/food')} />
+        {logged === 'saved' && <Text style={[styles.body, { color: c.danger }]}>Saved on this device but not synced yet. It stays in your diary marked Not synced, and you can retry there.</Text>}
+        <Button label="View Diary" onPress={() => router.replace({ pathname: '/food/diary', params: { date: localDateKey(when) } })} />
+        <Button plain label="Log Another Food" onPress={() => router.replace('/food')} />
         <Button plain label="Done" onPress={() => router.replace('/')} />
         <Text style={[styles.caption, { color: c.inkSoft }]}>{ESTIMATE_NOTE}</Text>
       </Screen>

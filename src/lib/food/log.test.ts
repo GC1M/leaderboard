@@ -2,11 +2,11 @@ import { consumedNutrients, defaultMeal, logFood, MAX_GRAMS, resolveQuantity } f
 import { emptyNutrients } from './nutrition';
 import type { Food } from './search';
 
-const mockUpsert = jest.fn();
-const mockGetUser = jest.fn();
-jest.mock('@/lib/supabase', () => ({
-  supabase: { auth: { getUser: () => mockGetUser() }, from: (table: string) => ({ upsert: (...a: unknown[]) => mockUpsert(table, ...a) }) },
-}));
+const mockEnqueue = jest.fn();
+const mockFlush = jest.fn();
+const mockGetSession = jest.fn();
+jest.mock('@/lib/supabase', () => ({ supabase: { auth: { getSession: () => mockGetSession() } } }));
+jest.mock('./pending', () => ({ enqueue: (...a: unknown[]) => mockEnqueue(...a), flushPending: (...a: unknown[]) => mockFlush(...a) }));
 jest.mock('@/lib/timezone', () => ({ deviceTimezone: () => 'America/Chicago' }));
 
 const food: Food = {
@@ -45,43 +45,45 @@ describe('logFood', () => {
   const input = { food, quantity: { mode: 'portion' as const, portion: food.portions[0], count: 2 }, meal: 'lunch' as const, consumedAt: new Date('2026-11-06T18:00:00Z'), clientId: 'c-1' };
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'me' } } });
-    mockUpsert.mockResolvedValue({ error: null });
+    mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'me' } } } });
+    mockEnqueue.mockResolvedValue(undefined);
+    mockFlush.mockResolvedValue(0);
   });
 
-  test('upserts the identity copy, resolved grams, snapshot, meal and device time zone on (user_id, client_id)', async () => {
-    await logFood(input);
-    const [table, row, opts] = mockUpsert.mock.calls[0];
-    expect(table).toBe('food_entries');
-    expect(opts).toEqual({ onConflict: 'user_id,client_id' });
-    expect(row).toMatchObject({
-      user_id: 'me', client_id: 'c-1', food_id: 'f1', meal: 'lunch', consumed_at: '2026-11-06T18:00:00.000Z', timezone: 'America/Chicago',
+  test('saves the identity copy, resolved grams, snapshot, meal and device time zone to the pending queue, then syncs', async () => {
+    expect(await logFood(input)).toBe(true);
+    const [uid, op] = mockEnqueue.mock.calls[0];
+    expect([uid, op.kind, op.clientId]).toEqual(['me', 'log', 'c-1']);
+    expect(op.row).toMatchObject({
+      client_id: 'c-1', food_id: 'f1', meal: 'lunch', consumed_at: '2026-11-06T18:00:00.000Z', timezone: 'America/Chicago',
       grams: 236, portion_label: 'medium', portion_count: 2, is_estimated: false,
       food_name: 'Bananas, raw', food_brand: null, provider: 'usda_fdc', provider_id: '173944', source_data_type: 'SR Legacy', source_version: '2019-04-01',
       protein_g: 2.5724, fiber_g: null, sodium_mg: null,
     });
-    expect(row.energy_kcal).toBeCloseTo(210.04, 2);
+    expect(op.row.energy_kcal).toBeCloseTo(210.04, 2);
+    expect(mockFlush).toHaveBeenCalledWith('me');
   });
 
-  test('a retry with changed values sends the same client id and conflict key, with identity columns unchanged', async () => {
+  test('a retry with changed values keeps the same client id and identity columns', async () => {
     await logFood(input);
     await logFood({ ...input, quantity: { mode: 'portion', portion: food.portions[0], count: 3 }, meal: 'dinner' });
-    const [a, b] = mockUpsert.mock.calls.map((c) => c[1]);
-    expect([b.user_id, b.client_id]).toEqual([a.user_id, a.client_id]);
-    for (const k of ['food_id', 'food_name', 'food_brand', 'provider', 'provider_id', 'source_data_type', 'source_version']) expect(b[k]).toEqual(a[k]);
-    expect(b).toMatchObject({ grams: 354, meal: 'dinner', portion_count: 3 });
+    const [a, b] = mockEnqueue.mock.calls.map((c) => c[1]);
+    expect(b.clientId).toBe(a.clientId);
+    for (const k of ['food_id', 'food_name', 'food_brand', 'provider', 'provider_id', 'source_data_type', 'source_version']) expect(b.row[k]).toEqual(a.row[k]);
+    expect(b.row).toMatchObject({ grams: 354, meal: 'dinner', portion_count: 3 });
   });
 
-  test('rejects a bad amount or time before any write', async () => {
+  test('rejects a bad amount or time before anything is saved', async () => {
     await expect(logFood({ ...input, quantity: { mode: 'grams', amount: 0 } })).rejects.toThrow('Enter an amount above 0 and up to 100,000 g.');
     await expect(logFood({ ...input, consumedAt: new Date(Number.NaN) })).rejects.toThrow('valid time');
-    expect(mockUpsert).not.toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
-  test('needs a signed-in user and reports a failed save without leaking the database error', async () => {
-    mockGetUser.mockResolvedValueOnce({ data: { user: null } });
+  test('needs a signed-in user; a failed sync keeps the entry and resolves false', async () => {
+    mockGetSession.mockResolvedValueOnce({ data: { session: null } });
     await expect(logFood(input)).rejects.toThrow('Sign in');
-    mockUpsert.mockResolvedValueOnce({ error: { message: 'secret detail' } });
-    await expect(logFood(input)).rejects.toThrow("Couldn't log that food. Try again.");
+    mockFlush.mockResolvedValueOnce(1);
+    expect(await logFood(input)).toBe(false);
+    expect(mockEnqueue).toHaveBeenCalledTimes(1);
   });
 });
