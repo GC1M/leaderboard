@@ -66,3 +66,26 @@ test('display rounding', () => {
   expect(roundNutrient('fat_g', 0)).toBe(0);
   expect(roundNutrient('fat_g', null)).toBeNull();
 });
+
+test('mass conversion rejects NaN, negative amounts and unknown units', () => {
+  expect(massToGrams(0, 'oz')).toBe(0);
+  expect(() => massToGrams(NaN, 'g')).toThrow('Invalid mass');
+  expect(() => massToGrams(-1, 'lb')).toThrow('Invalid mass');
+  expect(() => gramsToMass(Infinity, 'oz')).toThrow('Invalid mass');
+  expect(() => gramsToMass(-5, 'g')).toThrow('Invalid mass');
+  expect(() => massToGrams(1, 'stone' as never)).toThrow('Invalid mass');
+});
+
+test('non-finite or negative nutrient inputs count as unknown', () => {
+  const bad = food({ energy_kcal: NaN, protein_g: -3, carbs_g: Infinity, fat_g: 4 });
+  const scaled = scaleNutrients(bad, 100);
+  expect(scaled.energy_kcal).toBeNull();
+  expect(scaled.protein_g).toBeNull();
+  expect(scaled.carbs_g).toBeNull();
+  expect(scaled.fat_g).toBe(4);
+  const { totals, incomplete } = sumNutrients([bad, food({ energy_kcal: 10, protein_g: 2 })]);
+  expect(totals.energy_kcal).toBe(10);
+  expect(totals.carbs_g).toBeNull();
+  expect(incomplete).toEqual(expect.arrayContaining(['energy_kcal', 'protein_g', 'carbs_g']));
+  expect(totals.fat_g).toBe(4);
+});
