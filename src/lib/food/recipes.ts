@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 import { logEntry, type Meal } from './log';
 import { emptyNutrients, NUTRIENT_KEYS } from './nutrition';
-import { type Ingredient, type Recipe, recipeAmountMessage, recipePayload, type RecipeQuantity, recipeSnapshot, validateRecipe } from './recipe';
+import { type Ingredient, type Recipe, recipeAmountError, recipePayload, type RecipeQuantity, recipeSnapshot, validateRecipe } from './recipe';
 
 const SAVE_MESSAGE = "Couldn't save your recipe. Check your connection and try again.";
 const LOAD_MESSAGE = "Couldn't load your recipes. Pull down to try again.";
@@ -52,7 +52,7 @@ export type LogRecipeInput = { recipe: Recipe; quantity: RecipeQuantity; meal: M
 // path as foods. Resolves to false when the send failed and the entry is waiting to sync.
 export async function logRecipe({ recipe, quantity, meal, consumedAt, clientId, isEstimated = true }: LogRecipeInput): Promise<boolean> {
   const s = recipeSnapshot(recipe, quantity);
-  if (!s) throw new Error(recipeAmountMessage(quantity.mode));
+  if (!s) throw new Error(recipeAmountError(recipe, quantity));
   return logEntry(clientId, consumedAt, {
     client_id: clientId,
     food_id: null,

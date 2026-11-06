@@ -100,7 +100,7 @@ grant execute on function public.save_food_recipe(uuid, jsonb) to authenticated;
 -- The two old checks (the provider list, and custom = no provider id) were created without chosen names, so they
 -- are found by definition rather than by the generated name.
 do $$
-declare c record;
+declare c record; dropped int := 0;
 begin
   for c in
     select conname from pg_constraint
@@ -109,7 +109,11 @@ begin
         or pg_get_constraintdef(oid) like '%ARRAY[''usda_fdc''::text, ''custom''::text]%')
   loop
     execute format('alter table public.food_entries drop constraint %I', c.conname);
+    dropped := dropped + 1;
   end loop;
+  if dropped <> 2 then
+    raise exception 'food_recipes: expected old food_entries checks not found (dropped %, expected 2)', dropped;
+  end if;
 end $$;
 alter table public.food_entries add constraint food_entries_provider_check check (provider in ('usda_fdc', 'custom', 'recipe'));
 alter table public.food_entries add constraint food_entries_provider_id_match check ((provider = 'usda_fdc') = (provider_id is not null));

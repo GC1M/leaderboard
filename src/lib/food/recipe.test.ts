@@ -1,6 +1,6 @@
 import { buildEdit, entryFromRow } from './diary';
 import { emptyNutrients } from './nutrition';
-import { ingredientFromFood, per100g, perServing, recipeCaveats, recipePayload, type Recipe, recipeSnapshot, recipeTotals, resolveRecipePortion, validateRecipe } from './recipe';
+import { ingredientFromFood, recipeAmountError, per100g, perServing, recipeCaveats, recipePayload, type Recipe, recipeSnapshot, recipeTotals, resolveRecipePortion, validateRecipe } from './recipe';
 import { logRecipe } from './recipes';
 import { blankForm, formChanged, toForm, toRecipe } from './recipe-form';
 import type { Food } from './search';
@@ -161,4 +161,14 @@ test('the editor form round-trips a recipe and detects changes', () => {
   expect(toRecipe({ ...f, servings: 'abc', yieldG: ' ' })).toMatchObject({ servings: Number.NaN, yieldG: null });
   expect(formChanged(blankForm, toForm(recipe(), true))).toBe(true);
   expect(toForm(recipe(), true).name).toBe('Rice bowl copy');
+});
+
+test('an amount refused for the entry caps says it is too large, others get the usual message', async () => {
+  const big = { ...rice, grams: 100000, per100g: n({ energy_kcal: 900 }) };
+  const r = recipe({ yieldG: 1, servings: 1, ingredients: Array.from({ length: 12 }, () => ({ ...big })) });
+  const q = { mode: 'grams', amount: 1 } as const;
+  expect(recipeSnapshot(r, q)).toBeNull();
+  expect(recipeAmountError(r, q)).toBe('That amount is too large to save.');
+  await expect(logRecipe({ recipe: r, quantity: q, meal: 'lunch', consumedAt: new Date(), clientId: 'c9' })).rejects.toThrow('That amount is too large to save.');
+  expect(recipeAmountError(recipe(), { mode: 'servings', count: 0 })).toMatch(/Enter a number of servings/);
 });

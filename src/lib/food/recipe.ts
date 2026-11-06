@@ -48,6 +48,10 @@ export type RecipePortion = { grams: number; portionLabel: string | null; portio
 export const recipeAmountMessage = (mode: RecipeQuantity['mode']) =>
   `${mode === 'grams' ? 'Enter an amount above 0 and up to 100,000 g.' : 'Enter a number of servings above 0. The total can be up to 100,000 g.'} The nutrient totals must also stay within what an entry can hold.`;
 
+// Why an amount cannot be logged: not a usable amount, or fine by itself but too large for an entry's columns.
+export const recipeAmountError = (r: Recipe, q: RecipeQuantity) =>
+  resolveRecipePortion(r, q) && !recipeSnapshot(r, q) ? 'That amount is too large to save.' : recipeAmountMessage(q.mode);
+
 // What part of the recipe is eaten: N servings, or grams of the cooked yield (needs a cooked weight). Null when unusable.
 export function resolveRecipePortion(r: Recipe, q: RecipeQuantity): RecipePortion | null {
   const total = recipeGrams(r);
