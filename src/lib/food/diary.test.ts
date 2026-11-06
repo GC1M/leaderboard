@@ -1,4 +1,4 @@
-import { buildEdit, type Entry, entryFromRow, groupDay, historyDays, loadDay, mergePending, removeEntry, saveEdit } from './diary';
+import { buildEdit, type Entry, entryFromRow, getEntry, groupDay, historyDays, loadDay, mergePending, removeEntry, saveEdit } from './diary';
 import { emptyNutrients } from './nutrition';
 import type { Food } from './search';
 
@@ -9,10 +9,11 @@ const mockDiscard = jest.fn();
 const mockRows = jest.fn();
 const mockDeleteEq = jest.fn();
 const mockIn = jest.fn();
+const mockLookup = jest.fn();
 jest.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
-      select: () => ({ eq: () => ({ order: () => mockRows() }), in: (...a: unknown[]) => mockIn(...a) }),
+      select: () => ({ eq: () => ({ order: () => mockRows(), maybeSingle: () => mockLookup() }), in: (...a: unknown[]) => mockIn(...a) }),
       delete: () => ({ eq: (...a: unknown[]) => mockDeleteEq(...a) }),
     }),
   },
@@ -109,6 +110,23 @@ describe('saveEdit', () => {
     expect(mockEnqueue.mock.calls[0][1].patch.energy_kcal).toBe(65);
   });
 
+  test('an entry whose queued log was uploaded meanwhile is edited by the id the server gave it', async () => {
+    mockLoad.mockResolvedValue([]);
+    mockLookup.mockResolvedValue({ data: { id: 'srv1' }, error: null });
+    await saveEdit('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'), { meal: 'snack' });
+    expect(mockEnqueue).toHaveBeenCalledWith('u1', { kind: 'edit', id: 'srv1', patch: { meal: 'snack' } });
+  });
+
+  test('an unsynced entry that cannot be found anywhere throws instead of reporting success, and the queue is untouched', async () => {
+    mockLoad.mockResolvedValue([]);
+    mockLookup.mockResolvedValue({ data: null, error: null });
+    await expect(saveEdit('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'), { meal: 'snack' })).rejects.toThrow('This entry changed. Reload it.');
+    mockLookup.mockResolvedValue({ data: null, error: { message: 'offline' } });
+    await expect(saveEdit('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'), { meal: 'snack' })).rejects.toThrow("Couldn't save that entry");
+    expect(mockEnqueue).not.toHaveBeenCalled();
+    expect(mockFlush).not.toHaveBeenCalled();
+  });
+
   test('editing an entry that never synced updates its queued log, and no change does nothing', async () => {
     mockLoad.mockResolvedValue([{ kind: 'log', clientId: 'c9', row: { grams: 100 } }]);
     await saveEdit('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'), { meal: 'snack' });
@@ -143,11 +161,18 @@ describe('removeEntry', () => {
     expect(mockDiscard).not.toHaveBeenCalled();
   });
 
-  test('an entry that never synced is deleted by client id too, in case an earlier send landed, then dropped from the queue', async () => {
-    mockDeleteEq.mockResolvedValue({ error: null });
+  test('an entry that never synced is removed locally first, even offline, and a queued purge deletes any server copy after the in-flight flush', async () => {
+    const order: string[] = [];
+    mockDiscard.mockImplementation(async () => void order.push('discard'));
+    mockEnqueue.mockImplementation(async () => void order.push('purge queued'));
+    mockFlush.mockImplementation(async () => { order.push('flush'); throw new Error('offline'); });
     await removeEntry('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'));
-    expect(mockDeleteEq).toHaveBeenCalledWith('client_id', 'c9');
-    expect(mockDiscard).toHaveBeenCalledWith('u1', expect.objectContaining({ kind: 'log', clientId: 'c9' }));
+    expect(order).toEqual(['purge queued', 'discard', 'flush']);
+    expect(mockEnqueue).toHaveBeenCalledWith('u1', { kind: 'purge', clientId: 'c9' });
+    expect(mockDeleteEq).not.toHaveBeenCalled();
+    mockDiscard.mockReset();
+    mockEnqueue.mockReset();
+    mockFlush.mockReset();
   });
 });
 
@@ -187,4 +212,16 @@ test('a queued edit that does not change the time keeps the server local date', 
   // The entry was logged in another timezone, so its day is not the one this device would compute.
   const r = row({ consumed_at: '2026-11-06T03:00:00Z', timezone: 'Asia/Tokyo', local_date: '2026-11-06' });
   expect(mergePending([r], [{ kind: 'edit', id: 'e1', patch: { grams: 50 } }])[0].localDate).toBe('2026-11-06');
+});
+
+test('a row with a queued purge is not shown', () => {
+  expect(mergePending([row()], [{ kind: 'purge', clientId: 'c1' }])).toEqual([]);
+});
+
+test('getEntry answers null, not undefined, for a row hidden by a queued purge', async () => {
+  mockLookup.mockResolvedValue({ data: row(), error: null });
+  mockLoad.mockResolvedValue([{ kind: 'purge', clientId: 'c1' }]);
+  expect(await getEntry('u1', 'e1')).toBeNull();
+  mockLoad.mockResolvedValue([]);
+  expect(await getEntry('u1', 'e1')).toMatchObject({ id: 'e1' });
 });

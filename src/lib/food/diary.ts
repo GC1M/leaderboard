@@ -66,7 +66,10 @@ export function entryFromRow(r: Row, pending: Entry['pending'] = null, syncError
 }
 
 // Server rows with the queued edits applied, plus queued new entries the server does not have yet.
-export function mergePending(rows: Row[], ops: PendingOp[]): Entry[] {
+export function mergePending(allRows: Row[], ops: PendingOp[]): Entry[] {
+  // Rows with a queued purge are being deleted: not shown.
+  const purged = new Set(ops.flatMap((o) => (o.kind === 'purge' ? [o.clientId] : [])));
+  const rows = allRows.filter((r) => !purged.has(r.client_id as string));
   const out = rows.map((r) => {
     const op = ops.find((o) => o.kind === 'edit' && o.id === r.id);
     if (op?.kind !== 'edit') return entryFromRow(r);
@@ -123,18 +126,32 @@ export async function saveEdit(uid: string, entry: Entry, input: EditInput): Pro
   else {
     const op = (await loadPending(uid)).find((o) => o.kind === 'log' && o.clientId === entry.clientId);
     if (op?.kind === 'log') await enqueue(uid, { ...op, row: { ...op.row, ...patch } });
+    else {
+      // The log is no longer queued, so a flush uploaded it meanwhile: edit the row it made.
+      const { data, error } = await supabase.from('food_entries').select('id').eq('client_id', entry.clientId).maybeSingle();
+      if (error) throw new Error("Couldn't save that entry. Try again.");
+      if (!data) throw new Error('This entry changed. Reload it.');
+      await enqueue(uid, { kind: 'edit', id: data.id, patch });
+    }
   }
   return (await flushPending(uid)) === 0;
 }
 
-// Deleting is a confirmed online action. An entry that never synced is also deleted by client id on the
-// server, in case an earlier send landed after it was shown as unsynced. Queued changes for it are dropped.
+// A synced entry is deleted on the server (a confirmed online action) and its queued changes dropped. An entry
+// that never showed as synced is removed locally right away, even offline; a queued purge then deletes any copy
+// the server got from a send in flight, and is retried on the next flush if it fails. Flushes run one at a time,
+// so the purge always runs after the send it might undo.
 export async function removeEntry(uid: string, entry: Entry): Promise<void> {
-  const { error } = await (entry.id
-    ? supabase.from('food_entries').delete().eq('id', entry.id)
-    : supabase.from('food_entries').delete().eq('client_id', entry.clientId));
+  if (!entry.id) {
+    // Purge first: if the app stops between the two, the entry is hidden and deleted rather than briefly lost from the queue.
+    await enqueue(uid, { kind: 'purge', clientId: entry.clientId });
+    await discard(uid, { kind: 'log', clientId: entry.clientId, row: {} });
+    await flushPending(uid).catch(() => 0);
+    return;
+  }
+  const { error } = await supabase.from('food_entries').delete().eq('id', entry.id);
   if (error) throw new Error("Couldn't delete that entry. A connection is needed to delete. Try again.");
-  if (entry.id) await discard(uid, { kind: 'edit', id: entry.id, patch: {} });
+  await discard(uid, { kind: 'edit', id: entry.id, patch: {} });
   await discard(uid, { kind: 'log', clientId: entry.clientId, row: {} });
 }
 
@@ -163,7 +180,8 @@ export async function getEntry(uid: string, key: string): Promise<Entry | null> 
   const byId = await supabase.from('food_entries').select('*').eq('id', key).maybeSingle();
   const found = byId.data ?? (await supabase.from('food_entries').select('*').eq('client_id', key).maybeSingle()).data;
   if (byId.error && !found) throw new Error("Couldn't load that entry. Try again.");
-  return found ? mergePending([found], ops)[0] : null;
+  // A row with a queued purge is hidden by mergePending, which leaves nothing: that is "gone", not undefined.
+  return found ? (mergePending([found], ops)[0] ?? null) : null;
 }
 
 export type DayTotal = { date: string; entries: number; incomplete: boolean; kcalIncomplete: boolean } & Record<(typeof SUMMARY_KEYS)[number], number | null>;
