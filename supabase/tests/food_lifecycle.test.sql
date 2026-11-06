@@ -2,7 +2,7 @@
 -- row level security). Log, edit, share to a group, a member reads group_food, revoke, delete history, log again,
 -- then delete the account and check that nothing of hers is left anywhere, and nothing of anyone else's is touched.
 begin;
-select plan(28);
+select plan(29);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-0000-0000-0000000000a5', 'alice@x.com', '{"full_name":"Alice"}'),
@@ -68,6 +68,7 @@ select is((select count(*)::int from food_entries where user_id = '00000000-0000
   + (select count(*)::int from food_recipes where user_id = '00000000-0000-0000-0000-0000000000a5')
   + (select count(*)::int from foods where user_id = '00000000-0000-0000-0000-0000000000a5')
   + (select count(*)::int from food_recipe_ingredients), 0, 'entries, recipes, ingredients and custom foods are gone');
+select is((select string_agg(kind, ',') from health_exports where user_id = '00000000-0000-0000-0000-0000000000a5'), 'workout', 'the food Health export record is gone and the workout one stays');
 select is((select count(*)::int from food_entries where user_id = '00000000-0000-0000-0000-0000000000b5'), 1, 'Bob''s food is untouched');
 select is((select count(*)::int from profiles where id = '00000000-0000-0000-0000-0000000000a5'), 1, 'her account is still there');
 

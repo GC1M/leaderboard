@@ -49,7 +49,7 @@ Files are in `src/lib/food/` unless a path is given. SQL files are in `supabase/
 | Owner bypass (owner cannot read, share for, delete or revoke a member's food) | `food_sharing.test.sql` direct reads, insert 42501, delete and revoke | none | |
 | Non-member, other group, anon | `food_sharing.test.sql` | none | |
 | Food is not a ranking or competition metric | `food_sharing.test.sql`; `competition_*.test.sql` | none | |
-| Delete food history (server, queue, Health choice) | `food_sharing.test.sql` delete history; `profile.test.ts` deleteFoodHistory (queue cleared only after server delete, two passes, generation bump); `profile-screen.test.tsx` Keep or Remove; `health/food-export.test.ts` settle keep or remove; `health/export-queue.test.ts` forget and discard emit first | none | |
+| Delete food history (server, queue, Health choice) | `food_sharing.test.sql` delete history; `profile.test.ts` deleteFoodHistory (queue cleared only after server delete, two passes); `health/food-export.test.ts` sync generation bump (start and end, even on failure); `profile-screen.test.tsx` Keep or Remove; `health/food-export.test.ts` settle keep or remove; `health/export-queue.test.ts` forget and discard emit first | none | |
 | Account deletion, server cascade | `delete_account.test.sql` (no food); `food_sharing.test.sql` (entries only) | Recipes, ingredients, custom foods, shares, search log and Health export rows were never checked to cascade | `food_lifecycle.test.sql` |
 | Account deletion, local queue | `profile.test.ts` deleteAccount removes `food-pending-<uid>`; `pending.test.ts` clearFoodPending waits for a flush in flight | none | |
 | Account deletion, Health choice | `profile-screen.test.tsx` Delete Account keep or remove, stops if remove fails | none | |

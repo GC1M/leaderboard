@@ -5,6 +5,8 @@ const mockGetUser = jest.fn();
 const mockRpc = jest.fn();
 const mockCached = jest.fn();
 const mockIlike = jest.fn();
+const mockEq = jest.fn();
+const mockOrder = jest.fn();
 const mockUpserts: unknown[] = [];
 jest.mock(
   'npm:@supabase/supabase-js@2',
@@ -16,7 +18,9 @@ jest.mock(
             rpc: mockRpc,
             from: () => {
               const c: Record<string, unknown> = {};
-              for (const m of ['select', 'eq', 'order']) c[m] = () => c;
+              c.select = () => c;
+              c.eq = (...a: unknown[]) => (mockEq(...a), c);
+              c.order = (...a: unknown[]) => (mockOrder(...a), c);
               c.ilike = (...a: unknown[]) => (mockIlike(...a), c);
               c.limit = () => mockCached();
               c.upsert = (rows: unknown) => (mockUpserts.push(rows), { select: async () => ({ data: [], error: null }) });
@@ -119,6 +123,21 @@ describe('USDA failures', () => {
     mockCached.mockResolvedValue({ data: [], error: null });
     await call(req({ query: '100%_off' }));
     expect(mockIlike).toHaveBeenCalledWith('name', '%100\\%\\_off%');
+  });
+
+  test('the fallback reads only USDA rows, in name order', async () => {
+    mockFetch.mockResolvedValue(bad(500));
+    await call();
+    expect(mockEq).toHaveBeenCalledWith('provider', 'usda_fdc');
+    expect(mockOrder).toHaveBeenCalledWith('name');
+  });
+
+  test('a successful search caches the normalized food once, by provider and id', async () => {
+    const detail = { fdcId: 9, description: 'Nuts, almonds', dataType: 'SR Legacy', publicationDate: '4/1/2019', foodNutrients: [{ nutrient: { number: '208', unitName: 'kcal' }, amount: 579 }], foodPortions: [] };
+    mockFetch.mockResolvedValueOnce(ok({ totalHits: 1, foods: [{ fdcId: 9 }] })).mockResolvedValueOnce(ok([detail]));
+    expect((await call()).status).toBe(200);
+    expect(mockUpserts).toHaveLength(1);
+    expect(mockUpserts[0]).toEqual([expect.objectContaining({ provider: 'usda_fdc', provider_id: '9', name: 'Nuts, almonds', source_data_type: 'SR Legacy', energy_kcal: 579 })]);
   });
 
   test('a search with no hits is an empty list, not a failure, and writes nothing', async () => {
