@@ -126,3 +126,14 @@ test('a missing food explains itself', async () => {
   const c = await render();
   expect(JSON.stringify(c)).toContain('no longer available');
 });
+
+test('the estimate switch is sent with the log, and an unsynced log says so and opens the diary for that day', async () => {
+  mockLog.mockResolvedValue(false);
+  const c = await render();
+  await act(async () => find(c, 'Mark as an estimate', 'onChange').props.onChange({ nativeEvent: { value: true } }));
+  await click(c, 'Log Food');
+  expect(mockLog.mock.calls[0][0]).toMatchObject({ isEstimated: true });
+  expect(JSON.stringify(c)).toContain('not synced yet');
+  await click(c, 'View Diary');
+  expect(mockReplace).toHaveBeenCalledWith({ pathname: '/food/diary', params: { date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) } });
+});

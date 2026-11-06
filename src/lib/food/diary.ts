@@ -7,9 +7,8 @@ import { supabase } from '@/lib/supabase';
 import { deviceTimezone } from '@/lib/timezone';
 
 import { amountMessage, MEALS, type Meal, type Quantity, resolveQuantity } from './log';
-import { emptyNutrients, NUTRIENT_KEYS, type NutrientKey, type NutrientTotals, type Nutrients, scaleNutrients, sumNutrients } from './nutrition';
+import { emptyNutrients, NUTRIENT_KEYS, type NutrientKey, type NutrientTotals, type Nutrients, sumNutrients } from './nutrition';
 import { discard, enqueue, flushPending, loadPending, type PendingOp } from './pending';
-import { getFood, type Food } from './search';
 
 export type Entry = {
   id: string | null; // null until the server has it
@@ -48,8 +47,8 @@ export function entryFromRow(r: Row, pending: Entry['pending'] = null, syncError
     meal: r.meal as Meal,
     consumedAt: r.consumed_at as string,
     timezone: r.timezone as string,
-    // The server sets local_date from the entry's timezone; an unsynced entry is in this device's.
-    localDate: pending ? localDateKey(new Date(r.consumed_at as string)) : (r.local_date as string),
+    // The server sets local_date from the entry's timezone; an entry it has not seen is in this device's.
+    localDate: r.local_date ?? localDateKey(new Date(r.consumed_at as string)),
     grams: Number(r.grams),
     portionLabel: r.portion_label ?? null,
     portionCount: num(r.portion_count),
@@ -70,7 +69,10 @@ export function entryFromRow(r: Row, pending: Entry['pending'] = null, syncError
 export function mergePending(rows: Row[], ops: PendingOp[]): Entry[] {
   const out = rows.map((r) => {
     const op = ops.find((o) => o.kind === 'edit' && o.id === r.id);
-    return op?.kind === 'edit' ? entryFromRow({ ...r, ...op.patch }, 'edit', op.error ?? null) : entryFromRow(r);
+    if (op?.kind !== 'edit') return entryFromRow(r);
+    // Only an edit of the time moves the entry to another day (in this device's timezone).
+    const moved = typeof op.patch.consumed_at === 'string' ? { local_date: localDateKey(new Date(op.patch.consumed_at)) } : {};
+    return entryFromRow({ ...r, ...op.patch, ...moved }, 'edit', op.error ?? null);
   });
   const have = new Set(rows.map((r) => r.client_id));
   for (const op of ops) if (op.kind === 'log' && !have.has(op.clientId)) out.push(entryFromRow(op.row as Row, 'log', op.error ?? null));
@@ -100,14 +102,15 @@ export function scaleSnapshot(n: Nutrients, from: number, to: number): Nutrients
 
 export type EditInput = { quantity?: Quantity; meal?: Meal; consumedAt?: Date; isEstimated?: boolean };
 
-// The columns to UPDATE. A new amount recomputes grams, portion and every nutrient together: from the source
-// food when it still exists, otherwise by scaling the stored snapshot.
-export function buildEdit(entry: Entry, input: EditInput, food: Food | null): Record<string, unknown> {
+// The columns to UPDATE. A new amount recomputes grams, portion and every nutrient together by scaling the
+// entry's own saved snapshot, never the food's current values: later changes to the food do not reach logged
+// entries, and the result is the same online and offline.
+export function buildEdit(entry: Entry, input: EditInput): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
   if (input.quantity) {
     const r = resolveQuantity(input.quantity);
     if (!r) throw new Error(amountMessage(input.quantity.mode));
-    Object.assign(patch, { grams: r.grams, portion_label: r.portionLabel, portion_count: r.portionCount }, food ? scaleNutrients(food.per100g, r.grams) : scaleSnapshot(entry.nutrients, entry.grams, r.grams));
+    Object.assign(patch, { grams: r.grams, portion_label: r.portionLabel, portion_count: r.portionCount }, scaleSnapshot(entry.nutrients, entry.grams, r.grams));
   }
   if (input.meal && input.meal !== entry.meal) patch.meal = input.meal;
   if (input.consumedAt) {
@@ -121,9 +124,7 @@ export function buildEdit(entry: Entry, input: EditInput, food: Food | null): Re
 
 // Saves an edit on this device first, then syncs. Resolves to true when the server has it.
 export async function saveEdit(uid: string, entry: Entry, input: EditInput): Promise<boolean> {
-  // The source food gives exact nutrients; if it cannot be read (offline, or deleted) the snapshot is scaled instead.
-  const food = input.quantity && entry.foodId ? await getFood(entry.foodId).catch(() => null) : null;
-  const patch = buildEdit(entry, input, food);
+  const patch = buildEdit(entry, input);
   if (Object.keys(patch).length === 0) return true;
   if (entry.id) await enqueue(uid, { kind: 'edit', id: entry.id, patch });
   else {
@@ -133,12 +134,15 @@ export async function saveEdit(uid: string, entry: Entry, input: EditInput): Pro
   return (await flushPending(uid)) === 0;
 }
 
-// Deleting is a confirmed online action. An entry that never synced is just dropped from the queue.
+// Deleting is a confirmed online action. An entry that never synced is also deleted by client id on the
+// server, in case an earlier send landed after it was shown as unsynced. Queued changes for it are dropped.
 export async function removeEntry(uid: string, entry: Entry): Promise<void> {
-  if (!entry.id) return discard(uid, { kind: 'log', clientId: entry.clientId, row: {} });
-  const { error } = await supabase.from('food_entries').delete().eq('id', entry.id);
-  if (error) throw new Error("Couldn't delete that entry. Try again.");
-  await discard(uid, { kind: 'edit', id: entry.id, patch: {} });
+  const { error } = await (entry.id
+    ? supabase.from('food_entries').delete().eq('id', entry.id)
+    : supabase.from('food_entries').delete().eq('client_id', entry.clientId));
+  if (error) throw new Error("Couldn't delete that entry. A connection is needed to delete. Try again.");
+  if (entry.id) await discard(uid, { kind: 'edit', id: entry.id, patch: {} });
+  await discard(uid, { kind: 'log', clientId: entry.clientId, row: {} });
 }
 
 export async function discardPending(uid: string, entry: Entry): Promise<void> {
@@ -149,7 +153,12 @@ export async function discardPending(uid: string, entry: Entry): Promise<void> {
 export async function loadDay(uid: string, date: string): Promise<{ entries: Entry[]; error: string | null }> {
   const ops = await loadPending(uid);
   const { data, error } = await supabase.from('food_entries').select('*').eq('local_date', date).order('consumed_at');
-  const entries = mergePending(error ? [] : (data ?? []), ops).filter((e) => e.localDate === date);
+  let rows = error ? [] : (data ?? []);
+  // A queued time change can move an entry onto this day before the server knows: fetch those rows too.
+  const have = new Set(rows.map((r) => r.id));
+  const moved = ops.flatMap((o) => (o.kind === 'edit' && typeof o.patch.consumed_at === 'string' && localDateKey(new Date(o.patch.consumed_at)) === date && !have.has(o.id) ? [o.id] : []));
+  if (!error && moved.length) rows = [...rows, ...((await supabase.from('food_entries').select('*').in('id', moved)).data ?? [])];
+  const entries = mergePending(rows, ops).filter((e) => e.localDate === date);
   return { entries, error: error ? "Couldn't load your food. Pull down to try again." : null };
 }
 

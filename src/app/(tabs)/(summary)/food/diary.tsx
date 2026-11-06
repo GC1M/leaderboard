@@ -8,7 +8,7 @@ import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/com
 import { useAuth } from '@/lib/auth';
 import { groupDay, type Entry, loadDay, SUMMARY_KEYS } from '@/lib/food/diary';
 import { formatNutrient } from '@/lib/food/format';
-import { flushPending } from '@/lib/food/pending';
+import { flushPending, takeNotices } from '@/lib/food/pending';
 import { ESTIMATE_NOTE } from '@/lib/food/search';
 import { localDateKey, startOfLocalDay } from '@/lib/health/dates';
 import { dateFromKey } from '@/lib/health/format';
@@ -30,12 +30,15 @@ export default function Diary() {
   const [date, setDate] = useState(() => (params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : localDateKey(new Date())));
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     // Retry anything waiting to sync first, so the day shows what the server now has.
     await flushPending(uid);
+    const dropped = takeNotices(uid);
+    if (dropped.length) setNotice(dropped.join(' '));
     const r = await loadDay(uid, date);
     setEntries(r.entries);
     setError(r.error);
@@ -66,6 +69,7 @@ export default function Diary() {
       </View>
       <DateField label="Day" mode="date" value={dateFromKey(date)} onChange={(d) => setDate(localDateKey(d))} />
       <ErrorText>{error}</ErrorText>
+      {notice && <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: c.inkSoft }]}>{notice}</Text>}
       {waiting.length > 0 && (
         <View style={{ gap: 4 }}>
           <Text accessibilityLiveRegion="polite" style={[styles.body, { color: c.danger }]}>
@@ -77,7 +81,8 @@ export default function Diary() {
       {!day ? (
         !error && <Skeleton label="Loading food diary" />
       ) : day.count === 0 ? (
-        <Text style={[styles.body, { color: c.inkSoft }]}>No food logged</Text>
+        // If the load failed, an empty list says nothing about the day, so it must not read as "No food logged".
+        error ? <Button plain label="Try Again" busy={retrying} onPress={retry} /> : <Text style={[styles.body, { color: c.inkSoft }]}>No food logged</Text>
       ) : (
         <>
           <Section title="Day total" footer={incomplete(day) ? 'Some foods have unknown values, so these totals are incomplete and may be low.' : undefined}>
