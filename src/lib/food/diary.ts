@@ -150,8 +150,9 @@ export async function saveEdit(uid: string, entry: Entry, input: EditInput): Pro
 // so the purge always runs after the send it might undo.
 export async function removeEntry(uid: string, entry: Entry): Promise<void> {
   if (!entry.id) {
-    await discard(uid, { kind: 'log', clientId: entry.clientId, row: {} });
+    // Purge first: if the app stops between the two, the entry is hidden and deleted rather than briefly lost from the queue.
     await enqueue(uid, { kind: 'purge', clientId: entry.clientId });
+    await discard(uid, { kind: 'log', clientId: entry.clientId, row: {} });
     await flushPending(uid).catch(() => 0);
     return;
   }
@@ -186,7 +187,8 @@ export async function getEntry(uid: string, key: string): Promise<Entry | null> 
   const byId = await supabase.from('food_entries').select('*').eq('id', key).maybeSingle();
   const found = byId.data ?? (await supabase.from('food_entries').select('*').eq('client_id', key).maybeSingle()).data;
   if (byId.error && !found) throw new Error("Couldn't load that entry. Try again.");
-  return found ? mergePending([found], ops)[0] : null;
+  // A row with a queued purge is hidden by mergePending, which leaves nothing: that is "gone", not undefined.
+  return found ? (mergePending([found], ops)[0] ?? null) : null;
 }
 
 export type DayTotal = { date: string; entries: number; incomplete: boolean; kcalIncomplete: boolean } & Record<(typeof SUMMARY_KEYS)[number], number | null>;

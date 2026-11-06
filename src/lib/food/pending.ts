@@ -79,7 +79,8 @@ async function send(uid: string, op: PendingOp): Promise<Outcome> {
   }
   if (op.kind === 'purge') {
     const d = await supabase.from('food_entries').delete().eq('client_id', op.clientId);
-    return d.error ? fail(d) : { done: true };
+    // Always retryable: a purged row is hidden, so a refusal must never leave it hidden forever.
+    return d.error ? { done: false, error: SYNC_FAILED, permanent: false } : { done: true };
   }
   const r = await supabase.from('food_entries').update(op.patch as never).eq('id', op.id).select('id');
   if (r.error) return fail(r);
