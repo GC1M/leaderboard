@@ -4,7 +4,7 @@ import { Switch, Text, View } from 'react-native';
 import { Button, styles } from '@/components/ui';
 import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
-import { allowedFoodMask, deletedFoodIds, fetchRecentFoodRows, FOOD_KIND, FOOD_WRITE_TYPES, exportedFood, foodDeleteVersion, pendingFoodSaves, settleFoodExport } from '@/lib/health/food-export';
+import { allowedFoodMask, deletedFoodIds, fetchRecentFoodRows, FOOD_KIND, FOOD_WRITE_TYPES, exportedFood, foodSyncGeneration, foodDeleteVersion, pendingFoodSaves, settleFoodExport } from '@/lib/health/food-export';
 import { getHealthWriteAccess, isHealthAvailable } from '@/lib/health/healthkit';
 import { useHealthExport } from '@/lib/health/sync';
 import { secureStorage } from '@/lib/secure-storage';
@@ -38,10 +38,14 @@ export function useFoodExport() {
     running.current ??= (async () => {
       // Before the queue has loaded its saved entries every row would look new and reset each entry's attempt version.
       if (!latest.current.on || !latest.current.ready) return;
+      // Food deleted or settled meanwhile (see settleFoodExport): what was read is stale, so queue nothing from it.
+      const gen = foodSyncGeneration();
       const rows = await fetchRecentFoodRows();
       const { entries, enqueue } = latest.current;
+      const gone = await deletedFoodIds(rows, entries);
+      if (gen !== foodSyncGeneration()) return;
       for (const s of pendingFoodSaves(rows, entries, allowedFoodMask())) await enqueue(FOOD_KIND, s.id, 'save', s.payload, s.version);
-      for (const id of await deletedFoodIds(rows, entries)) await enqueue(FOOD_KIND, id, 'delete', null, foodDeleteVersion(entries, id)!);
+      for (const id of gone) await enqueue(FOOD_KIND, id, 'delete', null, foodDeleteVersion(entries, id)!);
     })().catch(() => {}).finally(() => { running.current = null; }); // a failure retries on the next diary load
     return running.current;
   }, []);

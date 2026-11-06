@@ -76,13 +76,28 @@ export type FoodExportControls = {
 };
 export const exportedFood = (entries: readonly ExportEntry[]) => entries.filter((e) => e.kind === FOOD_KIND && e.op === 'save' && (e.status === 'success' || !!e.writtenTypes));
 
+// Bumped when food is being settled or deleted. A diary sync that read the rows before such a change must not queue
+// anything from them, so it compares the number it saw at the start with the current one.
+let syncGeneration = 0;
+export const foodSyncGeneration = () => syncGeneration;
+export const bumpFoodSyncGeneration = () => { syncGeneration++; };
+
 export async function settleFoodExport(exp: FoodExportControls, removeFromHealth: boolean): Promise<void> {
+  bumpFoodSyncGeneration();
+  try {
+    await settle(exp, removeFromHealth);
+  } finally {
+    bumpFoodSyncGeneration();
+  }
+}
+
+async function settle(exp: FoodExportControls, removeFromHealth: boolean): Promise<void> {
   if (!removeFromHealth) return void (await exp.forget(FOOD_KIND, (e) => e.op === 'save'));
   for (const e of exp.getEntries().filter((x) => x.kind === FOOD_KIND && x.op === 'save')) {
     await exp.enqueue(FOOD_KIND, e.recordId, 'delete', null, foodDeleteVersion(exp.getEntries(), e.recordId)!);
   }
-  // A delete that could not run stays queued as failed: say so instead of claiming the food is gone from Health.
-  if (exp.getEntries().some((e) => e.kind === FOOD_KIND && e.op === 'delete' && e.status === 'failed')) throw new Error("Couldn't remove some food from Apple Health. Allow nutrition in Health and try again, or keep it in Health.");
+  // Any delete still queued (pending or failed) did not finish: say so instead of claiming the food is gone from Health.
+  if (exp.getEntries().some((e) => e.kind === FOOD_KIND && e.op === 'delete')) throw new Error("Couldn't remove some food from Apple Health. Allow nutrition in Health and try again, or keep it in Health.");
 }
 
 const COLUMNS = ['id', 'updated_at', 'food_name', 'consumed_at', ...FOOD_NUTRIENTS.map((n) => n[0])].join(',');

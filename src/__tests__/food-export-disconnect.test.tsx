@@ -8,6 +8,9 @@ const mockEnqueue = jest.fn();
 const mockForget = jest.fn();
 const mockDiscard = jest.fn();
 let mockEntries: unknown[] = [];
+let mockReady = false;
+const mockFetch = jest.fn();
+jest.mock('@/lib/health/food-export', () => ({ ...jest.requireActual('@/lib/health/food-export'), fetchRecentFoodRows: (...a: unknown[]) => mockFetch(...a), deletedFoodIds: async () => [] }));
 const mockStore = new Map<string, string>();
 jest.mock('@/lib/alert', () => ({ alert: (...a: unknown[]) => mockAlert(...a) }));
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
@@ -17,7 +20,7 @@ jest.mock('@/lib/secure-storage', () => ({
 }));
 jest.mock('@/lib/health/healthkit', () => ({ isHealthAvailable: () => true, getHealthWriteAccess: () => 'granted' }));
 jest.mock('@/lib/health/sync', () => ({
-  useHealthExport: () => ({ ready: false, processing: false, entries: mockEntries, getEntries: () => mockEntries, enqueue: mockEnqueue, forget: mockForget, discard: mockDiscard, retry: jest.fn(), allowWrite: jest.fn() }),
+  useHealthExport: () => ({ ready: mockReady, processing: false, entries: mockEntries, getEntries: () => mockEntries, enqueue: mockEnqueue, forget: mockForget, discard: mockDiscard, retry: jest.fn(), allowWrite: jest.fn() }),
 }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
@@ -36,6 +39,7 @@ async function turnOff() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockReady = false;
   mockStore.set('health-export-u1-food', '1');
   mockEntries = [saved('e1'), { ...saved('e2'), status: 'pending', payload: { name: 'Secret' } }];
 });
@@ -76,4 +80,31 @@ test('with nothing in Health the switch just turns off', async () => {
   expect(mockAlert).not.toHaveBeenCalled();
   expect(mockDiscard).toHaveBeenCalledWith('food');
   act(() => r.unmount());
+});
+
+describe('diary sync after food was settled or deleted', () => {
+  const row = { id: 'r1', updated_at: '2026-11-06T12:00:00.000Z', food_name: 'Secret', consumed_at: '2026-11-06T12:00:00.000Z', energy_kcal: 10 };
+  const mount = async () => {
+    mockReady = true;
+    mockEntries = [];
+    const r = createRoot();
+    await act(async () => r.render(<Option />));
+    await act(async () => { await new Promise((x) => setTimeout(x, 0)); });
+    return r;
+  };
+  it('queues the rows it read when nothing changed meanwhile', async () => {
+    mockFetch.mockResolvedValue([row]);
+    const r = await mount();
+    expect(mockEnqueue).toHaveBeenCalledWith('food', 'r1', 'save', expect.anything(), expect.any(Number));
+    act(() => r.unmount());
+  });
+  it('queues nothing when food was deleted or settled while it was reading', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { bumpFoodSyncGeneration } = require('@/lib/health/food-export');
+    mockFetch.mockImplementation(async () => { bumpFoodSyncGeneration(); return [row]; });
+    const r = await mount();
+    expect(mockFetch).toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
+    act(() => r.unmount());
+  });
 });

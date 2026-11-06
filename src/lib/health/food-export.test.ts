@@ -1,6 +1,6 @@
 import { isOwnExport } from './export-metadata';
 import { createExportQueue, exportWriters, type ExportEntry } from './export-queue';
-import { deletedFoodIds, EXPORT_DAYS, exportedFood, fetchRecentFoodRows, FOOD_KIND, FOOD_NUTRIENTS, foodDeleteVersion, foodPayload, foodVersion, pendingFoodSaves, settleFoodExport, type FoodRow } from './food-export';
+import { deletedFoodIds, EXPORT_DAYS, exportedFood, fetchRecentFoodRows, FOOD_KIND, FOOD_NUTRIENTS, foodDeleteVersion, foodPayload, foodSyncGeneration, foodVersion, pendingFoodSaves, settleFoodExport, type FoodRow } from './food-export';
 import { getHealthWriteAccess, resetHealthKitCache } from './healthkit';
 
 const mockSelect = jest.fn();
@@ -441,14 +441,17 @@ describe('settling food in Health (keep or remove)', () => {
   const at = Date.now();
   const mk = (recordId: string, status: ExportEntry['status'], o: Partial<ExportEntry> = {}): ExportEntry =>
     ({ kind: FOOD_KIND, recordId, op: 'save', payload: status === 'success' ? null : { name: 'Secret' }, version: foodVersion(new Date(at).toISOString(), 255)!, status, attempts: 0, ...o });
-  // A queue stand-in: enqueue replaces the entry (a delete runs later, or fails if told to), forget drops the matches.
-  const controls = (initial: ExportEntry[], failDeletes = false) => {
+  // A queue stand-in: enqueue replaces the entry; a delete then finishes (and leaves the queue), fails or stays pending as told.
+  // forget drops the matches.
+  const controls = (initial: ExportEntry[], deletes: 'finish' | 'fail' | 'wait' = 'finish') => {
     let entries = initial;
     return {
       get entries() { return entries; },
       getEntries: () => entries,
       enqueue: jest.fn(async (kind: string, recordId: string, op: 'save' | 'delete', payload: unknown, version?: number) => {
-        entries = [...entries.filter((e) => e.recordId !== recordId), { kind, recordId, op, payload, version: version!, status: failDeletes ? 'failed' : 'pending', attempts: 0 } as ExportEntry];
+        entries = entries.filter((e) => e.recordId !== recordId);
+        if (op === 'delete' && deletes === 'finish') return;
+        entries = [...entries, { kind, recordId, op, payload, version: version!, status: deletes === 'fail' ? 'failed' : 'pending', attempts: 0 } as ExportEntry];
       }),
       forget: jest.fn(async (kind: string, match: (e: ExportEntry) => boolean = () => true) => { entries = entries.filter((e) => !(e.kind === kind && match(e))); }),
     };
@@ -471,14 +474,22 @@ describe('settling food in Health (keep or remove)', () => {
     await expect(deletedFoodIds([], c.getEntries())).resolves.toEqual([]);
   });
   it('remove queues a delete for every food save, which replaces unsaved nutrients, and succeeds when they run', async () => {
-    const c = controls(all);
+    const c = controls(all.filter((e) => e.recordId !== 'del'));
     await settleFoodExport(c, true);
-    const food = c.getEntries().filter((e) => e.kind === FOOD_KIND);
-    expect(food.every((e) => e.op === 'delete' && e.payload === null)).toBe(true);
-    expect(food.map((e) => e.recordId).sort()).toEqual(['del', 'failed', 'sent', 'waiting']);
+    expect(c.enqueue.mock.calls.map((x) => [x[1], x[2], x[3]]).sort()).toEqual([['failed', 'delete', null], ['sent', 'delete', null], ['waiting', 'delete', null]]);
     expect(JSON.stringify(c.getEntries())).not.toContain('Secret');
   });
   it('remove says so when a Health delete could not run, instead of claiming success', async () => {
-    await expect(settleFoodExport(controls([mk('sent', 'success')], true), true)).rejects.toThrow(/Couldn't remove some food/);
+    await expect(settleFoodExport(controls([mk('sent', 'success')], 'fail'), true)).rejects.toThrow(/Couldn't remove some food/);
+  });
+  it('remove also says so when a delete is still pending, since that guards an irreversible account deletion', async () => {
+    await expect(settleFoodExport(controls([mk('sent', 'success')], 'wait'), true)).rejects.toThrow(/Couldn't remove some food/);
+  });
+  it('bumps the sync generation when it starts and when it ends, even on failure', async () => {
+    const before = foodSyncGeneration();
+    await settleFoodExport(controls([mk('sent', 'success')]), true);
+    expect(foodSyncGeneration()).toBe(before + 2);
+    await expect(settleFoodExport(controls([mk('sent', 'success')], 'wait'), true)).rejects.toThrow();
+    expect(foodSyncGeneration()).toBe(before + 4);
   });
 });

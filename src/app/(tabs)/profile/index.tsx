@@ -73,8 +73,9 @@ export default function Profile() {
   const count = (n: number) => `${n} ${n === 1 ? 'entry was' : 'entries were'} saved to Apple Health`;
   const deleteFood = (fromHealth: boolean) =>
     run(async () => {
-      await deleteFoodHistory();
+      // Health first, like account deletion: a failed Remove leaves the history intact, and Keep leaves nothing to reconcile.
       await settleFoodExport(healthExport, fromHealth);
+      await deleteFoodHistory();
     });
   // Health deletes must run while the account still exists, so they come first; if they fail the account stays.
   const removeAccount = (fromHealth: boolean) =>

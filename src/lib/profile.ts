@@ -1,4 +1,5 @@
 import { clearFoodPending } from './food/pending';
+import { bumpFoodSyncGeneration } from './health/food-export';
 import { clearMeasurementDraft } from './measurement-draft';
 import { deleteHealthJournal } from './health/journal';
 import { secureStorage } from './secure-storage';
@@ -39,10 +40,15 @@ export async function deleteFoodHistory(): Promise<void> {
     const { error } = await supabase.rpc('delete_my_food_history');
     if (error) throw new Error("Couldn't delete your food history. Check your connection and try again.");
   };
-  await del();
-  await clearFoodPending(uid);
-  // A flush that was in flight may have saved an entry after the first delete; the queue is empty now, so this is final.
-  await del();
+  bumpFoodSyncGeneration(); // a diary sync that read rows before this must not queue from them
+  try {
+    await del();
+    await clearFoodPending(uid);
+    // A flush that was in flight may have saved an entry after the first delete; the queue is empty now, so this is final.
+    await del();
+  } finally {
+    bumpFoodSyncGeneration();
+  }
 }
 
 // Deletes the auth user server-side (cascades to everything), then the local session, which stops Health
