@@ -136,7 +136,7 @@ export default function Profile() {
       {Platform.OS === 'ios' && (
         <Section
           title="Apple Health"
-          footer="Leaderboard reads steps, sleep, weight, and workouts that you allow. Deleting imported data doesn't change Apple's permissions: to change what Leaderboard can read, open the Health app, tap your profile picture, then Apps, then Leaderboard."
+          footer="Leaderboard reads steps, sleep, weight, and workouts that you allow, and saves food to Apple Health only if you turn that on in the Food Diary. Deleting imported data doesn't change Apple's permissions: to change what Leaderboard can read, open the Health app, tap your profile picture, then Apps, then Leaderboard."
         >
           <Row label="Health Access" icon={{ ios: 'heart.text.square', android: 'favorite', web: 'favorite' }} onPress={() => router.push('/steps/permission')} />
           <Row
