@@ -73,6 +73,15 @@ Checked on 2026-11-06 against the OpenAPI spec (https://fdc.nal.usda.gov/api-spe
 - No entries for a date means no data, not 0 kcal.
 - `local_date` is the calendar date in the entry's own device timezone (a zone name such as America/Chicago, or UTC or GMT; the server sets it from `consumed_at` and `timezone`). Group summaries (#49) must group by `local_date`, not by converting `consumed_at` with the viewer's or the group's timezone.
 
+## Recipes and meals (#46)
+
+- A recipe (`food_recipes`) is owner-only: name, notes for assumptions (raw or cooked), `servings` (default 1) and an optional cooked weight `yield_g`. A reusable meal is a recipe with 1 serving and no cooked weight, so there is one model and no flag.
+- Each ingredient (`food_recipe_ingredients`) stores grams plus its own copy of the food name and per-100 g nutrients from when it was added. Totals therefore do not move when a food is edited or deleted, and they work offline. Unknown nutrients are NULL.
+- Totals are the sum of the ingredient copies scaled by grams (`src/lib/food/recipe.ts`). A nutrient unknown in any ingredient is reported incomplete ("At least ..."). Per serving divides by servings. Per 100 g and gram portions use the cooked weight, or the total ingredient weight when none was entered (the screen says which).
+- Applying a recipe logs ONE `food_entries` row: `provider = 'recipe'`, `provider_id` null, `food_id` null, `food_name` the recipe name, the portion as N servings (`portion_label` "serving") or grams of cooked weight. Its nutrients are the scaled totals, except that a nutrient incomplete in the recipe is saved as NULL (unknown) rather than as a partial sum, so the diary never shows an exact-looking number built from missing data. Nothing links the entry back to the recipe: editing or deleting the recipe never changes it, and editing the entry's amount scales its own snapshot like any other entry.
+- Constraint change: `provider_id` is set only for `usda_fdc` entries (custom and recipe entries have none), and a recipe entry has no `food_id`.
+- Recipe entries are tagged "Recipe" in the diary, and default to the "Estimate" tag. Account deletion cascades through profiles to recipes, ingredients and entries.
+
 ## Attribution the UI must show
 
 On food search and detail screens, and in any history view showing a USDA food:

@@ -43,6 +43,13 @@ export function scaleNutrients(per100g: Nutrients, grams: number): Nutrients {
   return out;
 }
 
+// Nutrients of an amount `from`, scaled to amount `to` (any shared unit). Unknown stays unknown.
+export function scaleSnapshot(n: Nutrients, from: number, to: number): Nutrients {
+  const out = emptyNutrients();
+  for (const k of NUTRIENT_KEYS) out[k] = n[k] == null ? null : (n[k] * to) / from;
+  return out;
+}
+
 export type NutrientTotals = {
   totals: Nutrients;
   // Nutrients where at least one input was unknown, so the total is a lower bound. A total that is

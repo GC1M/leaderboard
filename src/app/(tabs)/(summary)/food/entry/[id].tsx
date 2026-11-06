@@ -8,14 +8,12 @@ import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/com
 import { useAuth } from '@/lib/auth';
 import { alert } from '@/lib/alert';
 import { discardPending, type Entry, getEntry, removeEntry, saveEdit } from '@/lib/food/diary';
-import { entryTags, formatNutrient } from '@/lib/food/format';
+import { entryTags, formatNutrient, NUTRIENT_NAMES } from '@/lib/food/format';
 import { MEALS, type Meal, type Quantity } from '@/lib/food/log';
 import { NUTRIENT_KEYS } from '@/lib/food/nutrition';
 import { ESTIMATE_NOTE, FDC_ATTRIBUTION, type Food, getFood } from '@/lib/food/search';
 import { decimalValue } from '@/lib/numeric-input';
 import { useTheme } from '@/theme';
-
-const NAMES = { energy_kcal: 'Calories', protein_g: 'Protein', carbs_g: 'Carbs', fat_g: 'Fat', fiber_g: 'Fiber', sugars_g: 'Sugars', sat_fat_g: 'Saturated fat', sodium_mg: 'Sodium' } as const;
 
 const when = (e: Entry) => {
   const at = new Date(e.consumedAt);
@@ -148,10 +146,10 @@ export default function EntryDetail() {
         </View>
       )}
       <Section title="Nutrition for this amount" footer="These are the values saved when you logged this food, scaled if you changed the amount.">
-        {NUTRIENT_KEYS.map((k, i) => <Row key={k} label={NAMES[k]} value={formatNutrient(k, entry.nutrients[k])} last={i === NUTRIENT_KEYS.length - 1} />)}
+        {NUTRIENT_KEYS.map((k, i) => <Row key={k} label={NUTRIENT_NAMES[k]} value={formatNutrient(k, entry.nutrients[k])} last={i === NUTRIENT_KEYS.length - 1} />)}
       </Section>
       <Section title="Source">
-        <Row label="Provider" value={entry.provider === 'custom' ? 'Custom food' : 'USDA FoodData Central'} wrap />
+        <Row label="Provider" value={{ custom: 'Custom food', recipe: 'Your recipe (saved copy)', usda_fdc: 'USDA FoodData Central' }[entry.provider]} wrap />
         {entry.sourceDataType && <Row label="Data type" value={entry.sourceDataType} wrap />}
         {entry.sourceVersion && <Row label="Source version" value={entry.sourceVersion} wrap />}
         <Row label="Logged" value={when(entry)} wrap last />

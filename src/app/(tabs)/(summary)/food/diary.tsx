@@ -102,6 +102,7 @@ export default function Diary() {
         </>
       )}
       <Button label="Log Food" onPress={() => router.push('/food')} />
+      <Button plain label="Recipes and Meals" onPress={() => router.push('/food/recipes')} />
       <Button plain label="History" onPress={() => router.push('/food/history')} />
       <Text style={[styles.caption, { color: c.inkSoft }]}>{ESTIMATE_NOTE}</Text>
     </Screen>
