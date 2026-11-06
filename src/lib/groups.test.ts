@@ -3,6 +3,7 @@ import {
   deleteGroup,
   deleteMemberManualSteps,
   friendlyError,
+  getGroupFood,
   getGroupWorkouts,
   getMyShares,
   inviteLink,
@@ -184,6 +185,31 @@ test('getGroupWorkouts asks for whole weeks through tomorrow, and rethrows error
     const err = { message: 'not a member of this group' };
     rpc.mockResolvedValue({ data: null, error: err });
     await expect(getGroupWorkouts('g')).rejects.toBe(err);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('food can be shared and unshared like any metric', async () => {
+  getSession.mockResolvedValue({ data: { session: { user: { id: 'me' } } } });
+  const upsert = jest.fn().mockResolvedValue({ data: null, error: null });
+  const match = jest.fn().mockResolvedValue({ data: null, error: null });
+  from.mockReturnValue({ upsert, delete: () => ({ match }) });
+  await setShare('g', 'food', true);
+  expect(upsert).toHaveBeenCalledWith({ group_id: 'g', user_id: 'me', metric: 'food' }, { ignoreDuplicates: true });
+  await setShare('g', 'food', false);
+  expect(match).toHaveBeenCalledWith({ group_id: 'g', user_id: 'me', metric: 'food' });
+});
+
+test('getGroupFood asks for the last days through tomorrow, and rethrows errors untouched', async () => {
+  jest.useFakeTimers().setSystemTime(new Date(2026, 9, 28, 12));
+  try {
+    rpc.mockResolvedValue({ data: [{ user_id: 'a', local_date: '2026-10-28' }], error: null });
+    await expect(getGroupFood('g', 7)).resolves.toHaveLength(1);
+    expect(rpc).toHaveBeenCalledWith('group_food', { p_group_id: 'g', p_from: '2026-10-22', p_to: '2026-10-29' });
+    const err = { message: 'not a member of this group' };
+    rpc.mockResolvedValue({ data: null, error: err });
+    await expect(getGroupFood('g')).rejects.toBe(err);
   } finally {
     jest.useRealTimers();
   }

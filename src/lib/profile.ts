@@ -29,6 +29,19 @@ export async function updateDisplayName(name: string): Promise<string> {
   return trimmed;
 }
 
+// Deletes every food entry, recipe and custom food on the server, then the unsent food changes on this device,
+// so nothing queued re-creates what was just deleted. Sharing choices stay: a group then sees no food logged.
+// HOOK(#48): Apple Health food samples this app wrote are NOT removed here, and the confirm dialog says so. #48
+// (docs/food/health-export.md) queues Health deletes per entry through the shared export queue, and that needs
+// the entry ids, so once it lands, offer "also remove from Apple Health" in profile/index.tsx and, if chosen,
+// queue those deletes for the exported entries BEFORE calling this (the rows are gone afterwards).
+export async function deleteFoodHistory(): Promise<void> {
+  const uid = await myId();
+  const { error } = await supabase.rpc('delete_my_food_history');
+  if (error) throw new Error("Couldn't delete your food history. Check your connection and try again.");
+  await clearFoodPending(uid);
+}
+
 // Deletes the auth user server-side (cascades to everything), then the local session, which stops Health
 // sync, then this device's Health import state. Local cleanup is best effort: the account is already gone.
 export async function deleteAccount(): Promise<void> {

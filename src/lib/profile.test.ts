@@ -1,4 +1,4 @@
-import { deleteAccount, updateDisplayName } from './profile';
+import { deleteAccount, deleteFoodHistory, updateDisplayName } from './profile';
 import { supabase } from './supabase';
 
 jest.mock('./supabase', () => ({
@@ -40,4 +40,15 @@ test('deleteAccount signs out locally only after the server delete succeeds', as
   expect(mockRemoveItem).toHaveBeenCalledWith('template-drafts-me');
   expect(mockRemoveItem).toHaveBeenCalledWith('food-pending-me');
   expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
+});
+
+test('deleteFoodHistory clears the unsent food queue only after the server delete succeeds', async () => {
+  rpc.mockResolvedValue({ error: { message: 'boom' } });
+  await expect(deleteFoodHistory()).rejects.toThrow(/Couldn't delete your food history/);
+  expect(mockRemoveItem).not.toHaveBeenCalled();
+  rpc.mockResolvedValue({ error: null });
+  await deleteFoodHistory();
+  expect(rpc).toHaveBeenCalledWith('delete_my_food_history');
+  expect(mockRemoveItem).toHaveBeenCalledWith('food-pending-me');
+  expect(signOut).not.toHaveBeenCalled();
 });
