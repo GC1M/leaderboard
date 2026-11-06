@@ -1,45 +1,46 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Switch, Text, View } from 'react-native';
 
 import { Button, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import type { Entry } from '@/lib/food/diary';
-import { canExportFood, FOOD_KIND, FOOD_WRITE_TYPES, foodPayload } from '@/lib/health/food-export';
+import { allowedFoodTypes, fetchRecentFoodRows, FOOD_KIND, FOOD_WRITE_TYPES, foodDeleteVersion, pendingFoodSaves } from '@/lib/health/food-export';
 import { getHealthWriteAccess, isHealthAvailable } from '@/lib/health/healthkit';
 import { useHealthExport } from '@/lib/health/sync';
 import { secureStorage } from '@/lib/secure-storage';
 import { useTheme } from '@/theme';
 
 const DENIED = 'Health did not allow saving any nutrition. Turn it on in Settings, Health, Data Access & Devices, then try again.';
-const NOTE = 'Saves each synced entry to Health as a food with the nutrients we know, for the amount you ate. Ingredients, recipes and photos stay in this app. Health only shows the nutrients you allow.';
+const NOTE = 'Saves each synced entry from the last 90 days to Health as a food, with its name and the nutrients we know for the amount you ate. Ingredients, recipes and photos stay in this app. Health only shows the nutrients you allow.';
 
 // The "Save food to Apple Health" choice, remembered per account on this device. Turning it on asks Health for
 // permission to write each nutrient type (the sheet lets the user allow any of them), and nothing else.
-// Pass the entries on screen: each synced one is exported, and an edit (a new row version) replaces it.
-export function useFoodExport(entries?: readonly Entry[] | null) {
+// sync() queues the synced entries of the last 90 days that are not queued at their version yet. It runs when the switch
+// turns on, and screens call it after the diary loads or a food is logged.
+export function useFoodExport() {
   const { session } = useAuth();
   const exp = useHealthExport();
   const key = `health-export-${session?.user.id}-food`;
   const [on, setOn] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const latest = useRef({ on, entries: exp.entries, enqueue: exp.enqueue });
+  latest.current = { on, entries: exp.entries, enqueue: exp.enqueue };
+  const running = useRef<Promise<void> | null>(null);
   useEffect(() => {
     let live = true;
     secureStorage.getItem(key).then((v) => live && setOn(v === '1'), () => {});
     return () => { live = false; };
   }, [key]);
-  const send = (id: string, op: 'save' | 'delete', payload: unknown, version?: number) => exp.enqueue(FOOD_KIND, id, op, payload, version).catch(() => {});
-  useEffect(() => {
-    if (!on || !entries) return;
-    for (const e of entries) {
-      // The row's updated_at is the export version, so the same row never re-exports and an edit always does.
-      const version = e.updatedAt ? Date.parse(e.updatedAt) : NaN;
-      if (e.id && canExportFood(e) && Number.isFinite(version) && !exp.entries.some((x) => x.kind === FOOD_KIND && x.recordId === e.id && x.op === 'save' && x.version >= version)) {
-        void send(e.id, 'save', foodPayload(e), version);
+  const sync = useCallback(() => {
+    running.current ??= (async () => {
+      if (!latest.current.on) return;
+      for (const s of pendingFoodSaves(await fetchRecentFoodRows(), latest.current.entries, allowedFoodTypes())) {
+        await latest.current.enqueue(FOOD_KIND, s.id, 'save', s.payload, s.version);
       }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [on, entries]);
+    })().catch(() => {}).finally(() => { running.current = null; }); // a failure retries on the next diary load
+    return running.current;
+  }, []);
+  useEffect(() => { if (on) void sync(); }, [on, sync]);
   const set = async (next: boolean) => {
     setMessage(null);
     setBusy(true);
@@ -57,9 +58,12 @@ export function useFoodExport(entries?: readonly Entry[] | null) {
     }
   };
   return {
-    eligible: isHealthAvailable(), on, message, busy, set,
-    // After a diary delete: an entry this device exported leaves Health too.
-    deleted: (id: string) => (exp.entries.some((e) => e.kind === FOOD_KIND && e.recordId === id && e.op === 'save') ? send(id, 'delete', null) : undefined),
+    eligible: isHealthAvailable(), on, message, busy, set, sync,
+    // After the server deleted an entry: one this device exported leaves Health too, whatever the clock says.
+    deleted: useCallback(async (id: string) => {
+      const version = foodDeleteVersion(latest.current.entries, id);
+      if (version !== null) await latest.current.enqueue(FOOD_KIND, id, 'delete', null, version).catch(() => {});
+    }, []),
   };
 }
 

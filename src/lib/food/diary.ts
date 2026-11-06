@@ -138,11 +138,15 @@ export async function saveEdit(uid: string, entry: Entry, input: EditInput): Pro
 
 // Deleting is a confirmed online action. An entry that never synced is also deleted by client id on the
 // server, in case an earlier send landed after it was shown as unsynced. Queued changes for it are dropped.
-export async function removeEntry(uid: string, entry: Entry): Promise<void> {
+export async function removeEntry(uid: string, entry: Entry, onRemoved?: (id: string) => Promise<void>): Promise<void> {
+  // An entry that looks unsynced may have reached the server meanwhile, and may have been saved to Health since.
+  const id = entry.id ?? (onRemoved ? (await supabase.from('food_entries').select('id').eq('client_id', entry.clientId).maybeSingle()).data?.id ?? null : null);
   const { error } = await (entry.id
     ? supabase.from('food_entries').delete().eq('id', entry.id)
     : supabase.from('food_entries').delete().eq('client_id', entry.clientId));
   if (error) throw new Error("Couldn't delete that entry. A connection is needed to delete. Try again.");
+  // Straight after the server delete, so the Health copy is queued (and kept on the phone) before anything can interrupt.
+  if (id) await onRemoved?.(id);
   if (entry.id) await discard(uid, { kind: 'edit', id: entry.id, patch: {} });
   await discard(uid, { kind: 'log', clientId: entry.clientId, row: {} });
 }

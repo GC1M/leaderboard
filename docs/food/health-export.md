@@ -22,24 +22,26 @@ Units: the entry stores kcal, grams and milligrams, the same units HealthKit is 
 Rules:
 
 - A NULL (unknown) nutrient is not written. Never as zero. A recorded 0 is a known value and is written as 0. An entry with no known nutrient writes nothing.
-- Only entries that have reached the server and are not waiting on a queued edit are exported (`canExportFood`). Pending, unsynced or failed-to-sync entries are skipped until they sync.
+- Only entries the server has are exported, and only those from the last 90 days (`EXPORT_DAYS`, by `local_date`). Pending, unsynced or failed-to-sync entries are not on the server, so they are skipped until they sync. Older entries are never exported, and an entry edited into an older date after export is not removed from Health.
 - Only app-authored entries exist in `food_entries`; nothing imported from Health is ever in it, so nothing imported is written back. Every sample carries `LeaderboardRecordId = food:<entry id>`, which the Health importers skip.
 - Ingredients, recipes, meal names, brands, source data type, photos and notes stay in the app.
 
 ## Permissions
 
-Turning the switch on shows the Health sheet for the eight nutrient types (`toShare` only, never read access). The user can allow any subset, independently. Only allowed nutrients are written: a denied nutrient is simply left out of the correlation, and the entry still exports while at least one type is allowed. If none is allowed the switch stays off and says how to allow it. A queued entry whose permission is later revoked for every type stays `failed` with reason `permission`, keeps the diary entry, and exports after the user allows it (Retry on the diary). Nutrients allowed after an entry was exported are added when that entry is next edited.
+Turning the switch on shows the Health sheet for the eight nutrient types (`toShare` only, never read access). The user can allow any subset, independently. Only allowed nutrients are written: a denied nutrient is simply left out of the correlation, and the entry still exports while at least one type is allowed. If none is allowed the switch stays off and says how to allow it. Each type the user allowed when an entry was saved is recorded (on this device). If one of those types is later revoked, an edit or delete of that entry fails with reason `permission` rather than leave a second copy: the old samples can only be removed in the Health app, or after the type is allowed again. A queued entry whose permission is later revoked for every type stays `failed` with reason `permission`, keeps the diary entry, and exports after the user allows it (Retry on the diary). Nutrients allowed after an entry was exported are added automatically: the export version includes the count of allowed types, so the entry is saved again, at a higher sync version, the next time the diary loads.
 
 ## Mapping, retries, edits, deletes
 
 Uses the #34 queue and `health_exports` mapping unchanged (no SQL): kind `food`, recordId `food_entries.id`, one queue entry per diary entry. The id stays the same when an amount is edited.
 
-- Version: the row's `updated_at` in ms is the export version, so loading the diary again never re-exports a row, and any change to the row (amount, meal, time) exports a new version.
+- Trigger: when the switch turns on, on every diary load while it is on, and right after a food is logged and synced, one query reads the synced entries of the last 90 days (id, `updated_at`, name, time and nutrients only) and queues every entry not already queued at its version. The version check makes this idempotent.
+- Version: `updated_at` in ms times 16 plus the number of allowed nutrient types. Reloading never re-exports a row, any change to the row (amount, meal, time) exports a new version, and allowing more types does too.
+- Sync version: HealthKit ignores a save whose sync version is not above the one it holds, and the correlation delete is best effort, so each write attempt uses its own higher `HKMetadataKeySyncVersion`, saved in the queue entry before the write. A crash between the Health write and the mapping write therefore retries as a real replace.
 - Retry: a failed write retries on launch, foreground and the next enqueue. Before writing, the writer removes any correlation and members already saved for that record, so a retry after a lost mapping write never doubles correlation members (HealthKit's sync identifier only replaces the correlation object, not its members).
 - Edit: the new version removes the old correlation and members, then writes new ones from the new values.
-- Delete: deleting an entry in the diary enqueues a delete, which removes its correlation and members by the `LeaderboardRecordId` metadata and clears the mapping. HealthKit only lets an app delete its own samples.
+- Delete: `removeEntry` queues the Health delete right after the server delete succeeds, with a version above every earlier one for that entry (never below, whatever the clock says), so it works even if the entry had a queued edit or looked unsynced. It removes its correlation and members by the `LeaderboardRecordId` metadata and clears the mapping. HealthKit only lets an app delete its own samples.
 - Switch off: stops saving new and edited entries and drops saves not yet written. Entries already in Health stay, and are still removed when deleted in the app.
-- Limits: only entries on a day the user opens in the diary while the switch is on are queued, so turning it on later exports each day as it is viewed. A delete is only queued for an entry this device has an export entry for; one exported from another device, or after the switch was off, is removed in the Health app.
+- Limits: a delete is only queued for an entry this device has an export entry for; one exported from another device, or after the switch was off, is removed in the Health app.
 
 ## External display limitations
 
@@ -63,8 +65,11 @@ Needs a development build on a real iPhone with Health.
 - [ ] A recorded 0 (for example 0 g sugars) shows as 0.
 - [ ] Check the sample details for the food name and that the source is this app.
 - [ ] Edit the amount: Health shows the new values and no leftover old samples (and no empty or duplicate food in the correlation).
+- [ ] Allow a nutrient you denied earlier: the next diary load saves the entry again with that nutrient, replacing the old copy.
+- [ ] Log a food older than 90 days: it is not exported.
 - [ ] Edit and then force-quit mid-sync, reopen: still one set of samples.
 - [ ] Delete the entry: all its samples are gone from Health, including after deleting the correlation (confirm HealthKit's delete of the correlation, which is best effort, leaves nothing behind).
 - [ ] Turn off airplane mode after logging offline: the entry exports only once it has synced.
+- [ ] Revoke one nutrient permission after exporting, then edit or delete that entry: it shows a permission failure and leaves one copy, not two. Re-allow and retry to finish.
 - [ ] Revoke all nutrient permissions in Settings, log a food, then re-allow and tap Retry: it exports once.
 - [ ] After the next Health import, nothing the app exported comes back as imported data.

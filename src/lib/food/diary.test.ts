@@ -9,10 +9,11 @@ const mockDiscard = jest.fn();
 const mockRows = jest.fn();
 const mockDeleteEq = jest.fn();
 const mockIn = jest.fn();
+const mockMaybe = jest.fn();
 jest.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
-      select: () => ({ eq: () => ({ order: () => mockRows() }), in: (...a: unknown[]) => mockIn(...a) }),
+      select: () => ({ eq: () => ({ order: () => mockRows(), maybeSingle: () => mockMaybe() }), in: (...a: unknown[]) => mockIn(...a) }),
       delete: () => ({ eq: (...a: unknown[]) => mockDeleteEq(...a) }),
     }),
   },
@@ -148,6 +149,41 @@ describe('removeEntry', () => {
     await removeEntry('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'));
     expect(mockDeleteEq).toHaveBeenCalledWith('client_id', 'c9');
     expect(mockDiscard).toHaveBeenCalledWith('u1', expect.objectContaining({ kind: 'log', clientId: 'c9' }));
+  });
+});
+
+describe('removeEntry and the Health export', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('tells the export about the deleted id right after the server delete, before the queue is cleaned, even with a queued edit', async () => {
+    const order: string[] = [];
+    mockDeleteEq.mockImplementation(async () => { order.push('server'); return { error: null }; });
+    mockDiscard.mockImplementation(async () => { order.push('discard'); });
+    await removeEntry('u1', entryFromRow(row(), 'edit'), async (id) => { order.push(`export:${id}`); });
+    expect(order).toEqual(['server', 'export:e1', 'discard', 'discard']);
+  });
+
+  test('does not queue a Health delete when the server delete fails', async () => {
+    mockDeleteEq.mockResolvedValue({ error: { message: 'x' } });
+    const onRemoved = jest.fn();
+    await expect(removeEntry('u1', entry(), onRemoved)).rejects.toThrow();
+    expect(onRemoved).not.toHaveBeenCalled();
+  });
+
+  test('an entry that looked unsynced but reached the server is found by client id and its Health copy removed', async () => {
+    mockDeleteEq.mockResolvedValue({ error: null });
+    mockMaybe.mockResolvedValue({ data: { id: 'x9' } });
+    const onRemoved = jest.fn(async () => {});
+    await removeEntry('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'), onRemoved);
+    expect(onRemoved).toHaveBeenCalledWith('x9');
+  });
+
+  test('an entry the server never had has nothing to remove from Health', async () => {
+    mockDeleteEq.mockResolvedValue({ error: null });
+    mockMaybe.mockResolvedValue({ data: null });
+    const onRemoved = jest.fn(async () => {});
+    await removeEntry('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'), onRemoved);
+    expect(onRemoved).not.toHaveBeenCalled();
   });
 });
 

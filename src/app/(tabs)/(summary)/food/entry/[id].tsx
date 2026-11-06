@@ -128,8 +128,7 @@ export default function EntryDetail() {
           if (busy) return;
           setBusy(true);
           try {
-            await removeEntry(uid, entry);
-            if (entry.id) await foodExport.deleted(entry.id);
+            await removeEntry(uid, entry, foodExport.deleted);
             router.back();
           } catch (e) {
             setError(e instanceof Error ? e.message : "Couldn't delete that entry. Try again.");

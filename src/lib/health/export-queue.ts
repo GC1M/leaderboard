@@ -12,6 +12,7 @@ export type ExportEntry = {
   reason?: 'permission' | 'error';
   attempts: number;
   sampleUuid?: string | null;
+  attemptVersion?: number; // last sync version a writer with attemptVersions used, saved before the write so it only grows
 };
 export interface ExportStore {
   list(): Promise<ExportEntry[]>;
@@ -23,6 +24,9 @@ export interface ExportWriter {
   writeType: HealthWriteType;
   // For a writer that saves several types (food nutrients), each allowed on its own: the entry exports while any one is granted.
   writeTypes?: readonly HealthWriteType[];
+  // HealthKit ignores a save whose sync version is not above the one it holds, and a crash can leave a half-finished
+  // write there. This writer's save() reads entry.attemptVersion, which is higher on every attempt.
+  attemptVersions?: boolean;
   save(entry: ExportEntry): Promise<string | null>; // must tag the sample with exportMetadata(); returns the Health sample uuid
   remove(entry: ExportEntry): Promise<void>; // must delete only samples this app saved
 }
@@ -77,6 +81,7 @@ export function createExportQueue(deps: ExportDependencies) {
     const writer = deps.writers[entry.kind];
     if (!writer) return update(entry, { status: 'failed', reason: 'error' }, token);
     if (!(writer.writeTypes ?? [writer.writeType]).some((t) => deps.access(t) === 'granted')) return update(entry, { status: 'failed', reason: 'permission' }, token);
+    let attempt = entry.attemptVersion;
     try {
       await account(token);
       if (entry.op === 'delete') {
@@ -94,14 +99,22 @@ export function createExportQueue(deps: ExportDependencies) {
       const known = await deps.mapping.get(entry.kind, entry.recordId);
       await account(token);
       const done = known !== null && known.syncVersion >= entry.version;
-      const uuid = done ? entry.sampleUuid ?? null : await writer.save(entry);
+      let uuid = entry.sampleUuid ?? null;
+      if (!done) {
+        if (writer.attemptVersions) {
+          attempt = Math.max(entry.version, (entry.attemptVersion ?? 0) + 1, Date.now());
+          await update(entry, { attemptVersion: attempt }, token);
+        }
+        uuid = await writer.save({ ...entry, attemptVersion: attempt });
+      }
       await account(token);
       // A failure after the save retries with the same sync identifier and version, which replaces rather than duplicates.
       if (!done) await deps.mapping.record(entry.kind, entry.recordId, uuid, entry.version);
-      await update(entry, { status: 'success', reason: undefined, payload: null, sampleUuid: uuid }, token);
+      await update(entry, { status: 'success', reason: undefined, payload: null, sampleUuid: uuid, attemptVersion: attempt }, token);
     } catch (e) {
       if (!alive || epoch !== token) throw e;
-      await update(entry, { status: 'failed', reason: 'error', attempts: entry.attempts + 1 }, token);
+      // A writer can say a type it wrote earlier is no longer allowed, which only the user can fix.
+      await update(entry, { status: 'failed', reason: (e as { reason?: string }).reason === 'permission' ? 'permission' : 'error', attempts: entry.attempts + 1, attemptVersion: attempt }, token);
     }
   };
   // ponytail: failed entries retry on every process() call (launch, foreground, enqueue), no backoff timer.
@@ -139,7 +152,7 @@ export function createExportQueue(deps: ExportDependencies) {
       await account(epoch);
       const previous = state.entries.find((e) => e.kind === kind && e.recordId === recordId);
       if (previous && previous.version >= version) return; // duplicate or stale edit
-      const entry: ExportEntry = { kind, recordId, op, payload, version, status: 'pending', attempts: 0, sampleUuid: previous?.sampleUuid };
+      const entry: ExportEntry = { kind, recordId, op, payload, version, status: 'pending', attempts: 0, sampleUuid: previous?.sampleUuid, attemptVersion: previous?.attemptVersion };
       await deps.store.put(entry);
       emit([...state.entries.filter((e) => e !== previous), entry]);
       return process();
