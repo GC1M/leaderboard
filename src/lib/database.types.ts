@@ -653,6 +653,9 @@ isOneToOne: false
 "delete_my_account":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
+"delete_my_food_history":
+{ Args: Record<PropertyKey, never>; Returns: undefined
+                           },
 "delete_my_health_imports":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
@@ -669,6 +672,11 @@ isOneToOne: false
                            },
 "gen_invite_code":
 { Args: Record<PropertyKey, never>; Returns: string
+                           },
+"group_food":
+{ Args: { "p_from": string,"p_group_id": string,"p_to": string }; Returns: {
+              "carbs_g": number,"carbs_g_incomplete": boolean,"energy_kcal": number,"energy_kcal_incomplete": boolean,"fat_g": number,"fat_g_incomplete": boolean,"local_date": string,"protein_g": number,"protein_g_incomplete": boolean,"user_id": string
+            }[]
                            },
 "group_latest_weight":
 { Args: { "p_group_id": string }; Returns: {

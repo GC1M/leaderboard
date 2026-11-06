@@ -120,7 +120,7 @@ export async function deleteMemberManualSteps(groupId: string, userId: string): 
   await friendly(supabase.rpc('delete_member_manual_entry', { p_group_id: groupId, p_user_id: userId, p_metric: 'steps' }));
 }
 
-export type SharedMetric = 'steps' | 'sleep' | 'weight' | 'workouts';
+export type SharedMetric = 'steps' | 'sleep' | 'weight' | 'workouts' | 'food';
 
 async function myId(): Promise<string> {
   const { data: auth } = await supabase.auth.getSession();
@@ -178,6 +178,17 @@ export async function getGroupWorkouts(groupId: string, weeks = 4) {
   const now = new Date();
   const { data, error } = await supabase.rpc('group_workouts', {
     p_group_id: groupId, p_from: weekStartKey(now, weeks - 1), p_to: localDateKey(startOfLocalDay(now, -1)),
+  });
+  if (error) throw error;
+  return data;
+}
+
+// Daily nutrition totals per member who shares food with this group, and nothing else. The last `days` days
+// through tomorrow (a member ahead of you can already be on tomorrow's date).
+export async function getGroupFood(groupId: string, days = 7) {
+  const now = new Date();
+  const { data, error } = await supabase.rpc('group_food', {
+    p_group_id: groupId, p_from: lastNDates(days, now)[0], p_to: localDateKey(startOfLocalDay(now, -1)),
   });
   if (error) throw error;
   return data;

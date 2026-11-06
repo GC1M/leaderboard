@@ -1,4 +1,4 @@
-import { buildMemberSummaries, sleepText, weightText, workoutsText } from './group-summaries';
+import { buildMemberSummaries, foodText, sleepText, weightText, workoutsText } from './group-summaries';
 
 const members = [
   { userId: 'a', name: 'Ann' },
@@ -76,5 +76,37 @@ describe('workouts', () => {
     expect(workoutsText({ state: 'recorded', count: 1, durationS: 1800, weekStart: '2026-10-12' }, now)).toBe('1 workout, 30m, week of oct 12');
     expect(workoutsText({ state: 'no_data' }, now)).toBe('No recent workouts');
     expect(workoutsText({ state: 'not_shared' }, now)).toBe('Not shared');
+  });
+});
+
+describe('food', () => {
+  const day = (user_id: string, local_date: string, kcal: number | null, o: Partial<Record<'protein_g' | 'carbs_g' | 'fat_g', number | null>> = {}, incomplete = false) => ({
+    user_id, local_date, energy_kcal: kcal, protein_g: o.protein_g ?? null, carbs_g: o.carbs_g ?? null, fat_g: o.fat_g ?? null,
+    energy_kcal_incomplete: incomplete, protein_g_incomplete: false, carbs_g_incomplete: false, fat_g_incomplete: false,
+  });
+  const out = buildMemberSummaries(
+    members,
+    { a: ['food'], b: ['food'], c: ['steps'] },
+    [],
+    [],
+    [],
+    [day('a', '2026-10-24', 900), day('a', '2026-10-26', 1850.4, { protein_g: 80.26, carbs_g: 0, fat_g: 60 }, true), day('c', '2026-10-26', 500)],
+  );
+  it('takes the latest day and keeps a recorded zero', () => {
+    expect(out[0].food).toMatchObject({ state: 'recorded', date: '2026-10-26', energy: { value: 1850.4, incomplete: true }, carbs: { value: 0 } });
+  });
+  it('shared with no entries is no data, and an unshared member is not shared even with entries', () => {
+    expect(out[1].food).toEqual({ state: 'no_data' });
+    expect(out[2].food).toEqual({ state: 'not_shared' });
+  });
+  it('is not shared when no food rows were passed in', () => {
+    expect(buildMemberSummaries(members, { a: ['food'] }, [], [])[0].food).toEqual({ state: 'no_data' });
+  });
+  it('formats totals, lower bounds and unknowns, and never shows no food as 0', () => {
+    expect(foodText(out[0].food, now)).toBe('at least 1,850 kcal, protein 80.3 g, carbs 0 g, fat 60 g, today');
+    expect(foodText({ state: 'no_data' }, now)).toBe('No food logged this week');
+    expect(foodText({ state: 'not_shared' }, now)).toBe('Not shared');
+    const none = { value: null, incomplete: true };
+    expect(foodText({ state: 'recorded', date: '2026-10-25', energy: none, protein: none, carbs: none, fat: none }, now)).toBe('Logged, amounts unknown, yesterday');
   });
 });

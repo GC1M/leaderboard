@@ -172,6 +172,38 @@ test('discard (exports turned off) drops unsent saves of that kind so a later gr
   expect(rows.has('weight:r1')).toBe(false);
 });
 
+test('forget drops matching entries without writing or deleting anything, and never touches other kinds', async () => {
+  const { queue, writer, rows } = setup('denied');
+  await queue.initialize();
+  await queue.enqueue('weight', 'r1', 'save', { kg: 80 }, 1);
+  await queue.enqueue('weight', 'r2', 'delete', null, 1);
+  await queue.enqueue('sleep', 's1', 'save', {}, 1);
+  await queue.forget('weight', (e) => e.op === 'save');
+  expect(queue.getSnapshot().entries.map((e) => e.recordId).sort()).toEqual(['r2', 's1']);
+  await queue.forget('weight');
+  expect(queue.getSnapshot().entries.map((e) => e.recordId)).toEqual(['s1']);
+  expect(rows.has('weight:r1')).toBe(false);
+  expect(writer.save).not.toHaveBeenCalled();
+  expect(writer.remove).not.toHaveBeenCalled();
+});
+
+test('forget and discard show the dropped state before the store removals finish, so nothing can save a dropped entry', async () => {
+  const { queue, deps } = setup('denied');
+  await queue.initialize();
+  await queue.enqueue('weight', 'r1', 'save', { kg: 80 }, 1);
+  await queue.enqueue('weight', 'r2', 'save', { kg: 81 }, 1);
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  const remove = deps.store.remove;
+  deps.store.remove = async (k, id) => { await gate; return remove(k, id); };
+  const forgetting = queue.forget('weight', (e) => e.recordId === 'r1');
+  expect(queue.getSnapshot().entries.map((e) => e.recordId)).toEqual(['r2']);
+  const discarding = queue.discard('weight');
+  expect(queue.getSnapshot().entries).toEqual([]);
+  release();
+  await Promise.all([forgetting, discarding]);
+});
+
 test('an edit enqueued while the old version is exporting is not overwritten by the old result', async () => {
   const { queue, writer, rows } = setup();
   await queue.initialize();

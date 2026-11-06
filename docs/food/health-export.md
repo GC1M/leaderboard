@@ -46,6 +46,8 @@ Uses the #34 queue and `health_exports` mapping, extended (opt-in `attemptVersio
 - Older entries: edits to entries older than 90 days are not re-exported, and an entry edited into an older date after export keeps its old Health copy.
 - Limits: a delete is only queued for an entry this device has an export entry for; one exported from another device, or after the switch was off, is removed in the Health app.
 
+The Keep or Remove choice (when the switch is turned off, food history is deleted, or the account is deleted) applies to this device. Another device of the same account with the switch on keeps its own record of what it saved.
+
 ## External display limitations
 
 - Health shows the members of a food correlation as separate nutrient samples under Browse, Nutrition (Calories, Protein, Carbohydrates and so on). There is no combined "meal" card, and the correlation is not grouped in its own view.

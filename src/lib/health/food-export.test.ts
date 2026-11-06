@@ -1,6 +1,6 @@
 import { isOwnExport } from './export-metadata';
 import { createExportQueue, exportWriters, type ExportEntry } from './export-queue';
-import { deletedFoodIds, EXPORT_DAYS, fetchRecentFoodRows, FOOD_KIND, FOOD_NUTRIENTS, foodDeleteVersion, foodPayload, foodVersion, pendingFoodSaves, type FoodRow } from './food-export';
+import { deletedFoodIds, EXPORT_DAYS, exportedFood, fetchRecentFoodRows, FOOD_KIND, FOOD_NUTRIENTS, foodDeleteVersion, foodPayload, foodSyncGeneration, foodVersion, pendingFoodSaves, settleFoodExport, type FoodRow } from './food-export';
 import { getHealthWriteAccess, resetHealthKitCache } from './healthkit';
 
 const mockSelect = jest.fn();
@@ -435,4 +435,61 @@ test('a recipe entry (provider recipe, no food id) exports as one food like any 
   const p = foodPayload({ name: entry.food_name, consumedAt: entry.consumed_at, nutrients: { ...ALL, energy_kcal: entry.energy_kcal, protein_g: entry.protein_g, sodium_mg: entry.sodium_mg } });
   expect(p).toMatchObject({ name: 'Rice bowl', at: '2026-11-08T18:00:00.000Z', nutrients: { energy_kcal: 295, protein_g: 4.55 } });
   expect(p.nutrients.sodium_mg).toBeUndefined(); // unknown is left out, never written as 0
+});
+
+describe('settling food in Health (keep or remove)', () => {
+  const at = Date.now();
+  const mk = (recordId: string, status: ExportEntry['status'], o: Partial<ExportEntry> = {}): ExportEntry =>
+    ({ kind: FOOD_KIND, recordId, op: 'save', payload: status === 'success' ? null : { name: 'Secret' }, version: foodVersion(new Date(at).toISOString(), 255)!, status, attempts: 0, ...o });
+  // A queue stand-in: enqueue replaces the entry; a delete then finishes (and leaves the queue), fails or stays pending as told.
+  // forget drops the matches.
+  const controls = (initial: ExportEntry[], deletes: 'finish' | 'fail' | 'wait' = 'finish') => {
+    let entries = initial;
+    return {
+      get entries() { return entries; },
+      getEntries: () => entries,
+      enqueue: jest.fn(async (kind: string, recordId: string, op: 'save' | 'delete', payload: unknown, version?: number) => {
+        entries = entries.filter((e) => e.recordId !== recordId);
+        if (op === 'delete' && deletes === 'finish') return;
+        entries = [...entries, { kind, recordId, op, payload, version: version!, status: deletes === 'fail' ? 'failed' : 'pending', attempts: 0 } as ExportEntry];
+      }),
+      forget: jest.fn(async (kind: string, match: (e: ExportEntry) => boolean = () => true) => { entries = entries.filter((e) => !(e.kind === kind && match(e))); }),
+    };
+  };
+  const all = [mk('sent', 'success'), mk('waiting', 'pending'), mk('failed', 'failed', { reason: 'permission' }), mk('del', 'pending', { op: 'delete', payload: null }), { ...mk('w', 'success'), kind: 'workout' }];
+
+  it('counts what reached Health, including a save that may have been written', () => {
+    expect(exportedFood([...all, mk('half', 'pending', { writtenTypes: 3 })]).map((e) => e.recordId)).toEqual(['sent', 'half']);
+  });
+  it('keep drops every food save, pending and failed too, writes nothing, and leaves a queued delete and other kinds', async () => {
+    const c = controls(all);
+    await settleFoodExport(c, false);
+    expect(c.enqueue).not.toHaveBeenCalled();
+    expect(c.getEntries().map((e) => e.recordId)).toEqual(['del', 'w']);
+  });
+  it('keep means reconciling the deleted server rows queues no Health delete later', async () => {
+    mockIn.mockResolvedValue({ data: [], error: null }); // the server has none of these rows any more
+    const c = controls([mk('sent', 'success')]);
+    await settleFoodExport(c, false);
+    await expect(deletedFoodIds([], c.getEntries())).resolves.toEqual([]);
+  });
+  it('remove queues a delete for every food save, which replaces unsaved nutrients, and succeeds when they run', async () => {
+    const c = controls(all.filter((e) => e.recordId !== 'del'));
+    await settleFoodExport(c, true);
+    expect(c.enqueue.mock.calls.map((x) => [x[1], x[2], x[3]]).sort()).toEqual([['failed', 'delete', null], ['sent', 'delete', null], ['waiting', 'delete', null]]);
+    expect(JSON.stringify(c.getEntries())).not.toContain('Secret');
+  });
+  it('remove says so when a Health delete could not run, instead of claiming success', async () => {
+    await expect(settleFoodExport(controls([mk('sent', 'success')], 'fail'), true)).rejects.toThrow(/Couldn't remove some food/);
+  });
+  it('remove also says so when a delete is still pending, since that guards an irreversible account deletion', async () => {
+    await expect(settleFoodExport(controls([mk('sent', 'success')], 'wait'), true)).rejects.toThrow(/Couldn't remove some food/);
+  });
+  it('bumps the sync generation when it starts and when it ends, even on failure', async () => {
+    const before = foodSyncGeneration();
+    await settleFoodExport(controls([mk('sent', 'success')]), true);
+    expect(foodSyncGeneration()).toBe(before + 2);
+    await expect(settleFoodExport(controls([mk('sent', 'success')], 'wait'), true)).rejects.toThrow();
+    expect(foodSyncGeneration()).toBe(before + 4);
+  });
 });

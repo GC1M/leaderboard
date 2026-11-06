@@ -55,7 +55,11 @@ export const enqueue = (uid: string, op: PendingOp) =>
 
 export const discard = (uid: string, op: PendingOp) => mutate(uid, (ops) => ops.filter((o) => !same(o, op)));
 
-export const clearFoodPending = (uid: string) => orderedDraftWrite(uid, () => secureStorage.removeItem(key(uid)));
+// Waits for a flush already in flight, so it cannot send a change after the queue was cleared.
+export async function clearFoodPending(uid: string): Promise<void> {
+  await running.get(uid)?.catch(() => {});
+  await orderedDraftWrite(uid, () => secureStorage.removeItem(key(uid)));
+}
 
 type Failure = { status?: number; error: { code?: string; message?: string } };
 // Bad data or not allowed: sending it again cannot help. Everything else (network, 5xx, 408, 429, an expired

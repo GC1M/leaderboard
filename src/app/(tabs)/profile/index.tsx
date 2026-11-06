@@ -4,13 +4,15 @@ import { AccessibilityInfo, Keyboard, Platform } from 'react-native';
 
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton } from '@/components/ui';
 import { alert } from '@/lib/alert';
-import { useHealthSync } from '@/lib/health/sync';
-import { NAME_MAX, deleteAccount, getDisplayName, updateDisplayName } from '@/lib/profile';
+import { exportedFood, settleFoodExport } from '@/lib/health/food-export';
+import { useHealthExport, useHealthSync } from '@/lib/health/sync';
+import { NAME_MAX, deleteAccount, deleteFoodHistory, getDisplayName, updateDisplayName } from '@/lib/profile';
 import { supabase } from '@/lib/supabase';
 
 export default function Profile() {
   const router = useRouter();
   const health = useHealthSync();
+  const healthExport = useHealthExport();
   const [saved, setSaved] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,14 +67,47 @@ export default function Profile() {
       ],
     );
 
+  // Food this app saved to Apple Health. The user chooses whether it goes too (see settleFoodExport); the entries are
+  // read when the button is pressed, not from this render.
+  const exported = exportedFood(healthExport.entries).length;
+  const count = (n: number) => `${n} ${n === 1 ? 'entry was' : 'entries were'} saved to Apple Health`;
+  const deleteFood = (fromHealth: boolean) =>
+    run(async () => {
+      // Health first, like account deletion: a failed Remove leaves the history intact, and Keep leaves nothing to reconcile.
+      await settleFoodExport(healthExport, fromHealth);
+      await deleteFoodHistory();
+    });
+  // Health deletes must run while the account still exists, so they come first; if they fail the account stays.
+  const removeAccount = (fromHealth: boolean) =>
+    run(async () => {
+      if (fromHealth) await settleFoodExport(healthExport, true);
+      await deleteAccount();
+    });
+
+  const confirmDeleteFood = () =>
+    alert(
+      'Delete food history?',
+      `This deletes every food entry, recipe and custom food you saved, on your account and in your groups. Your sharing choices stay, so groups you share food with will see no food logged. ${
+        exported ? `${count(exported)}: choose whether to remove ${exported === 1 ? 'it' : 'them'} from Health too. ` : ''
+      }This can't be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        ...(exported ? [{ text: 'Delete and Remove from Health', style: 'destructive' as const, onPress: () => deleteFood(true) }] : []),
+        { text: exported ? 'Delete, Keep in Health' : 'Delete Food History', style: 'destructive', onPress: () => deleteFood(false) },
+      ],
+    );
+
   const confirmDelete = () =>
     alert(
       'Delete your account?',
-      "This deletes your profile, your steps, sleep, weight, workouts and templates, your sharing choices and your memberships. Groups you own are deleted for everyone in them. This can't be undone.",
+      `This deletes your profile, your steps, sleep, weight, workouts and templates, your food entries and recipes, your sharing choices and your memberships. Groups you own are deleted for everyone in them. ${
+        exported ? `${count(exported)}: choose whether to remove ${exported === 1 ? 'it' : 'them'} from Health too. ` : ''
+      }This can't be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         // The session ends after the delete, and the route guard takes over from there.
-        { text: 'Delete Account', style: 'destructive', onPress: () => run(deleteAccount) },
+        ...(exported ? [{ text: 'Delete Account and Remove from Health', style: 'destructive' as const, onPress: () => removeAccount(true) }] : []),
+        { text: exported ? 'Delete Account, Keep in Health' : 'Delete Account', style: 'destructive', onPress: () => removeAccount(false) },
       ],
     );
 
@@ -119,6 +154,10 @@ export default function Profile() {
           />
         </Section>
       )}
+
+      <Section title="Food" footer="Food is private unless you share daily totals with a group in Group Info.">
+        <Row label="Delete Food History" icon={{ ios: 'trash', android: 'delete', web: 'delete' }} danger last disabled={busy} onPress={confirmDeleteFood} />
+      </Section>
 
       <Section title="Preferences">
         <Row label="Units" value="Weight and distance" last onPress={() => router.push('/profile/preferences')} />
