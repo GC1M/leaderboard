@@ -1,5 +1,5 @@
 begin;
-select plan(68);
+select plan(72);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000f1', 'alice@x.com'),
@@ -69,6 +69,12 @@ $$;
 select is(pg_temp.local_day('2026-11-01 04:30:00+00', 'America/Chicago'), '2026-10-31'::date, 'before the change it is still Oct 31 (CDT)');
 select is(pg_temp.local_day('2026-11-01 07:30:00+00', 'America/Chicago'), '2026-11-01'::date, 'the repeated hour after the change is Nov 1 (CST)');
 select is(pg_temp.local_day('2026-11-01 04:30:00+00', 'UTC'), '2026-11-01'::date, 'the same instant is Nov 1 in UTC');
+select is(pg_temp.local_day('2026-11-01 06:30:00+00', 'America/Chicago'), '2026-11-01'::date, 'the first 1:30 am (CDT) is Nov 1');
+-- Local midnight is 05:00Z while CDT applies; a fixed CST offset would put this on Oct 31.
+select is(pg_temp.local_day('2026-11-01 05:00:00+00', 'America/Chicago'), '2026-11-01'::date, 'local midnight under CDT starts Nov 1');
+-- After the change the offset is -6; a fixed CDT offset would put 05:30Z on Nov 2.
+select is(pg_temp.local_day('2026-11-02 05:30:00+00', 'America/Chicago'), '2026-11-01'::date, 'after the change 23:30 CST is still Nov 1');
+select is(pg_temp.local_day('2026-11-01 04:30:00+00', 'GMT'), '2026-11-01'::date, 'GMT is accepted as a timezone');
 
 -- Entry constraints.
 select throws_ok($$insert into food_entries (user_id, client_id, meal, consumed_at, timezone, grams, food_name, provider, provider_id)

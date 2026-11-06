@@ -60,7 +60,7 @@ create table public.food_entries (
   food_id uuid references public.foods on delete set null,
   meal text not null check (meal in ('breakfast', 'lunch', 'dinner', 'snack')),
   consumed_at timestamptz not null check (isfinite(consumed_at)),
-  -- IANA zone of the device when eaten (Area/City or UTC); local_date is the calendar date there. The
+  -- IANA zone of the device when eaten (Area/City, UTC or GMT); local_date is the calendar date there. The
   -- trigger always sets local_date, so the default only keeps it optional in generated insert types.
   timezone text not null,
   local_date date not null default current_date,
@@ -100,7 +100,9 @@ language plpgsql set search_path = '' as $$
 begin
   -- Zone names must be Area/City or UTC; pg_timezone_names also lists abbreviations such as EST that
   -- shift with no DST, and a POSIX string like UTC+5 is not listed at all.
-  if not exists (select 1 from pg_timezone_names z where z.name = new.timezone and (z.name = 'UTC' or z.name like '%/%')) then
+  -- Checked only when written or changed, so the FK set-null cascade from a food delete never re-checks old rows.
+  if (tg_op = 'INSERT' or new.timezone is distinct from old.timezone)
+    and not exists (select 1 from pg_timezone_names z where z.name = new.timezone and (z.name in ('UTC', 'GMT') or z.name like '%/%')) then
     raise exception 'invalid timezone' using errcode = '22023';
   end if;
   new.local_date := (new.consumed_at at time zone new.timezone)::date;

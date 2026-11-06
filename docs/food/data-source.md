@@ -48,9 +48,10 @@ Every other nutrient follows the same rule: a missing value is NULL, a reported 
 ## Estimates, logging and history
 
 - Snapshot nutrients on `food_entries` are computed by the client (per-100 g values scaled to the eaten grams, `scaleNutrients`). The server only bounds them (non-negative, finite, upper limits) and cannot verify them, so they are estimates and never medical advice.
+- "Immutable snapshot" means later edits to the food never change logged entries. An entry's own nutrients change only when the user edits its amount, in one UPDATE together with grams.
 - The amount of an entry is editable in place (grams, portion, `is_estimated` and the nutrients, recomputed together by the client). The row id stays the same so Health export mappings (#48) stay stable. Identity never changes: user, client id, food id (it can only become null when a food is deleted), food name, brand, provider, provider id, source data type and version, and created_at.
 - No entries for a date means no data, not 0 kcal.
-- `local_date` is the calendar date in the entry's own device timezone (a zone name such as America/Chicago, or UTC; the server sets it from `consumed_at` and `timezone`). Group summaries (#49) must group by `local_date`, not by converting `consumed_at` with the viewer's or the group's timezone.
+- `local_date` is the calendar date in the entry's own device timezone (a zone name such as America/Chicago, or UTC or GMT; the server sets it from `consumed_at` and `timezone`). Group summaries (#49) must group by `local_date`, not by converting `consumed_at` with the viewer's or the group's timezone.
 
 ## Attribution the UI must show
 
