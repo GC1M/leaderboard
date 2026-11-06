@@ -1,4 +1,4 @@
-import { buildEdit, type Entry, entryFromRow, groupDay, historyDays, loadDay, mergePending, removeEntry, saveEdit } from './diary';
+import { buildEdit, type Entry, entryFromRow, getEntry, groupDay, historyDays, loadDay, mergePending, removeEntry, saveEdit } from './diary';
 import { emptyNutrients } from './nutrition';
 import type { Food } from './search';
 
@@ -167,7 +167,7 @@ describe('removeEntry', () => {
     mockEnqueue.mockImplementation(async () => void order.push('purge queued'));
     mockFlush.mockImplementation(async () => { order.push('flush'); throw new Error('offline'); });
     await removeEntry('u1', entryFromRow(row({ id: undefined, client_id: 'c9' }), 'log'));
-    expect(order).toEqual(['discard', 'purge queued', 'flush']);
+    expect(order).toEqual(['purge queued', 'discard', 'flush']);
     expect(mockEnqueue).toHaveBeenCalledWith('u1', { kind: 'purge', clientId: 'c9' });
     expect(mockDeleteEq).not.toHaveBeenCalled();
     mockDiscard.mockReset();
@@ -257,4 +257,12 @@ test('a queued edit that does not change the time keeps the server local date', 
 
 test('a row with a queued purge is not shown', () => {
   expect(mergePending([row()], [{ kind: 'purge', clientId: 'c1' }])).toEqual([]);
+});
+
+test('getEntry answers null, not undefined, for a row hidden by a queued purge', async () => {
+  mockLookup.mockResolvedValue({ data: row(), error: null });
+  mockLoad.mockResolvedValue([{ kind: 'purge', clientId: 'c1' }]);
+  expect(await getEntry('u1', 'e1')).toBeNull();
+  mockLoad.mockResolvedValue([]);
+  expect(await getEntry('u1', 'e1')).toMatchObject({ id: 'e1' });
 });

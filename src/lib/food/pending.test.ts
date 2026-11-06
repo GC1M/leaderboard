@@ -259,3 +259,12 @@ test('a new edit replaces a refused one instead of merging its refused fields', 
   await enqueue('u1', { kind: 'edit', id: 'e1', patch: { meal: 'lunch' } });
   expect((await loadPending('u1'))[0]).toMatchObject({ patch: { grams: 50, meal: 'lunch' } });
 });
+
+test('a purge that the server refuses is still retryable, never stuck as refused', async () => {
+  await enqueue('u1', { kind: 'purge', clientId: 'c1' });
+  mockDelete.mockResolvedValueOnce({ status: 403, error: { code: '42501', message: 'x' } });
+  expect(await flushPending('u1')).toBe(1);
+  expect((await loadPending('u1'))[0]).toMatchObject({ kind: 'purge', error: SYNC_FAILED, permanent: false });
+  expect(await flushPending('u1')).toBe(0);
+  expect(mockDelete).toHaveBeenCalledTimes(2);
+});
