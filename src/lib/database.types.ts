@@ -187,6 +187,72 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"food_entries": {
+                  Row: {
+                    "carbs_g": number | null,"client_id": string,"consumed_at": string,"created_at": string,"energy_kcal": number | null,"fat_g": number | null,"fiber_g": number | null,"food_brand": string | null,"food_id": string | null,"food_name": string,"grams": number,"id": string,"is_estimated": boolean,"local_date": string,"meal": string,"portion_count": number | null,"portion_label": string | null,"protein_g": number | null,"provider": string,"provider_id": string | null,"sat_fat_g": number | null,"sodium_mg": number | null,"source_data_type": string | null,"source_version": string | null,"sugars_g": number | null,"timezone": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "carbs_g"?: number | null,"client_id": string,"consumed_at": string,"created_at"?: string,"energy_kcal"?: number | null,"fat_g"?: number | null,"fiber_g"?: number | null,"food_brand"?: string | null,"food_id"?: string | null,"food_name": string,"grams": number,"id"?: string,"is_estimated"?: boolean,"local_date"?: string,"meal": string,"portion_count"?: number | null,"portion_label"?: string | null,"protein_g"?: number | null,"provider": string,"provider_id"?: string | null,"sat_fat_g"?: number | null,"sodium_mg"?: number | null,"source_data_type"?: string | null,"source_version"?: string | null,"sugars_g"?: number | null,"timezone": string,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "carbs_g"?: number | null,"client_id"?: string,"consumed_at"?: string,"created_at"?: string,"energy_kcal"?: number | null,"fat_g"?: number | null,"fiber_g"?: number | null,"food_brand"?: string | null,"food_id"?: string | null,"food_name"?: string,"grams"?: number,"id"?: string,"is_estimated"?: boolean,"local_date"?: string,"meal"?: string,"portion_count"?: number | null,"portion_label"?: string | null,"protein_g"?: number | null,"provider"?: string,"provider_id"?: string | null,"sat_fat_g"?: number | null,"sodium_mg"?: number | null,"source_data_type"?: string | null,"source_version"?: string | null,"sugars_g"?: number | null,"timezone"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "food_entries_food_id_fkey"
+      columns: ["food_id"]
+isOneToOne: false
+      referencedRelation: "foods"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "food_entries_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"food_portions": {
+                  Row: {
+                    "food_id": string,"gram_weight": number,"id": string,"label": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "food_id": string,"gram_weight": number,"id"?: string,"label": string
+                  }
+                  Update: {
+                    "food_id"?: string,"gram_weight"?: number,"id"?: string,"label"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "food_portions_food_id_fkey"
+      columns: ["food_id"]
+isOneToOne: false
+      referencedRelation: "foods"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"foods": {
+                  Row: {
+                    "brand": string | null,"carbs_g": number | null,"energy_kcal": number | null,"fat_g": number | null,"fiber_g": number | null,"id": string,"name": string,"protein_g": number | null,"provider": string,"provider_id": string | null,"sat_fat_g": number | null,"sodium_mg": number | null,"source_data_type": string | null,"source_version": string | null,"sugars_g": number | null,"updated_at": string,"user_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "brand"?: string | null,"carbs_g"?: number | null,"energy_kcal"?: number | null,"fat_g"?: number | null,"fiber_g"?: number | null,"id"?: string,"name": string,"protein_g"?: number | null,"provider": string,"provider_id"?: string | null,"sat_fat_g"?: number | null,"sodium_mg"?: number | null,"source_data_type"?: string | null,"source_version"?: string | null,"sugars_g"?: number | null,"updated_at"?: string,"user_id"?: string | null
+                  }
+                  Update: {
+                    "brand"?: string | null,"carbs_g"?: number | null,"energy_kcal"?: number | null,"fat_g"?: number | null,"fiber_g"?: number | null,"id"?: string,"name"?: string,"protein_g"?: number | null,"provider"?: string,"provider_id"?: string | null,"sat_fat_g"?: number | null,"sodium_mg"?: number | null,"source_data_type"?: string | null,"source_version"?: string | null,"sugars_g"?: number | null,"updated_at"?: string,"user_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "foods_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"goals": {
                   Row: {
                     "end_date": string | null,"id": string,"metric": string,"start_date": string,"start_value": number,"target_value": number,"user_id": string
