@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, RefreshControl, Text, View } from 'react-native';
 
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { hasStepHistory } from '@/lib/history-presence';
 import { BarHistory } from '@/components/history/BarHistory';
 import { Button, ErrorText, Row as DetailRow, Screen, Section, styles } from '@/components/ui';
@@ -12,6 +13,7 @@ import { useExportChoice } from '@/components/health/ExportOption';
 import { ManualEntry } from '@/components/steps/ManualEntry';
 import { StepRow } from '@/components/steps/StepRow';
 import { useTheme } from '@/theme';
+import { isHealthConnectLoaded } from '@/lib/health/health-connect';
 import { isHealthAvailable } from '@/lib/health/healthkit';
 import { lastNDates, localDateKey } from '@/lib/health/dates';
 import type { StepRow as Row } from '@/lib/health/rules';
@@ -29,7 +31,8 @@ export default function Steps() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const dates = lastNDates(SYNC_DAYS);
   const today = localDateKey(new Date());
-  const health = isHealthAvailable();
+  const health = isHealthAvailable() || isHealthConnectLoaded();
+  const provider = healthProviderName();
   const choice = useExportChoice('steps');
   const exp = useHealthExport();
 
@@ -60,11 +63,11 @@ export default function Steps() {
   };
 
   const status = !health
-    ? 'Health sync needs the iOS app build. Enter steps manually below.'
+    ? `Health sync needs the ${Platform.OS === 'android' ? 'Android' : 'iOS'} app build. Enter steps manually below.`
     : syncError
       ? syncError
       : result?.status === 'not-connected'
-        ? 'Connect this account to Apple Health to import your steps.'
+        ? `Connect this account to ${provider} to import your steps.`
       : result?.status === 'needs-permission'
         ? 'Health access is not set up yet.'
         : result?.status === 'no-data'
@@ -78,15 +81,15 @@ export default function Steps() {
     await load();
   };
 
-  const remove = () => alert(`Delete steps for ${selected ? dateFromKey(selected.date).toLocaleDateString() : ''}?`, 'The manual total is removed for good. Apple Health may fill the day again at the next sync.', [
+  const remove = () => alert(`Delete steps for ${selected ? dateFromKey(selected.date).toLocaleDateString() : ''}?`, `The manual total is removed for good. ${provider} may fill the day again at the next sync.`, [
     { text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { if (!selected) return; try { await deleteManualSteps(selected.date); if (choice.on) void exp.enqueue(MANUAL_KINDS.steps, selected.date, 'delete', null).catch(() => {}); setSelected(null); await load(); } catch (e) { setLoadError((e as Error).message); } } },
   ]);
   if (entering) return <ManualEntry dates={dates} rows={rows ?? []} initialDate={editRow?.date} initialText={editRow ? String(editRow.value) : ''} choice={choice} onCancel={() => setEntering(false)} onSaved={() => { setEntering(false); setEditRow(null); void load(); }} />;
   if (selected) return <Screen title="Step Entry" back onBack={() => setSelected(null)} headerActions={selected.source === 'manual' && <Button plain label="Edit" onPress={() => { setEditRow(selected); setSelected(null); setEntering(true); }} />}>
-    <Section><DetailRow label="Date" value={dateFromKey(selected.date).toLocaleDateString()} /><DetailRow label="Steps" value={`${selected.value.toLocaleString()} steps`} /><DetailRow label="Source" value={selected.source === 'manual' ? 'Manual' : 'Apple Health'} last /></Section>
+    <Section><DetailRow label="Date" value={dateFromKey(selected.date).toLocaleDateString()} /><DetailRow label="Steps" value={`${selected.value.toLocaleString()} steps`} /><DetailRow label="Source" value={selected.source === 'manual' ? 'Manual' : provider} last /></Section>
     {selected.source === 'manual' && <Overflow name="step entry"><DetailRow label="Delete Entry" danger last onPress={remove} /></Overflow>}
     <ErrorText>{loadError}</ErrorText>
-    {selected.source === 'manual' && health && connected && <Button secondary label="Use Apple Health Total" onPress={async () => { await switchToHealth(selected.date); setSelected(null); }} />}
+    {selected.source === 'manual' && health && connected && <Button secondary label={`Use ${provider} Total`} onPress={async () => { await switchToHealth(selected.date); setSelected(null); }} />}
   </Screen>;
   return (
     <Screen

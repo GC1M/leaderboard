@@ -1,19 +1,25 @@
+import { Platform } from 'react-native';
+
 import { localDateKey, startOfLocalDay } from './dates';
 import { EXCLUDE_OWN_EXPORTS, isOwnExport } from './export-metadata';
+import { queryHealthConnectChanges, readHealthConnectSteps } from './health-connect';
 import { HEALTH_TYPES, loadHealthKit, type HealthMetric } from './healthkit';
 import { summarizeSleep } from './sleep';
 import { normalizeWeight, readLatestWeight } from './weight';
 import { queryWorkoutChanges, type WorkoutChange } from './workouts';
 
 export type StoredSample = { id: string; start: string; end: string; value: number; dates?: string[] };
-export type ChangePage = { samples: StoredSample[]; deleted: string[]; anchor: string; hasMore: boolean; workouts?: WorkoutChange[] };
+// truncatedFrom: the platform refused the full import window and the history read starts here instead (Health Connect without
+// history access). Present but undefined on a fresh history read that got the full window, which clears an earlier truncation.
+export type ChangePage = { samples: StoredSample[]; deleted: string[]; anchor: string; hasMore: boolean; workouts?: WorkoutChange[]; truncatedFrom?: string };
 export type DailyChange = { date: string; value: number; window_start?: string; window_end?: string };
 export type HealthChanges = { daily: DailyChange[]; removeDaily: string[]; weight: { measured_at: string; kg: number }[]; removeWeight: string[]; workouts?: WorkoutChange[]; removeWorkouts?: string[] };
-export type JournalState = { from: string; anchor?: string; samples: StoredSample[]; dailyKeys?: string[]; resetAfterPending?: boolean; pending?: { anchor: string; changes: HealthChanges; hasMore: boolean } };
+export type JournalState = { from: string; truncatedFrom?: string; anchor?: string; samples: StoredSample[]; dailyKeys?: string[]; resetAfterPending?: boolean; pending?: { anchor: string; changes: HealthChanges; hasMore: boolean } };
 export interface HealthJournal { read(metric: HealthMetric): Promise<JournalState | null>; write(metric: HealthMetric, state: JournalState): Promise<void> }
 export const CHANGE_PAGE_SIZE = 500;
 
 export async function queryChanges(metric: HealthMetric, state: JournalState): Promise<ChangePage> {
+  if (Platform.OS === 'android') return queryHealthConnectChanges(metric, state, CHANGE_PAGE_SIZE);
   if (metric === 'workouts') return queryWorkoutChanges(state, CHANGE_PAGE_SIZE);
   const hk = loadHealthKit();
   if (!hk) throw new Error('Apple Health requires a native iPhone build.');
@@ -77,16 +83,17 @@ export async function deriveChanges(metric: HealthMetric, previous: readonly Sto
     const changedIds = new Set([...page.deleted, ...page.samples.map((s) => s.id)]);
     const affected = new Set([...previous.filter((s) => changedIds.has(s.id)), ...page.samples].flatMap(sampleDates));
     const remaining = new Set(next.flatMap(sampleDates));
-    const hk = loadHealthKit();
-    if (!hk) throw new Error('Health unavailable.');
+    const android = Platform.OS === 'android';
+    const hk = android ? null : loadHealthKit();
+    if (!android && !hk) throw new Error('Health unavailable.');
     for (const date of affected) {
       if (!remaining.has(date)) { changes.removeDaily.push(date); continue; }
       const start = new Date(`${date}T00:00:00`);
-      const total = await hk.queryStatisticsForQuantity(HEALTH_TYPES.steps, ['cumulativeSum'], {
+      // Both platforms total a local calendar day with the store's own de-duplicating aggregation.
+      const value = android ? await readHealthConnectSteps(start, startOfLocalDay(start, -1)) : (await hk!.queryStatisticsForQuantity(HEALTH_TYPES.steps, ['cumulativeSum'], {
         unit: 'count', filter: { date: { startDate: start, endDate: startOfLocalDay(start, -1) }, ...EXCLUDE_OWN_EXPORTS },
-      });
+      })).sumQuantity?.quantity;
       // A missing statistic is ambiguous (e.g. access changed); leave the previous total intact.
-      const value = total.sumQuantity?.quantity;
       if (value !== undefined) {
         if (!Number.isFinite(value) || value < 0) throw new Error('Invalid Health step total.');
         changes.daily.push({ date, value: Math.round(value) });
@@ -107,7 +114,7 @@ export type ReconcileOptions = {
 
 // Write-ahead journal: commit the proposed snapshot + exact upload before sending it. Advance the
 // native cursor only after remote success. Crash/network retry replays the same idempotent payload.
-export async function reconcileHealth(metric: HealthMetric, options: ReconcileOptions): Promise<{ hasMore: boolean; written: number; knownSamples: number }> {
+export async function reconcileHealth(metric: HealthMetric, options: ReconcileOptions): Promise<{ hasMore: boolean; written: number; knownSamples: number; truncatedFrom?: string }> {
   const { journal, checkOwner, upload } = options;
   await checkOwner();
   const now = options.now ?? new Date();
@@ -131,7 +138,7 @@ export async function reconcileHealth(metric: HealthMetric, options: ReconcileOp
         changes.removeDaily = [...new Set([...changes.removeDaily, ...state.dailyKeys.filter((d) => !nextKeys.has(d))])];
       }
       await checkOwner();
-      state = { ...state, samples: next, ...(metric === 'sleep' && changed ? { dailyKeys: changes.daily.map((d) => d.date) } : {}), pending: { anchor: page.anchor, changes, hasMore: page.hasMore } };
+      state = { ...state, samples: next, ...(metric === 'sleep' && changed ? { dailyKeys: changes.daily.map((d) => d.date) } : {}), ...('truncatedFrom' in page ? { truncatedFrom: page.truncatedFrom } : {}), pending: { anchor: page.anchor, changes, hasMore: page.hasMore } };
       await journal.write(metric, state);
     }
     await checkOwner();
@@ -144,7 +151,8 @@ export async function reconcileHealth(metric: HealthMetric, options: ReconcileOp
     const recheck = state.resetAfterPending;
     state = { ...state, anchor: recheck ? undefined : state.samples.length || state.anchor || pending.changes.removeDaily.length || pending.changes.removeWeight.length || pending.changes.removeWorkouts?.length ? pending.anchor : state.anchor, pending: undefined, resetAfterPending: undefined };
     await journal.write(metric, state);
-    if (!pending.hasMore && !recheck) return { hasMore: false, written, knownSamples: state.samples.length };
+    const truncated = state.truncatedFrom ? { truncatedFrom: state.truncatedFrom } : {};
+    if (!pending.hasMore && !recheck) return { hasMore: false, written, knownSamples: state.samples.length, ...truncated };
   }
-  return { hasMore: true, written, knownSamples: state.samples.length };
+  return { hasMore: true, written, knownSamples: state.samples.length, ...(state.truncatedFrom ? { truncatedFrom: state.truncatedFrom } : {}) };
 }

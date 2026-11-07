@@ -4,6 +4,7 @@ import { AccessibilityInfo, Keyboard, Platform } from 'react-native';
 
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton } from '@/components/ui';
 import { alert } from '@/lib/alert';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { exportedFood, settleFoodExport } from '@/lib/health/food-export';
 import { useHealthExport, useHealthSync } from '@/lib/health/sync';
 import { NAME_MAX, deleteAccount, deleteFoodHistory, getDisplayName, signOut, updateDisplayName } from '@/lib/profile';
@@ -11,6 +12,7 @@ import { NAME_MAX, deleteAccount, deleteFoodHistory, getDisplayName, signOut, up
 export default function Profile() {
   const router = useRouter();
   const health = useHealthSync();
+  const provider = healthProviderName();
   const healthExport = useHealthExport();
   const [saved, setSaved] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -59,7 +61,7 @@ export default function Profile() {
   const confirmDeleteImports = () =>
     alert(
       'Delete imported Health data?',
-      "This stops Health imports and deletes the steps, sleep, weight, and workouts Leaderboard imported from Apple Health, here and in your groups. Manual entries stay. Nothing is uploaded again until you reconnect Apple Health. Your data in the Health app isn't touched.",
+      `This stops Health imports and deletes the steps, sleep, weight, and workouts Leaderboard imported from ${provider}, here and in your groups. Manual entries stay. Nothing is uploaded again until you reconnect ${provider}. Your data in ${Platform.OS === 'android' ? 'Health Connect' : 'the Health app'} isn't touched.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete Imported Data', style: 'destructive', onPress: () => run(health.deleteImports) },
@@ -132,6 +134,15 @@ export default function Profile() {
       )}
       <ErrorText>{error}</ErrorText>
 
+      {Platform.OS === 'android' && (
+        <Section
+          title="Health Connect"
+          footer="Leaderboard reads steps, sleep, weight, and workouts that you allow. Deleting imported data doesn't change Health Connect permissions: to change what Leaderboard can read, open Health Connect, then App permissions, then Leaderboard."
+        >
+          <Row label="Health Access" icon={{ ios: 'heart.text.square', android: 'favorite', web: 'favorite' }} onPress={() => router.push('/steps/permission')} />
+          <Row label="Delete Imported Health Data" icon={{ ios: 'trash', android: 'delete', web: 'delete' }} danger last disabled={busy || !health.ready} onPress={confirmDeleteImports} />
+        </Section>
+      )}
       {Platform.OS === 'ios' && (
         <Section
           title="Apple Health"

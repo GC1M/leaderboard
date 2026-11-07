@@ -7,7 +7,7 @@ import { reconcileHealth } from './changes';
 import { createHealthCoordinator, HEALTH_METRICS, initialHealthState, type HealthConnection, type HealthCoordinator } from './coordinator';
 import { createExportQueue, exportWriters, initialExportState, type ExportQueue } from './export-queue';
 import { healthExportMapping } from './export-mapping';
-import { getHealthAccess, getHealthWriteAccess, requestHealthAccess, requestHealthWriteAccess, type HealthWriteType } from './healthkit';
+import { getHealthAccess, getHealthWriteAccess, healthUnavailableMessage, requestHealthAccess, requestHealthWriteAccess, type HealthWriteType } from './healthkit';
 import { deleteImportedJournal, getHealthDeviceId, healthExportStore, healthJournal, resetHealthAnchors } from './journal';
 import './manual-export'; // registers the manual weight/sleep/steps writers
 import { assertHealthOwner } from './owner';
@@ -31,7 +31,7 @@ function createAccountSync(userId: string) {
     checkAccount:()=>assertHealthOwner(userId),
     load:async()=>{const raw=await secureStorage.getItem(key);return raw?JSON.parse(raw) as HealthConnection:null;},
     save:async(value)=>{await secureStorage.setItem(key,JSON.stringify(value));},
-    requestAccess:async()=>{if(await getHealthAccess('steps')==='unavailable')throw new Error('Apple Health requires the native iPhone app build.');await requestHealthAccess();},
+    requestAccess:async()=>{if(await getHealthAccess('steps')==='unavailable')throw new Error(await healthUnavailableMessage());await requestHealthAccess();},
     access:getHealthAccess,
     recheck:()=>resetHealthAnchors(userId),
     // Local journal first: if the server delete then fails, a retry still finds nothing to re-upload.

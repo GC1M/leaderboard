@@ -1,5 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import type { HealthMetric } from './healthkit';
 import type { HealthJournal, JournalState } from './changes';
 import type { ExportEntry, ExportStore } from './export-queue';
@@ -28,7 +29,7 @@ async function open(userId: string) {
       try {
         await db.execAsync(`PRAGMA key = "x'${key}'";`);
         const cipher = await db.getFirstAsync<{ cipher_version: string }>('PRAGMA cipher_version');
-        if (!cipher?.cipher_version) throw new Error('Health journal requires a new iPhone build with SQLCipher.');
+        if (!cipher?.cipher_version) throw new Error(`Health journal requires a new ${Platform.OS === 'android' ? 'Android' : 'iPhone'} build with SQLCipher.`);
         await db.execAsync('CREATE TABLE IF NOT EXISTS health_journal (metric TEXT PRIMARY KEY, state TEXT NOT NULL)');
         await db.execAsync('CREATE TABLE IF NOT EXISTS health_export_queue (kind TEXT NOT NULL, record_id TEXT NOT NULL, entry TEXT NOT NULL, PRIMARY KEY (kind, record_id))');
         return db;
@@ -54,7 +55,7 @@ export function healthJournal(userId: string): HealthJournal {
   };
 }
 
-// Queue of app records waiting to be written to Apple Health (#34). Same encrypted per-account database as the
+// Queue of app records waiting to be written to the phone's health store (#34). Same encrypted per-account database as the
 // journal, so deleteHealthJournal on account deletion removes it too.
 export function healthExportStore(userId: string): ExportStore {
   return {

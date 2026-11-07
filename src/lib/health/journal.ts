@@ -1,9 +1,9 @@
 import type { HealthJournal } from './changes';
 import type { ExportStore } from './export-queue';
 
-// Metro selects journal.ios.ts on iPhone. Do not import SQLite here: web/Expo Go must
+// Metro selects journal.native.ts on iPhone and Android, so this stub is web only. Do not import SQLite here: web must
 // remain usable for manual entries without bundling an unused native Health journal.
-const unavailable = () => new Error('Apple Health imports require the native iPhone app build.');
+const unavailable = () => new Error('Health imports require the native iPhone or Android app build.');
 export async function getHealthDeviceId(): Promise<string> { throw unavailable(); }
 export function healthJournal(_userId: string): HealthJournal {
   return { read: async () => { throw unavailable(); }, write: async () => { throw unavailable(); } };

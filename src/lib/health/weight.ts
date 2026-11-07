@@ -1,5 +1,8 @@
+import { Platform } from 'react-native';
+
 import { startOfLocalDay } from './dates';
 import { EXCLUDE_OWN_EXPORTS } from './export-metadata';
+import { readHealthConnectWeightTies } from './health-connect';
 import { HEALTH_TYPES, loadHealthKit } from './healthkit';
 
 export type WeightReading = { sampleId: string; measuredAt: string; kg: number };
@@ -23,6 +26,7 @@ export function normalizeWeight(samples: readonly WeightSample[]): WeightReading
 }
 
 export async function readLatestWeight(now = new Date()): Promise<WeightReading | null> {
+  if (Platform.OS === 'android') return normalizeWeight(await readHealthConnectWeightTies(now))[0] ?? null;
   const hk = loadHealthKit();
   if (!hk) return null;
   const latest = await hk.queryQuantitySamples(HEALTH_TYPES.weight, { unit: 'kg', ascending: false, limit: 1, filter: { date: { endDate: now }, ...EXCLUDE_OWN_EXPORTS } });

@@ -46,11 +46,11 @@ describe('iOS entries match the existing Apple Health behavior', () => {
 });
 
 describe('Android entries', () => {
-  it('offers every type for read and write but has no adapter wired yet', () => {
-    for (const entry of Object.values(ANDROID_MATRIX.entries)) {
-      expect(entry.read && entry.write).toBe(true);
-      expect(entry.implemented).toEqual({ read: false, write: false });
-    }
+  it('offers every type for read and write, and reads exactly the metrics Health Connect imports (#60)', () => {
+    for (const entry of Object.values(ANDROID_MATRIX.entries)) expect(entry.read && entry.write).toBe(true);
+    const read = HEALTH_DATA_TYPES.filter((t) => ANDROID_MATRIX.entries[t].implemented.read).sort();
+    expect(read).toEqual(Object.keys(HEALTH_TYPES).sort());
+    expect(HEALTH_DATA_TYPES.filter((t) => ANDROID_MATRIX.entries[t].implemented.write)).toEqual([]);
   });
   it('limits reads to 30 days unless the history permission is granted, and needs a permission for background reads', () => {
     for (const entry of Object.values(ANDROID_MATRIX.entries)) {

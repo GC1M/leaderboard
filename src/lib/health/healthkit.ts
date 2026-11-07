@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { localDateKey, startOfLocalDay } from './dates';
 import { APP_RECORD_KEY, EXCLUDE_OWN_EXPORTS } from './export-metadata';
+import { getHealthConnectAccess, healthConnectUnavailableMessage, requestHealthConnectAccess } from './health-connect';
 
 type HealthKit = typeof import('@kingstinct/react-native-healthkit');
 
@@ -50,6 +51,7 @@ export function resetHealthKitCache() {
 }
 
 export async function getHealthAccess(metric: HealthMetric): Promise<HealthAccess> {
+  if (Platform.OS === 'android') return getHealthConnectAccess(metric);
   const hk = loadHealthKit();
   if (!hk) return 'unavailable';
   const status = await hk.getRequestStatusForAuthorization({ toRead: [HEALTH_TYPES[metric]] });
@@ -64,10 +66,13 @@ export async function getAllHealthAccess(): Promise<Record<HealthMetric, HealthA
 // Shows the Health sheet for any metric not asked yet; iOS never shows it again for ones already asked.
 // Resolves when the sheet closes, which says nothing about what the user allowed.
 export async function requestHealthAccess(): Promise<void> {
+  if (Platform.OS === 'android') return requestHealthConnectAccess();
   const hk = loadHealthKit();
   if (!hk) return;
   await hk.requestAuthorization({ toRead: METRICS.map((m) => HEALTH_TYPES[m]) });
 }
+
+export const healthUnavailableMessage = async () => Platform.OS === 'android' ? healthConnectUnavailableMessage() : 'Apple Health requires the native iPhone app build.';
 
 // One cumulative-sum bucket per local calendar day. HealthKit de-duplicates overlapping sources (iPhone + Watch) inside the statistics query, so totals match the Health app.
 // Days with no samples are omitted: no data is not the same claim as zero steps.
