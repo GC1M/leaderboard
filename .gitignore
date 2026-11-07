@@ -16,6 +16,9 @@ npm-debug.*
 
 # Native signing
 *.jks
+*.keystore
+google-services.json
+credentials.json
 *.p8
 *.p12
 *.key
