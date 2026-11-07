@@ -1,4 +1,6 @@
-<img src="assets/images/icon.png" alt="Leaderboard logo" width="96" />
+<p align="center">
+  <img src="assets/images/icon.png" alt="Leaderboard logo" width="96" />
+</p>
 
 # Leaderboard
 
