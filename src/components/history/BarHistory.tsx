@@ -12,7 +12,8 @@ type Day = { date: string; value: number };
 // 7/30/90-day bars for a daily metric (steps, sleep minutes). `fetch` must be stable (module function or useCallback).
 // A new `refresh` value refetches the current range, e.g. after the screen's own reload.
 // Days without a row draw a dashed outline, never a zero bar; the summary averages recorded days only.
-export function BarHistory({ fetch, fmt, noun, refresh, hasAny, emptyAction }: { hasAny?: () => Promise<boolean>; emptyAction?: { label: string; onPress: () => void }; fetch: (days: number) => Promise<Day[]>; fmt: (v: number) => string; noun: string; refresh?: unknown }) {
+// `target` (a user-set goal) draws a dashed line at that value.
+export function BarHistory({ fetch, fmt, noun, refresh, hasAny, emptyAction, target }: { target?: number | null; hasAny?: () => Promise<boolean>; emptyAction?: { label: string; onPress: () => void }; fetch: (days: number) => Promise<Day[]>; fmt: (v: number) => string; noun: string; refresh?: unknown }) {
   const c = useTheme();
   const [days, setDays] = useState<Range>(7);
   const [tries, setTries] = useState(0);
@@ -35,7 +36,7 @@ export function BarHistory({ fetch, fmt, noun, refresh, hasAny, emptyAction }: {
   const now = new Date();
   const dates = lastNDates(days, now);
   const values = dates.map((d) => rows?.find((r) => r.date === d)?.value ?? null);
-  const max = Math.max(0, ...values.map((v) => v ?? 0));
+  const max = Math.max(0, target ?? 0, ...values.map((v) => v ?? 0));
   const summary = barSummary(dates, values, fmt, noun, now, readingDateLabel);
   const edge = (d: string) => dateFromKey(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
@@ -59,7 +60,7 @@ export function BarHistory({ fetch, fmt, noun, refresh, hasAny, emptyAction }: {
       ) : !rows.length ? (
         <Text style={[ui.body, { color: c.inkSoft }]}>{`No ${noun} recorded in the last ${days} days.`}</Text>
       ) : (
-        <View accessible accessibilityRole="image" accessibilityLabel={summary} style={{ gap: 8 }}>
+        <View accessible accessibilityRole="image" accessibilityLabel={target ? `${summary}. Target ${fmt(target)}` : summary} style={{ gap: 8 }}>
           <View style={[styles.chart, { gap: days === 7 ? 8 : days === 30 ? 2 : 1 }]}>
             {values.map((v, i) => (
               <View key={dates[i]} style={styles.track}>
@@ -76,6 +77,7 @@ export function BarHistory({ fetch, fmt, noun, refresh, hasAny, emptyAction }: {
                 )}
               </View>
             ))}
+            {!!target && <View style={[styles.target, { bottom: `${(target / max) * 100}%`, borderColor: c.accent }]} />}
           </View>
           <View style={styles.axis}>
             <Text style={[ui.caption, { color: c.inkSoft }]}>{edge(dates[0])}</Text>
@@ -92,5 +94,6 @@ const styles = StyleSheet.create({
   chart: { flexDirection: 'row', height: 140 },
   track: { flex: 1, justifyContent: 'flex-end' },
   gap: { height: 8, borderWidth: 1, borderStyle: 'dashed' },
+  target: { position: 'absolute', left: 0, right: 0, borderTopWidth: 1, borderStyle: 'dashed' },
   axis: { flexDirection: 'row', justifyContent: 'space-between' },
 });

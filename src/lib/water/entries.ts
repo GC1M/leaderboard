@@ -5,6 +5,7 @@ import * as Crypto from 'expo-crypto';
 
 import type { Tables } from '@/lib/database.types';
 import { localDateKey } from '@/lib/health/dates';
+import { bumpWaterSyncGeneration } from '@/lib/health/water-export';
 import { createPendingQueue, type PendingOp } from '@/lib/pending-queue';
 import { supabase } from '@/lib/supabase';
 import { deviceTimezone } from '@/lib/timezone';
@@ -57,7 +58,7 @@ export function mergePending(allRows: Row[], ops: PendingOp[]): WaterEntry[] {
     return entryFromRow({ ...r, ...op.patch, ...moved }, 'edit', op.error ?? null);
   });
   const have = new Set(rows.map((r) => r.client_id));
-  for (const op of ops) if (op.kind === 'log' && !have.has(op.clientId)) out.push(entryFromRow(op.row as Row, 'log', op.error ?? null));
+  for (const op of ops) if (op.kind === 'log' && !have.has(op.clientId)) out.push(entryFromRow({ ...(op.row as Row), client_id: op.clientId }, 'log', op.error ?? null));
   return out.sort((a, b) => a.consumedAt.localeCompare(b.consumedAt));
 }
 
@@ -202,8 +203,20 @@ export async function setWaterTarget(uid: string, dailyMl: number | null): Promi
 
 // Deletes every water entry (manual and imported), the target and the export mapping on the server, and the water
 // changes waiting on this device.
+// Same order as food: a flush in flight may save an entry after the first delete, so delete again once the queue is empty.
 export async function deleteWaterHistory(uid: string): Promise<void> {
-  await waterQueue.clear(uid);
-  const { error } = await supabase.rpc('delete_my_water_history');
-  if (error) throw new Error("Couldn't delete your water history. Check your connection and try again.");
+  const del = async () => {
+    const { error } = await supabase.rpc('delete_my_water_history');
+    if (error) throw new Error("Couldn't delete your water history. Check your connection and try again.");
+  };
+  bumpWaterSyncGeneration(); // an export sync that read rows before this must not queue from them
+  try {
+    await del();
+    await waterQueue.clear(uid);
+    await del();
+  } finally {
+    bumpWaterSyncGeneration();
+  }
 }
+
+export const sourceLabel = (e: WaterEntry) => (e.source === 'manual' ? 'Added here' : `From Apple Health${e.sourceName ? ` · ${e.sourceName}` : ''}`);

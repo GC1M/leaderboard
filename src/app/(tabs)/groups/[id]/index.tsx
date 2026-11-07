@@ -8,7 +8,8 @@ import { LeaderboardRowView } from '@/components/leaderboard/LeaderboardRowView'
 import { MemberSummaries } from '@/components/leaderboard/MemberSummaries';
 import { useAuth } from '@/lib/auth';
 import { buildMemberSummaries, type MemberSummary } from '@/lib/group-summaries';
-import { getGroupFood, getGroupShares, getGroupSleep, getGroupWeights, getGroupWorkouts, isNotMember, isValidGroupId, listMembers } from '@/lib/groups';
+import { getGroupFood, getGroupShares, getGroupWater, getGroupSleep, getGroupWeights, getGroupWorkouts, isNotMember, isValidGroupId, listMembers } from '@/lib/groups';
+import { useWaterUnit } from '@/lib/water/units';
 import { useWeightUnit } from '@/lib/weight-unit';
 import {
   formatValue,
@@ -49,6 +50,7 @@ export default function GroupDetail() {
   const [manual, setManual] = useState<Record<string, number>>({});
   const [summaries, setSummaries] = useState<MemberSummary[] | null>(null);
   const [unit] = useWeightUnit();
+  const [waterUnit] = useWaterUnit();
   const [visible, setVisible] = useState<string[] | null>(null);
   const list = useRef<FlatList<LeaderboardRow>>(null);
   const focused = useRef(false);
@@ -69,9 +71,9 @@ export default function GroupDetail() {
           // Source captions are extra; a failure here shouldn't hide the board.
           return Promise.all([
             getManualDays(id, period).then(setManual, () => setManual({})),
-            // Same for the sleep, weight, workout and food summaries, except that losing access must leave the screen.
-            Promise.all([listMembers(id), getGroupShares(id), getGroupSleep(id), getGroupWeights(id), getGroupWorkouts(id), getGroupFood(id)]).then(
-              ([m, sh, sl, w, wo, fo]) => setSummaries(buildMemberSummaries(m, sh, sl, w, wo, fo)),
+            // Same for the sleep, weight, workout, food and water summaries, except that losing access must leave the screen.
+            Promise.all([listMembers(id), getGroupShares(id), getGroupSleep(id), getGroupWeights(id), getGroupWorkouts(id), getGroupFood(id), getGroupWater(id)]).then(
+              ([m, sh, sl, w, wo, fo, wa]) => setSummaries(buildMemberSummaries(m, sh, sl, w, wo, fo, wa)),
               (e) => {
                 if (isNotMember(e)) throw e;
                 setSummaries(null);
@@ -201,7 +203,7 @@ export default function GroupDetail() {
                   No steps recorded {period === 'day' ? 'today' : 'this week'} yet.
                 </Text>
               ) : null}
-              {summaries && <MemberSummaries items={summaries} me={me} unit={unit} />}
+              {summaries && <MemberSummaries items={summaries} me={me} unit={unit} waterUnit={waterUnit} />}
             </>
           }
           renderItem={({ item, index }) => (

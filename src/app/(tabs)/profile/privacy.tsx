@@ -8,8 +8,8 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'What Leaderboard reads from Apple Health',
     body: [
-      'Only what you allow on your iPhone, and only steps, sleep, weight, and workouts. It never reads your location, heart rate, or anything else.',
-      'Steps: a daily total for each day. Sleep: how long you were asleep each night, and when that sleep started and ended. Weight: each reading and when it was taken. Workouts: the activity type, start and end time, duration, and distance or energy when recorded.',
+      'Only what you allow on your iPhone, and only steps, sleep, weight, workouts, and water. It never reads your location, heart rate, or anything else.',
+      'Steps: a daily total for each day. Sleep: how long you were asleep each night, and when that sleep started and ended. Weight: each reading and when it was taken. Workouts: the activity type, start and end time, duration, and distance or energy when recorded. Water: each amount, when it was recorded, and the name of the app or device that recorded it (for example WaterMinder).',
       'The first import looks back 90 days for steps and sleep, and at all your weight readings. After that, imports run only while the app is open.',
     ],
   },
@@ -17,7 +17,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
     title: 'What Leaderboard saves to Apple Health',
     body: [
       'Only entries you create in this app, and only when you turn on "Also save to Apple Health" (or "Save food to Apple Health" for food). You allow each type separately on your iPhone: workouts, weight, sleep, steps, and each nutrient.',
-      'Workouts: the activity type, start and end time, and duration, plus distance or energy only if you recorded them. Your exercises, sets, loads, and notes stay in this app. Weight: the reading and when it was taken. Sleep: when you went to sleep and woke. Steps: steps you entered by hand. Food: for each food you logged in the last 90 days, the food name (stored in Health with it), when you ate it, and the nutrients we know for the amount you ate (calories, protein, carbs, fat, fiber, sugars, saturated fat, and sodium). A nutrient we do not know is left out, never saved as zero, and only the nutrients you allow are saved. Your ingredients, recipes, and photos stay in this app.',
+      'Workouts: the activity type, start and end time, and duration, plus distance or energy only if you recorded them. Your exercises, sets, loads, and notes stay in this app. Weight: the reading and when it was taken. Sleep: when you went to sleep and woke. Steps: steps you entered by hand. Food: for each food you logged in the last 90 days, the food name (stored in Health with it), when you ate it, and the nutrients we know for the amount you ate (calories, protein, carbs, fat, fiber, sugars, saturated fat, and sodium). A nutrient we do not know is left out, never saved as zero, and only the nutrients you allow are saved. Your ingredients, recipes, and photos stay in this app. Water: only water you add in this app, with its amount and time, when you turn on saving water to Apple Health on the Water screen.',
       'It never writes back anything it imported from Apple Health, and it never changes entries made by other apps. If you edit or delete an entry here, the copy it saved to Health is updated or removed.',
     ],
   },
@@ -27,6 +27,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
       'Your account: the name you choose, the email, phone number, or Apple or Google account you sign in with, and your time zone (so days line up with your local calendar).',
       'Your groups, and the steps, sleep, and weight above, plus anything you enter by hand. Workouts you log or import, with your exercises, sets, and notes, and your workout templates, are stored for you only. A workout file you import from another app (Strong, Hevy, Fitbod, or JEFIT) is read on your phone; only the workouts in it are saved, never the file. Each day records whether it came from Apple Health or manual entry.',
       'Food you log: the food, how much, the meal, and when. A food you search for is sent from our server to the U.S. Department of Agriculture’s FoodData Central, which returns the nutrition data. Your search words are sent, but not your name or account. Our server keeps a copy of the foods it finds, shared by everyone. Foods you create and entries you log are stored for you only. Nutrition values are estimates, not medical advice.',
+      'Water: each amount, when you drank it, your time zone, and whether you added it here or it came from Apple Health (with the source app name). Your daily water target, if you set one. Stored for you only.',
       'The data is stored in a Supabase database. It is not sold, not used for advertising, and not shared with anyone else.',
     ],
   },
@@ -40,8 +41,8 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'What your groups see',
     body: [
-      'You choose what each group sees, separately for steps, sleep, weight, workouts, and food, in Group Info. Steps are shared when you join a group, and you can turn that off. Sleep, weight, workouts, and food are never shared unless you turn them on.',
-      'Steps: your daily totals and whether a day was entered by hand. Sleep: how long you slept each night, not when. Weight: your latest reading and its date, and progress toward a weight goal. Your other weight readings are never shown. Workouts: how many you did each week and your total time, nothing about which exercises you did. Food: your total calories, protein, carbs, and fat for each day you logged food, and whether some foods had no value for them. Never which foods, meals, recipes, or amounts, and never ranked or used in a competition.',
+      'You choose what each group sees, separately for steps, sleep, weight, workouts, food, and water, in Group Info. Steps are shared when you join a group, and you can turn that off. Sleep, weight, workouts, food, and water are never shared unless you turn them on.',
+      'Steps: your daily totals and whether a day was entered by hand. Sleep: how long you slept each night, not when. Weight: your latest reading and its date, and progress toward a weight goal. Your other weight readings are never shown. Workouts: how many you did each week and your total time, nothing about which exercises you did. Food: your total calories, protein, carbs, and fat for each day you logged food, and whether some foods had no value for them. Never which foods, meals, recipes, or amounts, and never ranked or used in a competition. Water: your total for each day you logged water. Never each drink, its time, or the app it came from, and never ranked.',
       'Group members can see your name, your time zone (used to work out your day), and which metrics you share. A group owner can delete a step count you entered by hand today, and nothing else of yours.',
     ],
   },
@@ -49,8 +50,9 @@ const SECTIONS: { title: string; body: string[] }[] = [
     title: 'Stopping and deleting',
     body: [
       'Stop Health Imports (on Summary) stops reading Apple Health. Data already uploaded stays until you delete it.',
-      'Delete Imported Health Data (in Profile) stops imports and deletes every step, sleep, weight, and workout record that came from Apple Health. Manual entries, groups, and sharing choices stay. Nothing is uploaded again until you reconnect Apple Health, which starts a fresh import.',
+      'Delete Imported Health Data (in Profile) stops imports and deletes every step, sleep, weight, workout, and water record that came from Apple Health. Manual entries, groups, and sharing choices stay. Nothing is uploaded again until you reconnect Apple Health, which starts a fresh import.',
       'Delete Food History (in Profile) deletes every food entry, recipe, and custom food you saved, and the food changes waiting on this iPhone. Your sharing choices stay. You choose whether food this app saved to Apple Health is removed too; if you keep it, you can delete it in the Health app. The same choice appears when you turn off "Save food to Apple Health" and when you delete your account. Your choice applies to this iPhone: another device signed in to your account keeps its own record of what it saved.',
+      'Delete Water History (in Profile) deletes every water entry, added here or imported from Apple Health, your water target, and the water changes waiting on this iPhone. Your sharing choices stay. You choose whether water this app saved to Apple Health is removed too. Water other apps saved to Health is never touched.',
       'Delete Account (in Profile) deletes your account, everything above, your memberships, and groups you own.',
       'Deleted data may remain in our hosting provider’s database backups until they expire.',
       'To change what Leaderboard can read, open the Health app, tap your profile picture, then Apps, then Leaderboard. Stopping imports here does not change those permissions.',

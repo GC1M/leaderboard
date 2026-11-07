@@ -177,6 +177,35 @@ Run on a signed physical-device build with Apple Health, after the Phase 1 and 2
 - [ ] Turn it off, choose Keep, then On again: nothing is written twice. Turn it off, choose Remove: the samples go
 - [ ] Delete Food History and Delete Account offer Remove from Health or Keep in Health, and do what they say
 
+## Phase 6 regression checklist (water, issue #58)
+
+Run on a signed physical-device build with Apple Health, after the Phase 1, 2 and 4 checklists. CI covers the conversions, the pending queue, RLS and the group summaries. The data rules are in `docs/water.md`; the Health write steps are in `docs/water-export.md`.
+
+**Logging**
+- [ ] Log 250 mL and 8 fl oz with "Save water to Apple Health" on: Health shows the same amounts (8 fl oz is 236.6 mL)
+- [ ] Each quick-add button logs once, with the time now; a custom amount above 5000 mL or 0 shows an error and logs nothing
+- [ ] Edit an entry's amount and time, then delete another: Health shows the change once, with no duplicate or leftover sample
+- [ ] A day with no entries says "No water logged", never 0 mL. A target shows only after you set one, and Clear Target removes it
+
+**Health permissions**
+- [ ] Deny water write, log water: the entries stay here and show a retry. Allow water in Health and retry: each is saved once
+- [ ] Deny water read only: steps, sleep, weight and workouts still sync, and Water says access may be limited
+- [ ] Log water in another app (for example WaterMinder): it appears once, labelled "From Apple Health · WaterMinder", and is read-only
+- [ ] Change and then delete that sample in Health: the day updates after the next import
+- [ ] Water this app saved to Health is not imported back as a second entry
+
+**Days, offline and history**
+- [ ] Log water late in the evening, then change the phone's time zone: the entry stays on the day it was drunk
+- [ ] Log offline (airplane mode): the entry shows Not synced, then syncs once online, exactly once
+- [ ] History 7, 30 and 90 days: days with water show totals, days without are gaps, the target line shows only with a target
+- [ ] Compare several day totals with the Health app's water totals for the same days
+
+**Sharing and deletion**
+- [ ] Group Info: Water is off after joining. Turn it on: a group-mate sees only your daily total. Turn it off: they see Not shared on their next load
+- [ ] Sign out and sign in as another account: no water, pending entries or target from the first account show
+- [ ] Profile, Delete Water History: entries and target are gone, sharing choices stay, the group shows no water. Keep in Health and Remove from Health do what they say
+- [ ] Delete Account: water is gone, and the Remove from Health choice removes the water this app saved
+
 ## Competition rules (version 1, issue #43)
 
 These are the defaults the server enforces (`supabase/migrations/20261107*_competition_*.sql`). The app shows the same rules on the create, detail and standings screens.

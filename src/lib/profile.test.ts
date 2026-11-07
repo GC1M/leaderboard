@@ -41,6 +41,8 @@ test('deleteAccount signs out locally only after the server delete succeeds', as
   expect(mockRemoveItem).toHaveBeenCalledWith('food-pending-me');
   expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
   expect(mockRemoveItem).toHaveBeenCalledWith('health-export-me-food');
+  expect(mockRemoveItem).toHaveBeenCalledWith('water-pending-me');
+  expect(mockRemoveItem).toHaveBeenCalledWith('health-export-me-water');
 });
 
 test('signOut clears the stored session when the server cannot be reached', async () => {
