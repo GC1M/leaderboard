@@ -30,8 +30,10 @@ export function Screen({
   onBack,
   backLabel = 'Back',
   headerActions,
+  aboveTitle,
 }: {
   title: string;
+  aboveTitle?: ReactNode;
   back?: boolean;
   onBack?: () => void;
   backLabel?: string;
@@ -71,6 +73,7 @@ export function Screen({
         keyboardShouldPersistTaps="handled"
         refreshControl={refreshControl}
       >
+        {aboveTitle}
         {/* Capped so one long word like "Leaderboard" still fits a line at the largest text sizes instead of breaking mid-word. */}
         <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.title, { color: c.ink }]}>
           {title}

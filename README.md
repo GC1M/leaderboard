@@ -1,3 +1,5 @@
+<img src="assets/images/icon.png" alt="Leaderboard logo" width="96" />
+
 # Leaderboard
 
 Free social leaderboard app for friend groups: steps, workouts, weight goals, and screen time. Expo Router / React Native / TypeScript on Supabase.
