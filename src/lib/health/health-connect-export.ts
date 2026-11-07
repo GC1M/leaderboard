@@ -12,6 +12,7 @@ import { activityCode, WORKOUT_KIND, type WorkoutPayload } from './workout-expor
 const id = (e: ExportEntry) => syncIdentifier(e.kind, e.recordId);
 const writer = (type: HealthConnectWriteType, record: (e: ExportEntry) => WriteRecord, extra: Partial<ExportWriter> = {}): ExportWriter => ({
   writeType: type,
+  deviceLocal: true,
   save: (e) => insertHealthConnectRecord(type, record(e), id(e), e.version),
   remove: (e) => deleteHealthConnectRecord(type, id(e)),
   ...extra,

@@ -154,3 +154,24 @@ test('records this app wrote are never imported back', async () => {
   await reconcileHealth('weight', { journal, checkOwner: async () => {}, upload, now: new Date('2026-10-28T12:00:00Z') });
   expect(upload).toHaveBeenLastCalledWith('weight', expect.objectContaining({ weight: [{ measured_at: '2026-10-26T08:00:00.000Z', kg: 81 }] }));
 });
+
+test('a version another device exported to its own store never skips the Health Connect write, and is not overwritten', async () => {
+  grants.add('write:Nutrition');
+  await refreshHealthConnectWriteAccess();
+  // The account's shared mapping already has this food at the same version, written from the user's iPhone.
+  const mapping = { get: jest.fn(async () => ({ syncVersion: 7 })), record: jest.fn(async () => {}), remove: jest.fn(async () => {}) };
+  const store = new Map<string, ExportEntry>();
+  const q = createExportQueue({
+    checkAccount: async () => {},
+    store: { list: async () => [...store.values()], put: async (e) => { store.set(`${e.kind}:${e.recordId}`, e); }, remove: async (k, r) => { store.delete(`${k}:${r}`); }, clear: async () => store.clear() },
+    mapping, writers: exportWriters, access: getHealthWriteAccess,
+  });
+  await q.initialize();
+  await q.enqueue(FOOD_KIND, 'f1', 'save', foodPayload({ name: 'Oats', consumedAt: at, nutrients: { energy_kcal: 150, protein_g: null, carbs_g: null, fat_g: null, fiber_g: null, sugars_g: null, sat_fat_g: null, sodium_mg: null } }), 7);
+  expect(records.filter((r) => r.recordType === 'Nutrition')).toHaveLength(1);
+  await q.enqueue(FOOD_KIND, 'f1', 'delete', null, 8);
+  expect(records).toHaveLength(0);
+  // Health Connect is on this phone only: its writes must not tell the iPhone (Apple Health) that it is done, or undo that.
+  expect(mapping.record).not.toHaveBeenCalled();
+  expect(mapping.remove).not.toHaveBeenCalled();
+});
