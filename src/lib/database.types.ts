@@ -729,6 +729,9 @@ isOneToOne: false
 "record_health_export":
 { Args: { "p_device": string,"p_kind": string,"p_record_id": string,"p_sample_uuid": string,"p_version": number }; Returns: boolean
                            },
+"regenerate_invite_code":
+{ Args: { "p_group_id": string }; Returns: string
+                           },
 "remove_member":
 { Args: { "p_group_id": string,"p_user_id": string }; Returns: undefined
                            },

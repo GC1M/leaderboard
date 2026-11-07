@@ -15,6 +15,7 @@ import {
   isValidGroupId,
   leaveGroup,
   listMembers,
+  regenerateInviteCode,
   removeMember,
   renameGroup,
   setShare,
@@ -149,7 +150,7 @@ export default function GroupInfo() {
         text: 'Remove from Group',
         style: 'destructive',
         onPress: () =>
-          alert(`Remove ${m.name}?`, 'They can join again with the invite code unless you share a new one.', [
+          alert(`Remove ${m.name}?`, 'They can join again with the invite code unless you make a new one in Invite friends.', [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Remove', style: 'destructive', onPress: () => act(() => removeMember(id, m.userId)) },
           ]),
@@ -215,13 +216,27 @@ export default function GroupInfo() {
           label={copied ? 'Copied' : 'Copy Code'}
           icon={{ ios: 'doc.on.doc', android: 'content_copy', web: 'content_copy' }}
           action
-          last
+          last={!owner}
           onPress={async () => {
             await Clipboard.setStringAsync(code);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
           }}
         />
+        {owner && (
+          <Row
+            label="New Invite Code"
+            icon={{ ios: 'arrow.clockwise', android: 'refresh', web: 'refresh' }}
+            action
+            last
+            onPress={() =>
+              alert('Make a new invite code?', 'The current code and links stop working. People already in the group stay.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'New Code', style: 'destructive', onPress: () => act(() => regenerateInviteCode(id)) },
+              ])
+            }
+          />
+        )}
       </Section>
 
       <Section

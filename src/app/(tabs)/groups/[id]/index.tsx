@@ -128,7 +128,7 @@ export default function GroupDetail() {
   // Scrolls with the list, so at large text sizes it doesn't squeeze the rows into a strip.
   const head = (
     <View style={styles.head}>
-      <Text accessibilityRole="header" numberOfLines={large ? undefined : 2} style={[ui.title, { color: c.ink }]}>
+      <Text accessibilityRole="header" numberOfLines={large ? undefined : 2} maxFontSizeMultiplier={1.5} style={[ui.title, { color: c.ink }]}>
         {group?.name ?? ' '}
       </Text>
       <View style={[styles.toggle, { backgroundColor: c.surface, borderColor: c.border }]} accessibilityRole="tablist">

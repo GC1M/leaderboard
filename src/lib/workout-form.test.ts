@@ -44,6 +44,8 @@ test('rejects bad values with a clear message', () => {
   expect(fail(base({ durationMin: 'abc' }))).toBe('Duration must be a number.');
   expect(fail(base({ durationMin: 'NaN' }))).toBe('Duration must be a number.');
   expect(fail(base({ durationMin: 'Infinity' }))).toBe('Duration must be a number.');
+  expect(fail(base({ durationMin: '1441' }))).toMatch(/24 hours/);
+  expect(fail(base({ date: '2099-01-01' }))).toMatch(/future/);
   expect(fail(base({ date: '2026-02-30' }))).toMatch(/does not exist/);
   expect(fail(base({ time: '25:00' }))).toMatch(/does not exist/);
   expect(fail(base({ time: 'noon' }))).toMatch(/HH:MM/);

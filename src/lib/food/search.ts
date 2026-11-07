@@ -118,7 +118,9 @@ export function validateCustomFood(input: CustomFoodInput): string | null {
   }
   const { energy_kcal: kcal, protein_g, carbs_g, fat_g } = input.per100g;
   if (kcal != null && kcal > 1000) return 'Calories per 100 g cannot be more than 1000.';
-  if ([protein_g, carbs_g, fat_g].some((g) => g != null && g > 100)) return 'Grams per 100 g cannot be more than 100.';
+  const { fiber_g, sugars_g, sat_fat_g, sodium_mg } = input.per100g;
+  if ([protein_g, carbs_g, fat_g, fiber_g, sugars_g, sat_fat_g].some((g) => g != null && g > 100)) return 'Grams per 100 g cannot be more than 100.';
+  if (sodium_mg != null && sodium_mg > 100000) return 'Sodium per 100 g cannot be more than 100,000 mg.';
   return null;
 }
 

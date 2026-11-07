@@ -115,6 +115,11 @@ export async function removeMember(groupId: string, userId: string): Promise<voi
   await friendly(supabase.rpc('remove_member', { p_group_id: groupId, p_user_id: userId }));
 }
 
+/** Owner only. The old code and invite links stop working. */
+export async function regenerateInviteCode(groupId: string): Promise<string> {
+  return friendly(supabase.rpc('regenerate_invite_code', { p_group_id: groupId }));
+}
+
 /** Owner deletes a member's manual steps for the member's today, e.g. an obviously wrong typed-in number. */
 export async function deleteMemberManualSteps(groupId: string, userId: string): Promise<void> {
   await friendly(supabase.rpc('delete_member_manual_entry', { p_group_id: groupId, p_user_id: userId, p_metric: 'steps' }));

@@ -56,7 +56,8 @@ const NUMBER = /(<|less than\s*)?(\d+(?:[.,]\d+)*)\s*(kcal|kj|cal|mg|mcg|µg|g)?
 // thousands separator; anywhere else it needs the user.
 function parseNumber(raw: string, energy: boolean): { value: number | null; ambiguous: boolean } {
   if (/^\d{1,3}(,\d{3})+$/.test(raw)) return energy ? { value: Number(raw.replace(/,/g, '')), ambiguous: false } : { value: null, ambiguous: true };
-  if (/[.,].*[.,]/.test(raw)) return { value: null, ambiguous: true };
+  // "1.046" is a thousands dot on many EU labels, not 1.046.
+  if (/[.,].*[.,]/.test(raw) || /^[1-9]\d{0,2}\.\d{3}$/.test(raw)) return { value: null, ambiguous: true };
   const n = Number(raw.replace(',', '.'));
   return Number.isFinite(n) ? { value: n, ambiguous: false } : { value: null, ambiguous: true };
 }
@@ -68,7 +69,10 @@ function tokens(text: string, energy = false): Token[] {
   for (const m of fixed.matchAll(NUMBER)) {
     if (m[4]) continue;
     const { value, ambiguous } = parseNumber(m[2], energy);
-    out.push({ raw: m[0].trim(), value, unit: (m[3] ?? '').toLowerCase(), less: !!m[1], ambiguous: ambiguous || fixed !== text });
+    // Either end of a range ("2-3g") is not the value.
+    const end = (m.index ?? 0) + m[0].length;
+    const range = (!m[3] && /^\s*[-–]\s*\d/.test(fixed.slice(end))) || /\d\s*[-–]\s*$/.test(fixed.slice(0, m.index));
+    out.push({ raw: m[0].trim(), value, unit: (m[3] ?? '').toLowerCase(), less: !!m[1], ambiguous: ambiguous || range || fixed !== text });
   }
   return out;
 }
@@ -84,25 +88,29 @@ const NUTRIENT_NAMES: [Exclude<NutrientKey, 'energy_kcal'>, RegExp][] = [
   ['sodium_mg', /\bsodium\b/i],
 ];
 // Lines that name a nutrient we do not store, or a sub-amount that would be misread as the total.
-const SKIP = /\b(trans|added|poly|mono|cholesterol|potassium|calcium|iron|vitamin|daily value|diet)\b/i;
+const SKIP = /\b(trans|added|poly\w*|mono\w*|cholesterol|potassium|calcium|iron|vitamin|daily value|diet|from fat)\b/i;
 
 const field = (value: number | null, status: FieldStatus, note: string | null = null): LabelField => ({ value, status, note });
 const missing = () => field(null, 'missing');
 
-// The column to read when a label has a per 100 g and a per serving column.
+const HUNDRED = /(^|[^\d.,])100\s*(g|ml)\b/i;
+
+// The column to read when a label has a per 100 g and a per serving column. Only a header ("Per 100g",
+// "Typical values 100g") sets the basis, never a net weight such as "Net Wt 3.5 oz (100g)".
 function columns(lines: readonly ScanLine[]): { basis: Basis; column: number; per100ml: boolean } {
-  const header = lines.find((l) => /100\s*(g|ml)\b/i.test(l.text));
+  const header = lines.find((l) => HUNDRED.test(l.text) && /\b(per|pro|pour|je|typical|values?)(\b|(?=\d))/i.test(l.text) && !/net\s*(wt|weight)|(serving|portion) size/i.test(l.text));
   if (!header) return { basis: 'serving', column: 0, per100ml: false };
   const t = header.text.toLowerCase();
-  const at100 = t.search(/100\s*(g|ml)\b/);
-  const atServing = t.search(/serving|portion|pack|bar|piece/);
-  return { basis: '100g', column: atServing >= 0 && atServing < at100 ? 1 : 0, per100ml: /100\s*ml\b/.test(t) && !/100\s*g\b/.test(t) };
+  // A serving column ("Per bar", "Per 30g") before the 100 g one puts the per 100 g values second.
+  const before = t.slice(0, t.search(HUNDRED));
+  return { basis: '100g', column: /serving|portion|pack|bar|piece|\d\s*(g|ml)\b/.test(before) ? 1 : 0, per100ml: /100\s*ml\b/.test(t) && !/100\s*g\b/.test(t) };
 }
 
 function readNutrient(key: Exclude<NutrientKey, 'energy_kcal'>, line: ScanLine, after: string, column: number): LabelField {
   const found = tokens(after);
   if (found.length === 0) return missing();
-  const tok = found[column] ?? found[0];
+  const tok = found[column];
+  if (!tok) return field(null, 'check', `Label shows "${found[0].raw}" in one column only. Enter the value per 100 g.`);
   const shown = `Label shows "${tok.raw}".`;
   if (line.confidence < LOW_CONFIDENCE || tok.ambiguous || tok.value == null) return field(null, 'check', `${shown} Enter the value.`);
   if (tok.less) return field(null, 'check', `Label says less than ${tok.value} ${tok.unit || 'g'}. Enter the value or leave it blank.`);
@@ -117,17 +125,23 @@ function readNutrient(key: Exclude<NutrientKey, 'energy_kcal'>, line: ScanLine, 
 }
 
 function readEnergy(lines: readonly ScanLine[], column: number): LabelField {
-  const energyLines = lines.filter((l) => /(calorie|energy|kcal|\bkj\b)/i.test(l.text) && !/(from fat|diet|daily)/i.test(l.text));
+  // "Calories 250 Calories from Fat 110": only the part before "from fat" is the energy.
+  const energyLines = lines
+    .map((l) => ({ ...l, text: l.text.replace(/\b(calories\s+)?from fat.*$/i, '') }))
+    .filter((l) => /(calorie|energy|kcal|\bkj\b)/i.test(l.text) && !/(diet|daily)/i.test(l.text));
   if (energyLines.length === 0) return missing();
   const all = energyLines.flatMap((l) => tokens(l.text, true).map((t) => ({ ...t, low: l.confidence < LOW_CONFIDENCE })));
   const kcal = all.filter((t) => t.unit === 'kcal' || t.unit === 'cal');
   const kj = all.filter((t) => t.unit === 'kj');
   const bare = energyLines.filter((l) => /calories/i.test(l.text)).flatMap((l) => tokens(l.text, true).filter((t) => t.unit === '').map((t) => ({ ...t, low: l.confidence < LOW_CONFIDENCE })));
-  const pick = <T,>(list: T[]) => list[column] ?? list[0];
-  const tok = pick(kcal) ?? pick(kj) ?? pick(bare);
+  const tok = kcal[column] ?? kj[column] ?? bare[column];
   if (!tok) return field(null, 'check', 'Calories were not readable. Enter them.');
   if (tok.low || tok.ambiguous || tok.value == null || tok.less) return field(null, 'check', `Label shows "${tok.raw}". Enter calories in kcal.`);
-  if (tok.unit === 'kj') return field(Math.round(kjToKcal(tok.value)), 'read', `Converted from ${tok.value} kJ.`);
+  if (tok.unit === 'kj') {
+    const kcalValue = Math.round(kjToKcal(tok.value));
+    if (kcalValue === 0 && tok.value > 0) return field(null, 'check', `Label shows "${tok.raw}". Enter calories in kcal.`);
+    return field(kcalValue, 'read', `Converted from ${tok.value} kJ.`);
+  }
   return field(tok.value, 'read');
 }
 
@@ -136,7 +150,7 @@ const SERVING = /(serving|portion) size|per (serving|portion|pack|bar|piece)|ser
 // The serving weight. On a header such as "Per 100g Per 30g serving" the 100 g column is skipped; a weight in
 // brackets ("1 cup (240g)") wins.
 function servingSize(lines: readonly ScanLine[]): { grams: number | null; text: string | null; warning: string | null } {
-  const line = lines.find((l) => SERVING.test(l.text) && !/servings per/i.test(l.text));
+  const line = lines.find((l) => /(serving|portion) size/i.test(l.text)) ?? lines.find((l) => SERVING.test(l.text) && !/servings per/i.test(l.text));
   if (!line) return { grams: null, text: null, warning: null };
   const found = [...line.text.matchAll(/(\()?\s*(\d+(?:[.,]\d+)?)\s*(g|ml)\b/gi)].map((m) => ({ bracket: !!m[1], value: Number(m[2].replace(',', '.')), ml: m[3].toLowerCase() === 'ml' }));
   const m = found.find((f) => f.bracket) ?? found.find((f) => f.value !== 100 || found.length === 1);
@@ -222,7 +236,12 @@ export function parseMenu(lines: readonly ScanLine[]): MenuItem[] {
   const items: MenuItem[] = [];
   for (const line of lines) {
     if (line.confidence < LOW_CONFIDENCE) continue;
-    const text = line.text.replace(PRICE, ' ').replace(/\s+/g, ' ').trim().replace(/^[^a-zà-ÿ]+|[^a-zà-ÿ)]+$/gi, '');
+    const unpriced = line.text.replace(PRICE, ' ');
+    const trimEnd = (t: string) => t.replace(/[^a-z0-9à-ÿ)]+$/i, '');
+    // Numbers can be part of a name ("Chicken 65", "7 Layer Dip"). A bare trailing number is only taken as the
+    // price when the line has no other price; a leading "1." or "2)" is a list marker.
+    let text = trimEnd(unpriced.replace(/\s+/g, ' ').trim().replace(/^(\d{1,2}[.)]\s+|[^a-z0-9à-ÿ]+)/i, ''));
+    if (unpriced === line.text) text = trimEnd(text.replace(/\s\d+$/, ''));
     if ((text.match(LETTER) ?? []).length < 3) continue;
     const last = items[items.length - 1];
     if (last && (/^[a-zà-ÿ]/.test(text) || text.split(' ').length > 6)) {
