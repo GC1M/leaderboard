@@ -55,6 +55,18 @@ Android uses the same coordinator, journal, upload RPCs and server rows as iOS. 
 
 Only a real device can verify: the permission sheet and partial grants, history grant behavior and whether old reads error, token expiry, sleep stage data from real trackers (Samsung Health, Fitbit, Pixel Watch), Android 13 with the Play Store app vs Android 14+, and the Play Console data-type declaration.
 
+## Android: Health Connect writes (#61)
+
+The export queue is the same on both platforms; on Android `registerHealthConnectWriters()` (`src/lib/health/health-connect-export.ts`, called from `sync.tsx`) replaces the HealthKit writers for the same kinds.
+
+- Every record carries `clientRecordId` = the shared export id `leaderboard:<kind>:<recordId>` (`syncIdentifier`) and `clientRecordVersion` = the queue version (food: the queue's attempt version, which grows on every attempt). Health Connect keeps the highest version, so a retry never duplicates and an edit replaces. A delete uses `deleteRecordsByUuids` with that client record id, which Health Connect limits to this app's own records.
+- Written: manual weight (`Weight`, kg), manual sleep (`SleepSession` without stages), app-created workouts (`ExerciseSession` with the mapped exercise type and the activity as title; no distance or energy, which are separate record types), food (`NutritionRecord`: energy, protein, carbs, fat, fiber, sugar, saturated fat, sodium; unknown nutrients absent; one second long because interval records need an end after the start). One nutrition permission covers every nutrient, so the allowed-nutrient mask is all or nothing.
+- Steps are never written to Health Connect (aggregation would add our own steps into imported totals). The steps "save to Health" switch is replaced by "Saving steps to Health Connect isn't supported yet", and a stray steps entry fails visibly (no writer).
+- Write permission is requested per kind (one switch, one request, write only). Health Connect answers grants asynchronously while the queue asks synchronously, so grants are cached and refreshed before the queue runs (launch, foreground), after every request, and after a failed write; a failed write without the grant is shown as a permission problem, not an error.
+- No export loop: imports skip records whose `dataOrigin` is this app's package.
+
+Only a real device can verify: upsert by client record id and version, deletes by client record id, the per-type write sheet, and how Health Connect and other apps show the written records.
+
 ## Export to Apple Health (#34)
 
 Shared write infrastructure for features that save app records (workouts, manual weight/steps/sleep) to Health. Feature code registers an `ExportWriter` per record `kind` (`registerExportWriter`) and calls `useHealthExport().enqueue(kind, recordId, 'save' | 'delete', payload, version?)`. Writers are registered for workouts (`workout-export.ts`, see docs/workout-export.md) and manual weight, sleep and steps (`manual-export`), and food entries (`food-export.ts`, see docs/food/health-export.md).

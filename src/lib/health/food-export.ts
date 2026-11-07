@@ -1,11 +1,13 @@
 import type { SampleForSaving } from '@kingstinct/react-native-healthkit';
+import { Platform } from 'react-native';
 
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { supabase } from '@/lib/supabase';
 
 import { localDateKey, startOfLocalDay } from './dates';
 import { APP_RECORD_KEY, exportMetadata } from './export-metadata';
 import { registerExportWriter, type ExportEntry, type ExportWriter } from './export-queue';
-import { getHealthWriteAccess, type HealthWriteType, loadHealthKit, removeExportedSample } from './healthkit';
+import { getHealthWriteAccess, loadHealthKit, removeExportedSample } from './healthkit';
 
 // Food entries logged in this app that the user chose to also save to Apple Health (#48). recordId is the
 // `food_entries.id`, which never changes when an amount is edited, so the mapping stays stable. Each entry is one
@@ -26,7 +28,7 @@ export const FOOD_NUTRIENTS = [
   ['sat_fat_g', 'HKQuantityTypeIdentifierDietaryFatSaturated', 'g'],
   ['sodium_mg', 'HKQuantityTypeIdentifierDietarySodium', 'mg'],
 ] as const;
-export const FOOD_WRITE_TYPES: readonly HealthWriteType[] = FOOD_NUTRIENTS.map((n) => n[1]);
+export const FOOD_WRITE_TYPES = FOOD_NUTRIENTS.map((n) => n[1]);
 type FoodKey = (typeof FOOD_NUTRIENTS)[number][0];
 
 // Only nutrients that are known. A missing or invalid value is absent, never 0; a recorded 0 is kept.
@@ -47,7 +49,9 @@ export const EXPORT_DAYS = 90; // how far back synced entries are exported
 
 // Bit i of a mask is FOOD_NUTRIENTS[i]: one byte says which nutrient types are allowed, or were written.
 const bit = (i: number) => 1 << i;
-export const allowedFoodMask = () => FOOD_NUTRIENTS.reduce((m, n, i) => (getHealthWriteAccess(n[1]) === 'granted' ? m | bit(i) : m), 0);
+// Health Connect has one nutrition permission for every nutrient, so on Android it allows all of them or none.
+export const allowedFoodMask = () => Platform.OS === 'android' ? (getHealthWriteAccess('Nutrition') === 'granted' ? bit(FOOD_NUTRIENTS.length) - 1 : 0)
+  : FOOD_NUTRIENTS.reduce((m, n, i) => (getHealthWriteAccess(n[1]) === 'granted' ? m | bit(i) : m), 0);
 
 // The export version of a row: updated_at in ms times 256 plus the allowed-type mask (about 4.5e14 today, under 2^53).
 // updated_at moves on every edit, and a larger allowed mask is a higher version, so the entry is saved again. A smaller
@@ -97,7 +101,7 @@ async function settle(exp: FoodExportControls, removeFromHealth: boolean): Promi
     await exp.enqueue(FOOD_KIND, e.recordId, 'delete', null, foodDeleteVersion(exp.getEntries(), e.recordId)!);
   }
   // Any delete still queued (pending or failed) did not finish: say so instead of claiming the food is gone from Health.
-  if (exp.getEntries().some((e) => e.kind === FOOD_KIND && e.op === 'delete')) throw new Error("Couldn't remove some food from Apple Health. Allow nutrition in Health and try again, or keep it in Health.");
+  if (exp.getEntries().some((e) => e.kind === FOOD_KIND && e.op === 'delete')) throw new Error(`Couldn't remove some food from ${healthProviderName()}. Allow nutrition in Health and try again, or keep it in Health.`);
 }
 
 const COLUMNS = ['id', 'updated_at', 'food_name', 'consumed_at', ...FOOD_NUTRIENTS.map((n) => n[0])].join(',');
@@ -106,7 +110,7 @@ export type FoodRow = { id: string; updated_at: string; food_name: string; consu
 // Synced entries of the last EXPORT_DAYS days: what the server has, so an entry still waiting to sync is never in it.
 export async function fetchRecentFoodRows(now = new Date()): Promise<FoodRow[]> {
   const { data, error } = await supabase.from('food_entries').select(COLUMNS).gte('local_date', localDateKey(startOfLocalDay(now, EXPORT_DAYS - 1)));
-  if (error) throw new Error("Couldn't load your food to save to Apple Health.");
+  if (error) throw new Error(`Couldn't load your food to save to ${healthProviderName()}.`);
   return data as unknown as FoodRow[];
 }
 
@@ -139,7 +143,7 @@ export async function deletedFoodIds(rows: readonly { id: string }[], known: rea
   for (let i = 0; i < ids.length; i += 100) {
     const chunk = ids.slice(i, i + 100);
     const { data, error } = await supabase.from('food_entries').select('id').in('id', chunk);
-    if (error) throw new Error("Couldn't check your food against Apple Health.");
+    if (error) throw new Error(`Couldn't check your food against ${healthProviderName()}.`);
     const found = new Set(data.map((r) => r.id));
     gone.push(...chunk.filter((id) => !found.has(id)));
   }
@@ -147,14 +151,14 @@ export async function deletedFoodIds(rows: readonly { id: string }[], known: rea
 }
 
 // Bit mask of the nutrients a payload has a known value for.
-const payloadMask = (p: FoodPayload) => FOOD_NUTRIENTS.reduce((m, n, i) => (p.nutrients[n[0]] !== undefined ? m | bit(i) : m), 0);
+export const payloadMask = (p: FoodPayload) => FOOD_NUTRIENTS.reduce((m, n, i) => (p.nutrients[n[0]] !== undefined ? m | bit(i) : m), 0);
 
 const need = () => {
   const hk = loadHealthKit();
   if (!hk) throw new Error('Apple Health requires a native iPhone build.');
   return hk;
 };
-const granted = (type: HealthWriteType) => getHealthWriteAccess(type) === 'granted';
+const granted = (type: (typeof FOOD_WRITE_TYPES)[number]) => getHealthWriteAccess(type) === 'granted';
 
 // Throws when a type this entry was, or may have been, saved with is no longer allowed: its old sample could not be replaced.
 function assertNotRevoked(e: ExportEntry) {

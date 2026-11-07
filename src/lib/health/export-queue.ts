@@ -55,6 +55,8 @@ export const initialExportState = (): ExportState => ({ ready: false, processing
 // Feature code adds its writer once at startup.
 export const exportWriters: Record<string, ExportWriter | undefined> = {};
 export const registerExportWriter = (kind: string, writer: ExportWriter) => { exportWriters[kind] = writer; };
+// The types a kind's switch asks permission for: the registered writer's, so each platform asks for its own.
+export const writeTypesFor = (kind: string): readonly HealthWriteType[] => { const w = exportWriters[kind]; return w ? w.writeTypes ?? [w.writeType] : []; };
 
 const same = (a: ExportEntry, b: ExportEntry) => a.kind === b.kind && a.recordId === b.recordId;
 

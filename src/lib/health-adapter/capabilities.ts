@@ -63,11 +63,11 @@ export const ANDROID_MATRIX: PlatformMatrix = {
     'Apps cannot be notified of new data: poll on foreground and while foregrounded, or use the changes token (it expires after 30 days unused).',
   ],
   entries: {
-    steps: android({ read: true, write: false }, 'Read as aggregated totals per local day, so overlapping sources are not double counted. Built-in step counting needs Android 14 with SDK extension 20. Imports start ~90 days back.'),
-    sleep: android({ read: true, write: false }, 'One session record with optional stages; asleep stages (or the whole session without stages) are summarized by the shared sleep rule. Imports start ~90 days back.'),
-    weight: android({ read: true, write: false }, 'Imported without an app-chosen lower bound; Health Connect may limit it to its default window.'),
-    workouts: android({ read: true, write: false }, 'Exercise sessions; distance and energy are not read. Routes need a separate permission and are not read.'),
-    nutrition: android({ read: false, write: false }, 'Nutrition and hydration are separate record types.'),
+    steps: android({ read: true, write: false }, 'Read as aggregated totals per local day, so overlapping sources are not double counted. Never written: aggregation would count our own steps in the imported totals. Built-in step counting needs Android 14 with SDK extension 20. Imports start ~90 days back.'),
+    sleep: android({ read: true, write: false }, 'One session record with optional stages; asleep stages (or the whole session without stages) are summarized by the shared sleep rule. Imports start ~90 days back. Manual sleep is exported by the export queue directly.'),
+    weight: android({ read: true, write: false }, 'Imported without an app-chosen lower bound; Health Connect may limit it to its default window. Manual readings are exported by the export queue directly, not through the adapter.'),
+    workouts: android({ read: true, write: false }, 'Exercise sessions; distance and energy are not read or written. Routes need a separate permission and are not used. App-created workouts are exported by the export queue directly.'),
+    nutrition: android({ read: false, write: false }, 'Nutrition and hydration are separate record types. Food entries are exported (write only) by the export queue directly, not through the adapter.'),
     water: android({ read: false, write: false }, 'Hydration record.'),
   },
 };

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
 import { secureStorage } from '@/lib/secure-storage';
@@ -7,6 +7,8 @@ import { reconcileHealth } from './changes';
 import { createHealthCoordinator, HEALTH_METRICS, initialHealthState, type HealthConnection, type HealthCoordinator } from './coordinator';
 import { createExportQueue, exportWriters, initialExportState, type ExportQueue } from './export-queue';
 import { healthExportMapping } from './export-mapping';
+import { refreshHealthConnectWriteAccess } from './health-connect';
+import { registerHealthConnectWriters } from './health-connect-export';
 import { getHealthAccess, getHealthWriteAccess, healthUnavailableMessage, requestHealthAccess, requestHealthWriteAccess, type HealthWriteType } from './healthkit';
 import { deleteImportedJournal, getHealthDeviceId, healthExportStore, healthJournal, resetHealthAnchors } from './journal';
 import './manual-export'; // registers the manual weight/sleep/steps writers
@@ -14,6 +16,10 @@ import { assertHealthOwner } from './owner';
 import { deleteHealthImports, uploadHealthChanges } from './upload';
 import './workout-export'; // registers the app-created workout writer
 import './food-export'; // registers the app-created food writer
+
+if (Platform.OS === 'android') registerHealthConnectWriters(); // replaces the HealthKit writers above
+// Health Connect reports write grants asynchronously; refresh the cached grants before the queue reads them.
+const refreshWrites = () => (Platform.OS === 'android' ? refreshHealthConnectWriteAccess().catch(() => {}) : Promise.resolve());
 
 export const SYNC_DAYS = 7; // existing My Steps view; import history is 90 days, not seven
 const HealthContext = createContext<HealthCoordinator | null>(null);
@@ -67,8 +73,8 @@ export function HealthSyncProvider({children}:{children:ReactNode}) {
   const state=useSyncExternalStore(controller?.subscribe ?? subscribeIdle,controller?.getSnapshot ?? idleSnapshot);
   useEffect(()=>{
     if(!exporter)return;
-    void exporter.initialize().then(()=>exporter.process());
-    const subscription=AppState.addEventListener('change',(s)=>{if(s==='active')void exporter.process();});
+    void exporter.initialize().then(refreshWrites).then(()=>exporter.process());
+    const subscription=AppState.addEventListener('change',(s)=>{if(s==='active')void refreshWrites().then(()=>exporter.process());});
     // Sign-out or account switch stops this queue; its entries stay in that account's own local store.
     return()=>{exporter.stop();subscription.remove();};
   },[exporter]);

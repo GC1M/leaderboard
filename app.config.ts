@@ -32,13 +32,18 @@ const config: ExpoConfig = {
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
-    // Health Connect reads (#60). History lets the first import reach 90 days back instead of 30 days before the first grant.
+    // Health Connect reads (#60) and writes of app-created entries (#61; never steps). History lets the first import reach
+    // 90 days back instead of 30 days before the first grant.
     permissions: [
       'android.permission.health.READ_STEPS',
       'android.permission.health.READ_SLEEP',
       'android.permission.health.READ_WEIGHT',
       'android.permission.health.READ_EXERCISE',
       'android.permission.health.READ_HEALTH_DATA_HISTORY',
+      'android.permission.health.WRITE_WEIGHT',
+      'android.permission.health.WRITE_SLEEP',
+      'android.permission.health.WRITE_EXERCISE',
+      'android.permission.health.WRITE_NUTRITION',
     ],
   },
   web: {

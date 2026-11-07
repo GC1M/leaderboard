@@ -71,7 +71,7 @@ export default function Profile() {
   // Food this app saved to Apple Health. The user chooses whether it goes too (see settleFoodExport); the entries are
   // read when the button is pressed, not from this render.
   const exported = exportedFood(healthExport.entries).length;
-  const count = (n: number) => `${n} ${n === 1 ? 'entry was' : 'entries were'} saved to Apple Health`;
+  const count = (n: number) => `${n} ${n === 1 ? 'entry was' : 'entries were'} saved to ${provider}`;
   const deleteFood = (fromHealth: boolean) =>
     run(async () => {
       // Health first, like account deletion: a failed Remove leaves the history intact, and Keep leaves nothing to reconcile.
@@ -137,7 +137,7 @@ export default function Profile() {
       {Platform.OS === 'android' && (
         <Section
           title="Health Connect"
-          footer="Leaderboard reads steps, sleep, weight, and workouts that you allow. Deleting imported data doesn't change Health Connect permissions: to change what Leaderboard can read, open Health Connect, then App permissions, then Leaderboard."
+          footer="Leaderboard reads steps, sleep, weight, and workouts that you allow, and saves what you log here only if you turn on saving for it. Deleting imported data doesn't change Health Connect permissions: to change what Leaderboard can read, open Health Connect, then App permissions, then Leaderboard."
         >
           <Row label="Health Access" icon={{ ios: 'heart.text.square', android: 'favorite', web: 'favorite' }} onPress={() => router.push('/steps/permission')} />
           <Row label="Delete Imported Health Data" icon={{ ios: 'trash', android: 'delete', web: 'delete' }} danger last disabled={busy || !health.ready} onPress={confirmDeleteImports} />
