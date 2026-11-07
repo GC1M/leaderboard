@@ -37,18 +37,26 @@ select save_manual_workout(null, jsonb_build_object('activity_type', 'Secret Str
   'timezone', 'UTC', 'duration_s', 3600, 'notes', 'private note',
   'exercises', jsonb_build_array(jsonb_build_object('exercise_id', (select id from exercises where name = 'Secret Lift'),
     'notes', 'private exercise note', 'sets', jsonb_build_array(jsonb_build_object('reps', 5, 'load_kg', 140))))));
+reset role; -- Health rows arrive through the import RPCs, so seed them as the database owner
 insert into workouts (user_id, source, activity_type, started_at, ended_at, timezone, duration_s, distance_m, energy_kcal, health_uuid, health_device_id)
   values (auth.uid(), 'healthkit', 'Running', (select (d + interval '3 hours') at time zone 'UTC' from day0),
     (select (d + interval '3 hours 30 minutes') at time zone 'UTC' from day0), 'UTC', 1800, 5000, 300,
     '00000000-0000-0000-0000-00000000f007', '00000000-0000-0000-0000-00000000d007');
+set local role authenticated;
 insert into workouts (user_id, source, activity_type, started_at, ended_at, timezone)
   values (auth.uid(), 'manual', 'Yoga', (select (d - interval '7 days' + interval '9 hours') at time zone 'UTC' from day0),
     (select (d - interval '7 days' + interval '9 hours 40 minutes') at time zone 'UTC' from day0), 'UTC');
 -- Steps, sleep and weight, to show they keep working next to workouts.
+reset role; -- Health rows arrive through the import RPCs, so seed them as the database owner
 insert into daily_metrics (user_id, date, metric, value, source) values (auth.uid(), current_date, 'steps', 9000, 'healthkit');
+set local role authenticated;
+reset role; -- Health rows arrive through the import RPCs, so seed them as the database owner
 insert into daily_metrics (user_id, date, metric, value, source, window_start, window_end)
   values (auth.uid(), current_date, 'sleep_min', 420, 'healthkit', now() - interval '8 hours', now() - interval '1 hour');
+set local role authenticated;
+reset role; -- Health rows arrive through the import RPCs, so seed them as the database owner
 insert into weight_measurements (user_id, measured_at, kg, source) values (auth.uid(), now() - interval '1 day', 80, 'healthkit');
+set local role authenticated;
 
 -- The server returns these columns and no others.
 select is((select proargnames from pg_proc where oid = 'public.group_workouts(uuid,date,date)'::regprocedure),

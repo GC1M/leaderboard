@@ -18,6 +18,7 @@ select join_group((select invite_code from g));
 
 -- sleep
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
+reset role; -- checks on Health rows, which only the import RPCs write, run as the database owner
 select lives_ok($$insert into daily_metrics (user_id, date, metric, value, source, window_start, window_end)
   values (auth.uid(), current_date, 'sleep_min', 450, 'healthkit', now() - interval '8 hours', now() - interval '30 minutes')$$,
   'sleep summary with its window is accepted');
@@ -29,28 +30,35 @@ select throws_ok($$insert into daily_metrics (user_id, date, metric, value, sour
   '23514', null, 'half-open window is rejected');
 select lives_ok($$insert into daily_metrics values (auth.uid(), current_date, 'steps', 0, 'healthkit')$$,
   'recorded zero steps is a row, distinct from no row');
+set local role authenticated;
 select throws_ok($$insert into daily_metrics values (auth.uid(), current_date, 'weight_kg', 70, 'manual')$$,
   '23514', null, 'weight no longer goes in daily_metrics');
 
 -- weight
+reset role; -- checks on Health rows, which only the import RPCs write, run as the database owner
 select lives_ok($$insert into weight_measurements (user_id, measured_at, kg, source) values
   (auth.uid(), '2026-10-20 07:00+00', 80.4, 'healthkit'),
   (auth.uid(), '2026-10-20 19:00+00', 80.9, 'healthkit'),
   (auth.uid(), '2026-10-21 07:00+00', 80.2, 'healthkit'),
   (auth.uid(), '2026-10-21 07:00+00', 80.0, 'manual')$$,
   'several readings per day, and same-time readings from different sources, are kept');
+set local role authenticated;
 select is((select count(*)::int from weight_measurements), 4, 'nothing averaged or dropped');
+reset role; -- checks on Health rows, which only the import RPCs write, run as the database owner
 select lives_ok($$insert into weight_measurements (user_id, measured_at, kg, source)
   values (auth.uid(), '2026-10-21 07:00+00', 80.3, 'healthkit')
   on conflict (user_id, measured_at, source) do update set kg = excluded.kg$$,
   're-importing the same reading upserts');
+set local role authenticated;
 select is((select count(*)::int from weight_measurements), 4, 're-import does not duplicate');
 select results_eq($$select kg, source from latest_weight$$, $$values (80.0::numeric, 'manual'::text)$$,
   'latest is the newest reading, manual wins a timestamp tie');
 select throws_ok($$insert into weight_measurements (user_id, measured_at, kg, source) values (auth.uid(), now(), 0, 'manual')$$,
   '23514', null, 'zero kg is rejected: no reading means no row');
 insert into goals (user_id, metric, start_value, target_value, start_date) values (auth.uid(), 'weight_kg', 82, 78, current_date - 10);
+reset role; -- Health rows arrive through the import RPCs, so seed them as the database owner
 insert into weight_measurements (user_id, measured_at, kg, source) values (auth.uid(), now() - interval '1 minute', 80, 'healthkit');
+set local role authenticated;
 select is((select value from group_leaderboard((select id from g), 'weight_kg', 'week') where user_id = auth.uid()), 50::numeric,
   'weight leaderboard progress reads weight_measurements');
 
