@@ -94,11 +94,13 @@ const field = (value: number | null, status: FieldStatus, note: string | null = 
 const missing = () => field(null, 'missing');
 
 const HUNDRED = /(^|[^\d.,])100\s*(g|ml)\b/i;
+// A row that names a nutrient is a value row, not the column header.
+const NAMED = /(calorie|energy|kcal|\bkj\b|\bsalt\b)/i;
 
 // The column to read when a label has a per 100 g and a per serving column. Only a header ("Per 100g",
 // "Typical values 100g") sets the basis, never a net weight such as "Net Wt 3.5 oz (100g)".
 function columns(lines: readonly ScanLine[]): { basis: Basis; column: number; per100ml: boolean } {
-  const header = lines.find((l) => HUNDRED.test(l.text) && /\b(per|pro|pour|je|typical|values?)(\b|(?=\d))/i.test(l.text) && !/net\s*(wt|weight)|(serving|portion) size/i.test(l.text));
+  const header = lines.find((l) => HUNDRED.test(l.text) && !NAMED.test(l.text) && !NUTRIENT_NAMES.some(([, re]) => re.test(l.text)) && !/net\s*(wt|weight)|(serving|portion) size/i.test(l.text));
   if (!header) return { basis: 'serving', column: 0, per100ml: false };
   const t = header.text.toLowerCase();
   // A serving column ("Per bar", "Per 30g") before the 100 g one puts the per 100 g values second.

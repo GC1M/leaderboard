@@ -2,7 +2,7 @@
 export function normalizePhone(input: string): string | null {
   // "+44 (0) 20 ..." writes the trunk 0, which is not dialled internationally. Italy keeps its leading 0, so a
   // bare 0 after the country code is only dropped for the UK.
-  const trimmed = input.trim().replace(/\(0\)/, '');
+  const trimmed = input.trim().replace(/^(\+.*?)\(0\)/, '$1');
   if (!/^\+?[\d\s().-]+$/.test(trimmed)) return null;
   let digits = trimmed.replace(/\D/g, '');
   if (trimmed.startsWith('+')) {

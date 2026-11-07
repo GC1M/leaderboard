@@ -12,10 +12,11 @@ alter table public.profiles add constraint profiles_display_name_length check (c
 create function public.check_profile_timezone() returns trigger
 language plpgsql set search_path = '' as $$
 begin
-  if not exists (select 1 from pg_catalog.pg_timezone_names where name = new.timezone) then
-    raise exception 'unknown time zone %', new.timezone using errcode = '22023';
-  end if;
+  -- Converting with the zone is the check Postgres itself applies, and is cheaper than scanning pg_timezone_names.
+  perform now() at time zone new.timezone;
   return new;
+exception when invalid_parameter_value then
+  raise exception 'unknown time zone %', new.timezone using errcode = '22023';
 end $$;
 create trigger profiles_timezone_check before insert or update of timezone on public.profiles
 for each row execute function public.check_profile_timezone();
@@ -38,16 +39,17 @@ begin
 end $$;
 
 -- NaN and Infinity passed "value >= 0". Manual sleep over a day, manual workouts over a day or starting in the future,
--- and future manual weights are rejected, as the app already does. NOT VALID: old rows are not rechecked.
+-- and future manual weights are rejected, as the app already does (with an hour's allowance for a fast device clock).
+-- NOT VALID: old rows are not rechecked.
 alter table public.daily_metrics
   add constraint daily_metrics_finite check (value < 'Infinity'::numeric) not valid,
   add constraint daily_metrics_manual_sleep_cap check (metric <> 'sleep_min' or source <> 'manual' or value <= 1440) not valid;
 alter table public.goals
   add constraint goals_finite check (start_value < 'Infinity'::numeric and target_value < 'Infinity'::numeric) not valid;
 alter table public.weight_measurements
-  add constraint weight_manual_not_future check (source <> 'manual' or measured_at <= now() + interval '5 minutes') not valid;
+  add constraint weight_manual_not_future check (source <> 'manual' or measured_at <= now() + interval '1 hour') not valid;
 alter table public.workouts
-  add constraint workouts_manual_bounds check (source <> 'manual' or (ended_at - started_at <= interval '24 hours' and started_at <= now() + interval '5 minutes')) not valid;
+  add constraint workouts_manual_bounds check (source <> 'manual' or (ended_at - started_at <= interval '24 hours' and started_at <= now() + interval '1 hour')) not valid;
 
 -- Deleting an owner who had joined a competition in their own group failed: the cascade marked them as left,
 -- and the audit row for that change pointed at a competition the same cascade was deleting. Removing the

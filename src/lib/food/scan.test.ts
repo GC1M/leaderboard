@@ -121,6 +121,9 @@ describe('parseLabel checks', () => {
   it('keeps a US label per serving when a net weight mentions 100 g', () => {
     expect(L('Serving size 1 oz (28g)\nNet Wt 3.5 oz (100g)\nCalories 140').basis).toBe('serving');
     expect(L('Serving size 30g\nNet weight 1100g\nCalories 120').basis).toBe('serving');
+    // Real headers still set per 100 g, in any wording.
+    expect(L('Información nutricional por 100 g\nGrasas 3,5 g').basis).toBe('100g');
+    expect(L('Nutrition information 100g 30g\nFat 4g 1.2g').basis).toBe('100g');
   });
 
   it('reads the 100 g column when a gram serving column comes first', () => {

@@ -14,7 +14,7 @@ test.each([
   expect(normalizePhone(input)).toBe(expected);
 });
 
-test.each(['', 'abc', '12345', '+123', '0152127777', '+0 415 212 7777', '+1 (055) 555-0100', '+12345678', '415 212 7777 99', 'a@b.co'])(
+test.each(['', 'abc', '12345', '+123', '0152127777', '+0 415 212 7777', '+1 (055) 555-0100', '(0) 20 7946 0958', '+12345678', '415 212 7777 99', 'a@b.co'])(
   'rejects %s',
   (input) => {
     expect(normalizePhone(input)).toBeNull();
