@@ -8,8 +8,6 @@ import { getAllHealthAccess, getHealthAccess, healthUnavailableMessage, requestH
 import { summarizeSleep } from './sleep';
 import { readLatestWeight } from './weight';
 
-// US DST ends on 2026-11-01 in this zone, so that local day is 25 hours long.
-process.env.TZ = 'America/Chicago';
 jest.mock('@/lib/metrics', () => ({ getMyRecentSteps: jest.fn(), upsertDailyMetrics: jest.fn() }));
 
 // In-memory Health Connect: records per type, a change log that changes tokens index into, and permission grants.
@@ -61,6 +59,7 @@ function memory(initial: JournalState | null = null) {
   return { journal, state: () => state! };
 }
 const NOW = new Date(2026, 9, 28, 12);
+const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const sync = (metric: Parameters<typeof reconcileHealth>[0], mem: ReturnType<typeof memory>, upload = jest.fn(async () => {})) =>
   reconcileHealth(metric, { journal: mem.journal, checkOwner: async () => {}, upload, now: NOW });
 
@@ -168,11 +167,12 @@ describe('change feed', () => {
     await sync('steps', mem, upload);
     expect(upload).toHaveBeenLastCalledWith('steps', expect.objectContaining({ daily: [], removeDaily: ['2026-10-25'] }));
   });
-  it('aggregates the 25-hour local day across the DST change', async () => {
+  it('aggregates local midnight to local midnight, which is 25 hours on the US DST change day', async () => {
     put('Steps', { metadata: meta('x'), startTime: new Date(2026, 10, 1, 9).toISOString(), endTime: new Date(2026, 10, 1, 10).toISOString(), count: 50 });
     stepTotal = 50;
     await reconcileHealth('steps', { journal: memory().journal, checkOwner: async () => {}, upload: async () => {}, now: new Date(2026, 10, 3) });
-    expect(mockHc.aggregateRecord).toHaveBeenCalledWith({ recordType: 'Steps', timeRangeFilter: { operator: 'between', startTime: '2026-11-01T05:00:00.000Z', endTime: '2026-11-02T06:00:00.000Z' } });
+    // Calendar arithmetic, never 24h steps: in America/Chicago this is 05:00Z to 06:00Z the next day; in UTC it is 24 hours.
+    expect(mockHc.aggregateRecord).toHaveBeenCalledWith({ recordType: 'Steps', timeRangeFilter: { operator: 'between', startTime: new Date(2026, 10, 1).toISOString(), endTime: new Date(2026, 10, 2).toISOString() } });
   });
   it('clamps to the default window when history access is missing and says so', async () => {
     historyFloor = startOfLocalDay(new Date(), 30).toISOString(); // 30 days before the first grant, which was today
@@ -221,8 +221,8 @@ describe('records', () => {
     const upload = jest.fn(async () => {});
     await sync('workouts', memory(), upload);
     expect(upload).toHaveBeenLastCalledWith('workouts', expect.objectContaining({ workouts: [
-      { health_uuid: '11111111-1111-4111-8111-111111111111', activity_type: 'Running', started_at: local(25, 7), ended_at: local(25, 7, 30), timezone: 'America/Chicago', duration_s: 1800, distance_m: null, energy_kcal: null },
-      { health_uuid: '22222222-2222-4222-8222-222222222222', activity_type: 'Other', started_at: local(26, 7), ended_at: local(26, 8), timezone: 'America/Chicago', duration_s: 3600, distance_m: null, energy_kcal: null },
+      { health_uuid: '11111111-1111-4111-8111-111111111111', activity_type: 'Running', started_at: local(25, 7), ended_at: local(25, 7, 30), timezone: TZ, duration_s: 1800, distance_m: null, energy_kcal: null },
+      { health_uuid: '22222222-2222-4222-8222-222222222222', activity_type: 'Other', started_at: local(26, 7), ended_at: local(26, 8), timezone: TZ, duration_s: 3600, distance_m: null, energy_kcal: null },
     ] }));
   });
 });
