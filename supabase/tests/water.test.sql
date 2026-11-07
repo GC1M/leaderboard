@@ -1,5 +1,5 @@
 begin;
-select plan(39);
+select plan(44);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-0000-0000-0000000000a7', 'alice@w.com', '{"full_name":"Alice"}'),
@@ -49,6 +49,9 @@ select throws_ok($$insert into water_entries (user_id, source, client_id, consum
   ('00000000-0000-0000-0000-0000000000b7', 'manual', gen_random_uuid(), now(), 'UTC', 100)$$, '42501', null,
   'a client cannot write water for another user');
 
+select throws_ok($$insert into water_entries (user_id, source, client_id, health_uuid, consumed_at, timezone, ml) values
+  (auth.uid(), 'manual', gen_random_uuid(), gen_random_uuid(), now(), 'UTC', 100)$$, '23514', null, 'a manual row cannot carry a Health UUID');
+
 -- Edit keeps the row id; the identity cannot change.
 select lives_ok($$update water_entries set ml = 300 where client_id = '11111111-0000-0000-0000-000000000001'$$, 'owner edits an amount');
 select throws_ok($$update water_entries set client_id = gen_random_uuid() where client_id = '11111111-0000-0000-0000-000000000001'$$,
@@ -82,6 +85,12 @@ select is((select count(*)::int from water_entries where source = 'healthkit'), 
 select lives_ok($$select apply_health_water(auth.uid(), '22222222-0000-0000-0000-00000000000d', '[]'::jsonb,
   '{33333333-0000-0000-0000-000000000002}')$$, 'this device''s tombstone runs');
 select is((select count(*)::int from water_entries where source = 'healthkit'), 1, 'a deletion in Health removes the imported row');
+
+-- An out-of-range sample is skipped instead of failing the batch.
+select lives_ok($$select apply_health_water(auth.uid(), '22222222-0000-0000-0000-00000000000d',
+  '[{"health_uuid":"33333333-0000-0000-0000-000000000009","consumed_at":"2026-11-03T15:00:00Z","timezone":"UTC","ml":250000}]'::jsonb, '{}')$$,
+  'a batch with a sample above 20 L still applies');
+select is((select count(*)::int from water_entries where health_uuid = '33333333-0000-0000-0000-000000000009'), 0, 'the out-of-range sample is skipped');
 
 -- Imported rows cannot be edited or deleted directly.
 update water_entries set ml = 1 where source = 'healthkit';
@@ -128,6 +137,14 @@ select record_health_export('water', (select id::text from water_entries limit 1
 select delete_my_water_history();
 select is((select count(*)::int from water_entries) + (select count(*)::int from water_targets)
   + (select count(*)::int from health_exports where kind = 'water'), 0, 'Delete Water History removes entries, target and export mapping');
+-- A recheck re-sends old samples: water drunk before the deletion stays deleted, later water imports.
+select apply_health_water(auth.uid(), '22222222-0000-0000-0000-00000000000d',
+  ('[{"health_uuid":"33333333-0000-0000-0000-000000000001","consumed_at":"2026-11-03T15:00:00Z","timezone":"UTC","ml":330},'
+   || '{"health_uuid":"33333333-0000-0000-0000-00000000000a","consumed_at":"' || (now() + interval '1 minute')::text || '","timezone":"UTC","ml":200}]')::jsonb, '{}');
+select is((select count(*)::int from water_entries where health_uuid = '33333333-0000-0000-0000-000000000001'), 0,
+  'imported water deleted with the history does not come back on a re-import');
+select is((select count(*)::int from water_entries where health_uuid = '33333333-0000-0000-0000-00000000000a'), 1,
+  'water drunk after the deletion still imports');
 
 -- Account deletion cascades.
 insert into water_entries (user_id, source, client_id, consumed_at, timezone, ml) values (auth.uid(), 'manual', gen_random_uuid(), now(), 'UTC', 100);

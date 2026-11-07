@@ -28,6 +28,8 @@ create table public.water_entries (
   updated_at timestamptz not null default now(),
   check ((source = 'manual') = (client_id is not null)),
   check ((source = 'healthkit') = (health_uuid is not null and health_device_id is not null)),
+  -- A manual row never carries Health ids, so a later import of that UUID cannot land on it.
+  check (source = 'healthkit' or (health_uuid is null and health_device_id is null)),
   -- A manual entry is one drink: above zero, at most 5 L, and not in the future (an hour's allowance for a fast clock).
   constraint water_manual_bounds check (source <> 'manual' or (ml > 0 and ml <= 5000 and consumed_at <= now() + interval '1 hour')),
   unique (user_id, client_id),
@@ -83,31 +85,47 @@ revoke all on public.water_targets from anon;
 create policy water_targets_all on public.water_targets for all to authenticated
   using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 
+-- When the user last deleted their water history. Imports skip Health samples drunk before it, so a recheck or another
+-- device re-reading Health cannot bring deleted water back. Owner-readable only; written by delete_my_water_history.
+create table public.water_history_cutoffs (
+  user_id uuid primary key references public.profiles on delete cascade,
+  deleted_at timestamptz not null
+);
+alter table public.water_history_cutoffs enable row level security;
+revoke all on public.water_history_cutoffs from anon;
+create policy water_history_cutoffs_select on public.water_history_cutoffs for select to authenticated
+  using (user_id = (select auth.uid()));
+
 -- Apple Health water import. Same contract as apply_health_workouts: bound to the signed-in account, one atomic
 -- idempotent transaction per call, the same sample UUID upserts, and a tombstone only deletes rows this device
 -- imported. A correction in Health is a delete plus a new sample, so it arrives as a tombstone and an upsert.
--- A sample zone the server does not accept falls back to the profile's zone rather than failing the batch.
+-- A sample zone the server does not accept falls back to the profile's zone rather than failing the batch, and a sample
+-- outside 0 to 20 L (another app writing in the wrong unit) or drunk before a history deletion is skipped, so one bad
+-- sample cannot stop every later import.
 create function public.apply_health_water(p_owner uuid, p_device uuid, p_samples jsonb, p_remove uuid[])
 returns void language plpgsql security definer set search_path = '' as $$
-declare r jsonb; v numeric; tz text;
+declare r jsonb; v numeric; tz text; at timestamptz; cutoff timestamptz;
 begin
   if auth.uid() is null or auth.uid() <> p_owner then raise exception 'Health account changed'; end if;
   if p_device is null or p_samples is null or p_remove is null or jsonb_typeof(p_samples) <> 'array' then
     raise exception 'invalid Health payload';
   end if;
   perform pg_advisory_xact_lock(hashtextextended(p_owner::text || ':water', 0));
+  select c.deleted_at into cutoff from public.water_history_cutoffs c where c.user_id = p_owner;
   delete from public.water_entries where user_id = p_owner and source = 'healthkit'
     and health_device_id = p_device and health_uuid = any(p_remove);
   for r in select * from jsonb_array_elements(p_samples) loop
     v := (r->>'ml')::numeric;
     if v is null or v = 'NaN'::numeric or v = 'Infinity'::numeric then raise exception 'invalid Health value'; end if;
+    at := (r->>'consumed_at')::timestamptz;
+    if v < 0 or v > 20000 or at <= cutoff then continue; end if;
     tz := r->>'timezone';
     if tz is null or not exists (select 1 from pg_timezone_names z where z.name = tz and (z.name in ('UTC', 'GMT') or z.name like '%/%')) then
       select p.timezone into tz from public.profiles p where p.id = p_owner;
     end if;
     insert into public.water_entries (user_id, source, health_uuid, health_device_id, source_name, consumed_at, timezone, ml)
     values (p_owner, 'healthkit', (r->>'health_uuid')::uuid, p_device, nullif(left(btrim(r->>'source_name'), 200), ''),
-      (r->>'consumed_at')::timestamptz, tz, v)
+      at, tz, v)
     on conflict (user_id, health_uuid) do update set health_device_id = excluded.health_device_id,
       source_name = excluded.source_name, consumed_at = excluded.consumed_at, timezone = excluded.timezone, ml = excluded.ml;
   end loop;
@@ -168,8 +186,8 @@ revoke execute on function public.group_water(uuid, date, date) from public, ano
 grant execute on function public.group_water(uuid, date, date) to authenticated;
 
 -- Delete water history: every water entry (manual and imported), the target, and the record of which entries were
--- saved to Apple Health. Sharing choices stay. Imported rows do not come back: the device's import cursor has already
--- passed them, so only water added to Health later is imported. Same lock as apply_health_water.
+-- saved to Apple Health. Sharing choices stay. Imported rows do not come back: the cutoff makes imports skip water
+-- drunk before now, on every device. Same lock as apply_health_water.
 create function public.delete_my_water_history() returns void
 language plpgsql security definer set search_path = '' as $$
 begin
@@ -178,6 +196,8 @@ begin
   delete from public.water_entries where user_id = auth.uid();
   delete from public.water_targets where user_id = auth.uid();
   delete from public.health_exports where user_id = auth.uid() and kind = 'water';
+  insert into public.water_history_cutoffs (user_id, deleted_at) values (auth.uid(), now())
+  on conflict (user_id) do update set deleted_at = excluded.deleted_at;
 end $$;
 revoke execute on function public.delete_my_water_history() from public, anon;
 grant execute on function public.delete_my_water_history() to authenticated;

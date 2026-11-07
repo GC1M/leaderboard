@@ -459,6 +459,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"water_history_cutoffs": {
+                  Row: {
+                    "deleted_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "deleted_at": string,"user_id": string
+                  }
+                  Update: {
+                    "deleted_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "water_history_cutoffs_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: true
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"water_targets": {
                   Row: {
                     "daily_ml": number,"updated_at": string,"user_id": string

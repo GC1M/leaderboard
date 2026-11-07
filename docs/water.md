@@ -27,7 +27,7 @@ Per group, off by default, through the Water switch in Group Info. A group sees 
 
 ## Deletion
 
-- Delete Water History (Profile): every water entry (manual and imported), the target, the export mapping and the changes waiting on this iPhone. The user chooses whether water this app saved to Health is removed too. Water other apps saved to Health is never touched.
+- Delete Water History (Profile): every water entry (manual and imported), the target, the export mapping and the changes waiting on this iPhone. The user chooses whether water this app saved to Health is removed too. Water other apps saved to Health is never touched. Imports then skip water drunk before the deletion (table `water_history_cutoffs`), so a recheck or another device cannot bring it back; water drunk later still imports.
 - Delete Imported Health Data: imported water goes, manual water stays.
 - Delete Account: everything cascades on the server; this iPhone's water queue and export state are cleared. The same Keep or Remove from Health choice is offered.
 - Sign-out and account switch: the queue and export state are keyed by account, so nothing carries across.
