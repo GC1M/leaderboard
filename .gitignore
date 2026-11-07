@@ -3,7 +3,7 @@
 node_modules/
 .expo/
 ios/
-android/
+/android/
 .DS_Store
 
 # Expo
