@@ -40,3 +40,20 @@ begin
   else raise exception 'unsupported moderation action'; end if;
   perform set_config('app.competition_reason','',true);
 end $$;
+
+-- 3. Re-apply the null-creator fix to finalize_competition. #129 corrected it by editing
+-- 20261107020000_competition_scoring.sql in place, which a database that already applied that file never re-runs.
+-- Without coalesce, a deleted creator (creator_id null) made the check null and let any group member finalize.
+create or replace function public.finalize_competition(p_id uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare c public.competitions;
+begin
+  select * into c from public.competitions where id=p_id for update;
+  if not found or auth.uid() is null or not public.is_group_member(c.group_id) then raise exception 'competition unavailable'; end if;
+  if not(coalesce(c.creator_id=auth.uid(),false) or exists(select 1 from public.groups g where g.id=c.group_id and g.owner_id=auth.uid()) or exists(select 1 from public.competition_participants p where p.competition_id=p_id and p.user_id=auth.uid() and p.status='joined')) then raise exception 'only participants, the creator or group owner can finalize'; end if;
+  if c.status='finalized' then return; end if;
+  if c.status='cancelled' then raise exception 'cancelled competitions cannot be finalized'; end if;
+  if now()<c.ends_at+interval '24 hours' then raise exception 'finalization opens 24 hours after the end'; end if;
+  insert into public.competition_results select p_id,s.* from public.competition_live_scores(p_id) s;
+  update public.competitions set status='finalized',finalized_at=now() where id=p_id;
+end $$;

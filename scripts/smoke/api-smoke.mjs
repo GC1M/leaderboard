@@ -295,7 +295,7 @@ async function main() {
     eq(ok(await admin.from('groups').select('id').eq('id', group.id), 'group after owner deletion').length, 0, 'group left after owner deleted account');
     for (const table of ['competitions', 'competition_results', 'competition_audit', 'competition_participants']) {
       const field = table === 'competitions' ? 'id' : 'competition_id';
-      eq(ok(await admin.from(table).select(field).eq(field, completed), `${table} after account deletion`), [], `${table} cascades with the deleted group`);
+      eq(ok(await admin.from(table).select(field).in(field, [completed, competition]), `${table} after account deletion`), [], `${table} cascades with the deleted group`);
     }
   });
 
