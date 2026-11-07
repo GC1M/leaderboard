@@ -244,6 +244,16 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Email sign-in sends a 6-digit code ({{ .Token }}) instead of only a magic link.
+# magic_link is used for existing users, confirmation for first-time signups.
+[auth.email.template.magic_link]
+subject = "Your Leaderboard sign-in code"
+content_path = "./supabase/templates/otp.html"
+
+[auth.email.template.confirmation]
+subject = "Your Leaderboard sign-in code"
+content_path = "./supabase/templates/otp.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
@@ -257,7 +267,7 @@ otp_expiry = 3600
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
-enable_signup = false
+enable_signup = true
 # If enabled, users need to confirm their phone number before signing in.
 enable_confirmations = false
 # Template for sending OTP to users
@@ -267,8 +277,10 @@ max_frequency = "5s"
 
 # Use pre-defined map of phone number to OTP for testing.
 # Keys are the phone number with country code and without the + prefix.
-# [auth.sms.test_otp]
-# 14152127777 = "123456"
+# Local only: no SMS provider is configured, so these numbers skip sending and accept a fixed code.
+[auth.sms.test_otp]
+15555550100 = "123456"
+15555550101 = "654321"
 
 # Configure logged in session timeouts.
 # [auth.sessions]
@@ -288,10 +300,12 @@ max_frequency = "5s"
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
+# GoTrue refuses phone OTP with no provider, even for test_otp numbers, so Twilio is switched on with
+# placeholder values locally. Nothing is ever sent for test numbers. Real SMS needs real values via env.
 [auth.sms.twilio]
-enabled = false
-account_sid = ""
-message_service_sid = ""
+enabled = true
+account_sid = "local-placeholder"
+message_service_sid = "local-placeholder"
 # DO NOT commit your Twilio auth token to git. Use environment variable substitution instead:
 auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 
@@ -321,9 +335,18 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
+[auth.external.google]
+enabled = true
+# Comma-separated: web client ID first, then the iOS client ID, so native ID tokens verify.
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+# The native Google SDK does not send a nonce.
+skip_nonce_check = true
+
 [auth.external.apple]
-enabled = false
-client_id = ""
+enabled = true
+# Native sign-in sends an ID token whose audience is the app bundle ID (comma-separate extra IDs, e.g. a web Services ID).
+client_id = "env(SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID)"
 # DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
 secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
 # Overrides the default auth callback URL derived from auth.external_url.
@@ -386,6 +409,12 @@ deno_version = 2
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
+
+# Food search (#45). Needs a signed-in user. FDC_API_KEY is a function secret: locally in
+# supabase/functions/.env (gitignored), hosted via `supabase secrets set FDC_API_KEY=...`.
+[functions.food-search]
+enabled = true
+verify_jwt = true
 
 [analytics]
 enabled = true

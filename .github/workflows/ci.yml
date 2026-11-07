@@ -2,12 +2,22 @@ name: CI
 
 on:
   pull_request:
+  workflow_dispatch:
   push:
     branches: [main, develop]
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref, but never on main/develop so every merge keeps its own run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,4 +27,194 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test
+      # Fails if global coverage drops below the floor in package.json ("jest.coverageThreshold").
+      - run: npm test -- --coverage
+      - name: Coverage summary
+        if: always()
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            node -e "
+              const t = require('./coverage/coverage-summary.json').total;
+              console.log('### Jest coverage\n\n| Metric | Covered | Total | % |\n| --- | --- | --- | --- |');
+              for (const k of ['statements', 'branches', 'functions', 'lines']) console.log('| ' + k + ' | ' + t[k].covered + ' | ' + t[k].total + ' | ' + t[k].pct + ' |');
+            " >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jest-coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Bundle for iOS and web
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: http://localhost:54321
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-dummy
+        run: |
+          npx expo export --platform ios --output-dir /tmp/export-ios
+          npx expo export --platform web --output-dir /tmp/export-web
+
+  db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - run: supabase start # applies every migration from scratch
+      - run: supabase test db
+      # src/lib/database.types.ts must be exactly what the migrations generate.
+      - name: Generated types match src/lib/database.types.ts
+        run: |
+          supabase gen types typescript --local > database.types.generated.ts
+          if ! diff -u src/lib/database.types.ts database.types.generated.ts > database.types.diff; then
+            {
+              echo "### database.types.ts is out of date"
+              echo "Regenerate with: \`npx supabase@2.122.0 gen types typescript --local > src/lib/database.types.ts\`"
+              echo '```diff'
+              head -n 80 database.types.diff
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error file=src/lib/database.types.ts::Out of date with supabase/migrations. Regenerate and commit it."
+            exit 1
+          fi
+      - name: Upload generated types
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-types-generated
+          path: |
+            database.types.generated.ts
+            database.types.diff
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # npm audit is report-only (findings go to the job summary); the gitleaks scan fails the job.
+  supply-chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks scans the full history
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: npm audit (production dependencies, high and above)
+        continue-on-error: true
+        run: |
+          set +e
+          npm audit --omit=dev --audit-level=high > audit.txt 2>&1
+          code=$?
+          {
+            echo "### npm audit (prod, high+): exit code $code"
+            echo '```'
+            cat audit.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat audit.txt
+          exit $code
+      - name: Secrets scan (gitleaks)
+        run: |
+          set +e
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0 \
+            detect --source /repo --redact --no-banner --exit-code 2 \
+            --report-format json --report-path /repo/gitleaks.json
+          code=$?
+          {
+            echo "### gitleaks: exit code $code (0 = clean, 2 = leaks found)"
+            if [ -s gitleaks.json ] && [ "$code" -ne 0 ]; then
+              echo '```'
+              node -e "for (const f of require('./gitleaks.json')) console.log(f.RuleID, f.File + ':' + f.StartLine, f.Commit.slice(0, 7))"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
+      - name: Upload gitleaks report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Drives the real local stack (Postgres, GoTrue, PostgREST, RLS, RPCs) with two users.
+  smoke-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,mailpit
+      - name: API smoke test
+        run: npm run smoke:api
+      - name: Service logs on failure
+        if: failure()
+        run: |
+          docker ps -a --format '{{.Names}}  {{.Status}}'
+          for c in supabase_auth_Leaderboard supabase_rest_Leaderboard supabase_db_Leaderboard; do
+            echo "::group::$c"; docker logs --tail 80 "$c" 2>&1 || true; echo "::endgroup::"
+          done
+
+  # Exports the web build against the local stack and loads it in headless Chromium.
+  smoke-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector
+      - name: Export web build against the local stack
+        run: |
+          supabase status -o env > "$RUNNER_TEMP/stack.env"
+          anon=$(sed -n 's/^ANON_KEY="\(.*\)"$/\1/p' "$RUNNER_TEMP/stack.env")
+          [ -n "$anon" ] || { echo "::error::supabase status did not report ANON_KEY"; exit 1; }
+          echo "::add-mask::$anon"
+          EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 EXPO_PUBLIC_SUPABASE_ANON_KEY="$anon" \
+            npx expo export --platform web --output-dir dist
+      - run: npx playwright install --with-deps chromium
+      - name: Web smoke test
+        run: npm run smoke:web
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-smoke-screenshots
+          path: web-smoke-*.png
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # One status for branch protection: green only when every job above succeeded (skipped counts as not green).
+  ci-ok:
+    if: always()
+    needs: [check, db, supply-chain, smoke-api, smoke-web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to have succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for r in $RESULTS; do
+            [ "$r" = success ] || { echo "::error::A required job did not succeed ($r)"; exit 1; }
+          done
