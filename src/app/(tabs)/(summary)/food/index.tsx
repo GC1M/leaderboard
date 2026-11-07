@@ -1,9 +1,11 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { formatNutrient } from '@/lib/food/format';
+import { photoScanAvailable } from '@/lib/food/photo';
+import { MENU_NOTE } from '@/lib/food/scan';
 import { ESTIMATE_NOTE, FDC_ATTRIBUTION, type Food, FoodSearchError, searchCachedFoods, searchFoods } from '@/lib/food/search';
 import { useTheme } from '@/theme';
 
@@ -16,7 +18,9 @@ const describe = (f: Food) => [f.brand, f.provider === 'custom' ? 'Custom food' 
 export default function FoodSearch() {
   const c = useTheme();
   const router = useRouter();
-  const [query, setQuery] = useState('');
+  // From a menu scan: the dish name to search, and the entry starts marked as an estimate.
+  const { q: dish, estimate, details } = useLocalSearchParams<{ q?: string; estimate?: string; details?: string }>();
+  const [query, setQuery] = useState(dish ?? '');
   const [result, setResult] = useState<Result | null>(null);
   const [tries, setTries] = useState(0);
   const now = useRef(false);
@@ -58,7 +62,7 @@ export default function FoodSearch() {
     now.current = true;
     setTries((t) => t + 1);
   };
-  const open = (f: Food) => router.push({ pathname: '/food/[id]', params: { id: f.id } });
+  const open = (f: Food) => router.push({ pathname: '/food/[id]', params: { id: f.id, ...(estimate ? { estimate, ...(details ? { details } : {}) } : {}) } });
   const shown = q.length >= 3 && result?.q === q ? result : null;
   const loading = q.length >= 3 && !shown;
   const none = !!shown && !shown.error && shown.foods.length + shown.mine.length === 0;
@@ -73,6 +77,7 @@ export default function FoodSearch() {
 
   return (
     <Screen title="Food" back>
+      {estimate && <Text style={[styles.caption, { color: c.inkSoft }]}>{details ? `${MENU_NOTE} The menu lists: ${details}` : MENU_NOTE}</Text>}
       <Field label="Search foods" value={query} onChangeText={setQuery} autoFocus autoCorrect={false} returnKeyType="search" onSubmitEditing={submit} helper="Search starts after 3 letters. Try a food name, such as banana or cheddar." />
       {loading && <Skeleton label="Searching foods" rows={4} />}
       {shown?.error && (
@@ -85,6 +90,12 @@ export default function FoodSearch() {
       {shown && list(shown.mine, 'Your foods')}
       {shown && list(shown.foods, shown.error ? 'Saved foods' : 'USDA foods')}
       {none && <Text style={[styles.body, { color: c.inkSoft }]}>{`No matches for "${q}". Try another word, or add it as a custom food.`}</Text>}
+      {photoScanAvailable() && !estimate && (
+        <>
+          <Button label="Scan a Nutrition Label" secondary onPress={() => router.push({ pathname: '/food/scan', params: { kind: 'label' } })} />
+          <Button label="Scan a Menu" secondary onPress={() => router.push({ pathname: '/food/scan', params: { kind: 'menu' } })} />
+        </>
+      )}
       <Button
         label="Add a Custom Food"
         secondary

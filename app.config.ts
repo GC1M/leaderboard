@@ -60,6 +60,14 @@ const config: ExpoConfig = {
       },
     ],
     'expo-apple-authentication',
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Leaderboard reads a photo you choose of a nutrition label or menu to fill in food details. The photo is read on your iPhone and is not uploaded.',
+        cameraPermission: 'Leaderboard uses the camera to photograph a nutrition label or menu. The photo is read on your iPhone and is not uploaded.',
+        microphonePermission: false,
+      },
+    ],
     ...(googleIosUrlScheme
       ? [['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }] as [string, object]]
       : []),
