@@ -34,6 +34,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
     title: 'What is stored on this iPhone',
     body: [
       'Your sign-in session, kept in the iPhone keychain, and an encrypted record of what has already been imported, so each import only sends changes.',
+      'A photo of a nutrition label or menu that you take or choose is read on this iPhone with Apple’s text recognition and deleted right after. It is never uploaded or kept. Only the food you check and save is stored, like any other custom food or entry.',
     ],
   },
   {

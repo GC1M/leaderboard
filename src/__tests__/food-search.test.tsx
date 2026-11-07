@@ -8,7 +8,9 @@ import { FoodSearchError, type Food } from '@/lib/food/search';
 const mockSearch = jest.fn();
 const mockCached = jest.fn();
 const mockPush = jest.fn();
-jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn(), canGoBack: () => true, push: (...a: unknown[]) => mockPush(...a) }), useSegments: () => [] }));
+let mockParams: Record<string, string> = {};
+jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn(), canGoBack: () => true, push: (...a: unknown[]) => mockPush(...a) }), useSegments: () => [], useLocalSearchParams: () => mockParams }));
+jest.mock('@/lib/food/photo', () => ({ photoScanAvailable: () => true }));
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/lib/food/search', () => ({
   ...jest.requireActual('@/lib/food/search'),
@@ -29,6 +31,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
   mockCached.mockResolvedValue([]);
+  mockParams = {};
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -99,4 +102,26 @@ test('Try Again after an outage searches again and shows the live results', asyn
   await act(async () => { await jest.advanceTimersByTimeAsync(800); });
   expect(text(c)).toContain('USDA foods');
   expect(text(c)).not.toContain('too long');
+});
+
+test('offers label and menu scans when photo reading is available', async () => {
+  root = createRoot();
+  await act(async () => root.render(<FoodSearch />));
+  expect(text(root.container)).toContain('Scan a Nutrition Label');
+  expect(text(root.container)).toContain('Scan a Menu');
+});
+
+test('a dish from a menu scan is searched, shows the estimate note, and opens the food as an estimate', async () => {
+  mockParams = { q: 'Chicken Burrito', estimate: '1', details: 'rice, beans, salsa' };
+  mockSearch.mockResolvedValue(page());
+  root = createRoot();
+  await act(async () => root.render(<FoodSearch />));
+  await act(async () => { await jest.advanceTimersByTimeAsync(800); });
+  const c = root.container as any;
+  expect(mockSearch).toHaveBeenCalledWith('Chicken Burrito');
+  expect(text(c)).toContain('The menu lists: rice, beans, salsa');
+  expect(text(c)).not.toContain('Scan a Menu');
+  const row = c.queryAll((n: any) => n.props.onClick && String(n.props.accessibilityLabel ?? '').startsWith('Almonds, raw'))[0];
+  await act(async () => row.props.onClick());
+  expect(mockPush).toHaveBeenCalledWith({ pathname: '/food/[id]', params: { id: 'f1', estimate: '1', details: 'rice, beans, salsa' } });
 });

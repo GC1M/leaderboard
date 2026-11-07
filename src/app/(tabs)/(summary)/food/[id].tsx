@@ -10,6 +10,7 @@ import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/com
 import { formatNutrient } from '@/lib/food/format';
 import { amountMessage, consumedNutrients, defaultMeal, logFood, MEALS, type Meal, type Quantity } from '@/lib/food/log';
 import { ESTIMATE_NOTE, FDC_ATTRIBUTION, type Food, getFood } from '@/lib/food/search';
+import { MENU_NOTE } from '@/lib/food/scan';
 import { localDateKey } from '@/lib/health/dates';
 import { decimalValue } from '@/lib/numeric-input';
 import { useTheme } from '@/theme';
@@ -20,7 +21,8 @@ type Mode = 'grams' | 'portion';
 export default function FoodDetail() {
   const c = useTheme();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `estimate` and `details` come from a menu scan: the entry starts marked as an estimate and shows the menu text.
+  const { id, estimate: fromMenu, details } = useLocalSearchParams<{ id: string; estimate?: string; details?: string }>();
   const [food, setFood] = useState<Food | null | undefined>();
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tries, setTries] = useState(0);
@@ -29,7 +31,7 @@ export default function FoodDetail() {
   const [portionId, setPortionId] = useState('');
   const [count, setCount] = useState('1');
   const [meal, setMeal] = useState<Meal>(() => defaultMeal(new Date()));
-  const [estimate, setEstimate] = useState(false);
+  const [estimate, setEstimate] = useState(fromMenu === '1');
   const [when, setWhen] = useState(() => new Date());
   // One id per screen visit: logging again after a failed save, with the same or changed values, updates one entry.
   const [clientId] = useState(() => Crypto.randomUUID());
@@ -133,6 +135,7 @@ export default function FoodDetail() {
         <Text style={[styles.body, { color: c.ink, flex: 1 }]}>Mark as an estimate</Text>
         <Switch accessibilityLabel="Mark as an estimate" value={estimate} onValueChange={setEstimate} />
       </View>
+      {fromMenu === '1' && <Text style={[styles.caption, { color: c.inkSoft }]}>{details ? `${MENU_NOTE} The menu lists: ${details}` : MENU_NOTE}</Text>}
       <Section title="For this amount" footer={nutrients ? undefined : amountMessage(mode === 'portion' && portion ? 'portion' : 'grams')}>
         <Row label="Calories" value={nutrients ? formatNutrient('energy_kcal', nutrients.energy_kcal) : '-'} />
         <Row label="Protein" value={nutrients ? formatNutrient('protein_g', nutrients.protein_g) : '-'} />
