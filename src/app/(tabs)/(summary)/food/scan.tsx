@@ -154,7 +154,7 @@ export default function FoodScan() {
                 key={item.name}
                 label={item.name}
                 value={item.details ?? undefined}
-                wrap
+                wrap={!!item.details}
                 last={i === items.length - 1}
                 onPress={() => router.push({ pathname: '/food', params: { q: item.name, estimate: '1', ...(item.details ? { details: item.details } : {}) } })}
               />

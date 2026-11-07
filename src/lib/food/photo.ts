@@ -23,7 +23,8 @@ export async function pickPhoto(source: 'camera' | 'library'): Promise<string | 
     const { granted } = await ImagePicker.requestCameraPermissionsAsync();
     if (!granted) throw new PhotoError('Allow camera access in Settings, or choose a photo instead.');
   }
-  const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.8, exif: false, allowsEditing: true };
+  // No picker crop: on iOS it is always square, which cuts off tall labels.
+  const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.8, exif: false };
   const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
   if (result.canceled || !result.assets[0]) return null;
   const asset = result.assets[0];

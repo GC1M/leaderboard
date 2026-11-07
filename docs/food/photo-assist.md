@@ -10,7 +10,7 @@ Decision: text is read on the device with Apple Vision (`VNRecognizeTextRequest`
 - No image retention policy is needed: the picker copies the photo into the app cache, `readPhoto` deletes that copy in a `finally` block whether reading worked or not, and the original in the photo library is never touched. Nothing reaches our server, logs or backups. Account deletion has nothing extra to remove.
 - iOS only for now (`modules/leaderboard-text-recognizer`, autolinked like `leaderboard-date-picker`). On Android and web the scan buttons are hidden. Phase 7 can add ML Kit text recognition behind the same `recognize(uri)` call.
 
-Limits: images only (`mediaTypes: ['images']`), no EXIF or location, 20 MB maximum, crop enabled in the picker.
+Limits: images only (`mediaTypes: ['images']`), no EXIF or location, 20 MB maximum. The picker crop is off because iOS only offers a square crop, which cuts off tall labels.
 
 ## Labels (#52)
 
