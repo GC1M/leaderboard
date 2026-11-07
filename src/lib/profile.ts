@@ -51,6 +51,16 @@ export async function deleteFoodHistory(): Promise<void> {
   }
 }
 
+// Signs out this device only; other devices stay signed in. Offline with an expired token, supabase-js returns an
+// error and keeps the stored session, so the next person would stay in this account: the stored session is
+// removed and sign-out runs again, which then finds no session and reports signed out.
+export async function signOut(): Promise<void> {
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
+  if (!error) return;
+  await secureStorage.removeItem((supabase.auth as unknown as { storageKey: string }).storageKey).catch(() => {});
+  await supabase.auth.signOut({ scope: 'local' });
+}
+
 // Deletes the auth user server-side (cascades to everything), then the local session, which stops Health
 // sync, then this device's Health import state. Local cleanup is best effort: the account is already gone.
 export async function deleteAccount(): Promise<void> {
@@ -58,5 +68,5 @@ export async function deleteAccount(): Promise<void> {
   const { error } = await supabase.rpc('delete_my_account');
   if (error) throw new Error("Couldn't delete your account. Check your connection and try again.");
   await supabase.auth.signOut({ scope: 'local' });
-  await Promise.allSettled([deleteHealthJournal(uid), secureStorage.removeItem(`health-connection-${uid}`), clearAllDrafts(uid), clearAllTemplateDrafts(uid), clearFoodPending(uid), clearMeasurementDraft(uid, 'weight'), clearMeasurementDraft(uid, 'sleep'), clearMeasurementDraft(uid, 'steps')]);
+  await Promise.allSettled([deleteHealthJournal(uid), secureStorage.removeItem(`health-connection-${uid}`), clearAllDrafts(uid), clearAllTemplateDrafts(uid), clearFoodPending(uid), clearMeasurementDraft(uid, 'weight'), clearMeasurementDraft(uid, 'sleep'), clearMeasurementDraft(uid, 'steps'), ...['weight', 'sleep', 'steps', 'food', 'workout'].map((type) => secureStorage.removeItem(`health-export-${uid}-${type}`))]);
 }

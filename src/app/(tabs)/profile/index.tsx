@@ -6,8 +6,7 @@ import { Button, ErrorText, Field, Row, Screen, Section, Skeleton } from '@/comp
 import { alert } from '@/lib/alert';
 import { exportedFood, settleFoodExport } from '@/lib/health/food-export';
 import { useHealthExport, useHealthSync } from '@/lib/health/sync';
-import { NAME_MAX, deleteAccount, deleteFoodHistory, getDisplayName, updateDisplayName } from '@/lib/profile';
-import { supabase } from '@/lib/supabase';
+import { NAME_MAX, deleteAccount, deleteFoodHistory, getDisplayName, signOut, updateDisplayName } from '@/lib/profile';
 
 export default function Profile() {
   const router = useRouter();
@@ -52,9 +51,9 @@ export default function Profile() {
   };
 
   const confirmSignOut = () =>
-    alert('Sign out?', 'Your groups and steps stay saved.', [
+    alert('Sign out?', 'Your groups and steps stay saved. Other devices stay signed in.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: () => supabase.auth.signOut() },
+      { text: 'Sign Out', style: 'destructive', onPress: () => signOut() },
     ]);
 
   const confirmDeleteImports = () =>

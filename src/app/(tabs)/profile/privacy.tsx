@@ -42,14 +42,14 @@ const SECTIONS: { title: string; body: string[] }[] = [
     body: [
       'You choose what each group sees, separately for steps, sleep, weight, workouts, and food, in Group Info. Steps are shared when you join a group, and you can turn that off. Sleep, weight, workouts, and food are never shared unless you turn them on.',
       'Steps: your daily totals and whether a day was entered by hand. Sleep: how long you slept each night, not when. Weight: your latest reading and its date, and progress toward a weight goal. Your other weight readings are never shown. Workouts: how many you did each week and your total time, nothing about which exercises you did. Food: your total calories, protein, carbs, and fat for each day you logged food, and whether some foods had no value for them. Never which foods, meals, recipes, or amounts, and never ranked or used in a competition.',
-      'Group members can see your name and which metrics you share. A group owner can delete a step count you entered by hand today, and nothing else of yours.',
+      'Group members can see your name, your time zone (used to work out your day), and which metrics you share. A group owner can delete a step count you entered by hand today, and nothing else of yours.',
     ],
   },
   {
     title: 'Stopping and deleting',
     body: [
       'Stop Health Imports (on Summary) stops reading Apple Health. Data already uploaded stays until you delete it.',
-      'Delete Imported Health Data (in Profile) stops imports and deletes every step, sleep, and weight record that came from Apple Health. Manual entries, groups, and sharing choices stay. Nothing is uploaded again until you reconnect Apple Health, which starts a fresh import.',
+      'Delete Imported Health Data (in Profile) stops imports and deletes every step, sleep, weight, and workout record that came from Apple Health. Manual entries, groups, and sharing choices stay. Nothing is uploaded again until you reconnect Apple Health, which starts a fresh import.',
       'Delete Food History (in Profile) deletes every food entry, recipe, and custom food you saved, and the food changes waiting on this iPhone. Your sharing choices stay. You choose whether food this app saved to Apple Health is removed too; if you keep it, you can delete it in the Health app. The same choice appears when you turn off "Save food to Apple Health" and when you delete your account. Your choice applies to this iPhone: another device signed in to your account keeps its own record of what it saved.',
       'Delete Account (in Profile) deletes your account, everything above, your memberships, and groups you own.',
       'Deleted data may remain in our hosting provider’s database backups until they expire.',

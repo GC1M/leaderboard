@@ -114,8 +114,8 @@ select is((select name || ':' || (select count(*) from workout_template_exercise
   from workout_templates t where t.id = '00000000-0000-0000-0000-00000000a601'), 'Push v2:1', 'the failed save left the template as it was');
 
 -- Applying a template copies it: repeatable, and independent of the template in both directions.
-select lives_ok($$select pg_temp.apply_template('00000000-0000-0000-0000-00000000a601', '2026-11-02 18:00+00')$$, 'apply to a chosen day');
-select lives_ok($$select pg_temp.apply_template('00000000-0000-0000-0000-00000000a601', '2026-11-09 18:00+00')$$, 'apply the same template again');
+select lives_ok($$select pg_temp.apply_template('00000000-0000-0000-0000-00000000a601', '2026-10-26 18:00+00')$$, 'apply to a chosen day');
+select lives_ok($$select pg_temp.apply_template('00000000-0000-0000-0000-00000000a601', '2026-11-02 18:00+00')$$, 'apply the same template again');
 select is((select count(*)::int from workouts where source = 'manual' and activity_type = 'Strength'), 2, 'two applications make two workouts');
 select is((select count(*)::int from workout_sets), 2, 'each has its own sets');
 select lives_ok($$select save_workout_template('00000000-0000-0000-0000-00000000a601', jsonb_build_object('name', 'Push v3', 'activity_type', 'Strength',
@@ -123,7 +123,7 @@ select lives_ok($$select save_workout_template('00000000-0000-0000-0000-00000000
     'sets', jsonb_build_array(jsonb_build_object('reps', 1, 'load_kg', 200))))))$$, 'the template is edited afterwards');
 select is((select array_agg(load_kg order by load_kg) from workout_sets), array[100, 100]::numeric[], 'past sessions keep the planned values from when they were made');
 select lives_ok($$select save_manual_workout((select id from workouts order by started_at limit 1), jsonb_build_object('activity_type', 'Strength',
-  'started_at', '2026-11-02 18:00+00'::timestamptz, 'ended_at', '2026-11-02 19:00+00'::timestamptz, 'timezone', 'UTC', 'exercises', jsonb_build_array(
+  'started_at', '2026-10-26 18:00+00'::timestamptz, 'ended_at', '2026-10-26 19:00+00'::timestamptz, 'timezone', 'UTC', 'exercises', jsonb_build_array(
   jsonb_build_object('exercise_id', (select id from exercises where name = 'Deadlift'), 'sets', jsonb_build_array(jsonb_build_object('reps', 5, 'load_kg', 110))))))$$,
   'an applied workout is edited on its own');
 select is((select load_kg from workout_template_sets ts join workout_template_exercises te on te.id = ts.template_exercise_id

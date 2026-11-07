@@ -109,6 +109,39 @@ describe('parseLabel checks', () => {
     expect(parseLabel(lines('Sodium 0.4 g')).fields.sodium_mg.value).toBe(400);
   });
 
+  // Found in the QA sweep: each of these used to save a wrong number.
+  const L = (text: string) => parseLabel(linesFromText(text));
+
+  it('does not read "Calories from Fat" as fat or lose the calories', () => {
+    const one = L('Serving Size 1 cup (240g)\nCalories 250 Calories from Fat 110\nTotal Fat 12g 18%');
+    expect([one.fields.fat_g.value, one.fields.energy_kcal.value]).toEqual([12, 250]);
+    expect(L('Serving Size 1 cup (240g)\nCalories 250\nCalories from Fat 110\nTotal Fat 12g').fields.fat_g.value).toBe(12);
+  });
+
+  it('keeps a US label per serving when a net weight mentions 100 g', () => {
+    expect(L('Serving size 1 oz (28g)\nNet Wt 3.5 oz (100g)\nCalories 140').basis).toBe('serving');
+    expect(L('Serving size 30g\nNet weight 1100g\nCalories 120').basis).toBe('serving');
+    // Real headers still set per 100 g, in any wording.
+    expect(L('Información nutricional por 100 g\nGrasas 3,5 g').basis).toBe('100g');
+    expect(L('Nutrition information 100g 30g\nFat 4g 1.2g').basis).toBe('100g');
+  });
+
+  it('reads the 100 g column when a gram serving column comes first', () => {
+    const scan = L('Per 30g Per 100g\nEnergy 450kJ/108kcal 1500kJ/360kcal\nFat 1.2g 4.0g');
+    expect([scan.fields.fat_g.value, scan.fields.energy_kcal.value]).toEqual([4, 360]);
+  });
+
+  it('asks instead of guessing for thousands dots, one-column rows and ranges', () => {
+    expect(L('Per 100g\nEnergy 1.046 kJ\nFat 12g').fields.energy_kcal.status).toBe('check');
+    expect(L('Per serving (30g) Per 100g\nFat 1.2g').fields.fat_g.status).toBe('check');
+    expect(L('Serving size 30g\nProtein 2-3g').fields.protein_g.status).toBe('check');
+  });
+
+  it('skips polyunsaturated fat and takes the serving size line over the header', () => {
+    expect(L('Serving size 30g\nPolyunsaturated Fat 2g\nTotal Fat 4g').fields.fat_g.value).toBe(4);
+    expect(L('Per 100g Per serving\nServing size 30g\nFat 4g 1.2g').servingGrams).toBe(30);
+  });
+
   it('returns all unknown for text that is not a label', () => {
     const scan = parseLabel(lines('Hello world', 'Open 9 to 5'));
     expect(Object.values(scan.fields).every((f) => f.value === null && f.status === 'missing')).toBe(true);
@@ -160,5 +193,9 @@ describe('parseMenu', () => {
       { name: 'Caesar Salad', details: 'Romaine, parmesan, croutons and anchovy dressing with lemon' },
       { name: 'Chicken Burrito', details: null },
     ]);
+  });
+
+  it('keeps numbers that are part of a dish name', () => {
+    expect(parseMenu(linesFromText('Chicken 65 $12\n7 Layer Dip 9.50\n2 Eggs Any Style 8\n1. Burger ..... 14')).map((i) => i.name)).toEqual(['Chicken 65', '7 Layer Dip', '2 Eggs Any Style', 'Burger']);
   });
 });

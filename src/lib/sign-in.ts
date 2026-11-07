@@ -83,7 +83,9 @@ export async function signInWithApple(): Promise<boolean> {
 
   // Apple only sends the name on the first sign-in.
   const { givenName, familyName } = credential.fullName ?? {};
-  const name = [givenName, familyName].filter(Boolean).join(' ');
+  const fullName = [givenName, familyName].filter(Boolean).join(' ');
+  // Whole characters, so an emoji is never cut in half.
+  const name = Array.from(fullName).slice(0, 40).join('').trim();
   if (name && data.user) {
     await supabase.from('profiles').update({ display_name: name }).eq('id', data.user.id);
   }

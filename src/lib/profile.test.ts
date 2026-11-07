@@ -1,8 +1,8 @@
-import { deleteAccount, deleteFoodHistory, updateDisplayName } from './profile';
+import { deleteAccount, deleteFoodHistory, signOut as signOutDevice, updateDisplayName } from './profile';
 import { supabase } from './supabase';
 
 jest.mock('./supabase', () => ({
-  supabase: { rpc: jest.fn(), from: jest.fn(), auth: { getSession: jest.fn(), signOut: jest.fn() } },
+  supabase: { rpc: jest.fn(), from: jest.fn(), auth: { getSession: jest.fn(), signOut: jest.fn(), storageKey: 'sb-auth' } },
 }));
 const mockDeleteJournal = jest.fn(async (_uid: string) => {});
 const mockRemoveItem = jest.fn(async (_key: string) => {});
@@ -40,6 +40,19 @@ test('deleteAccount signs out locally only after the server delete succeeds', as
   expect(mockRemoveItem).toHaveBeenCalledWith('template-drafts-me');
   expect(mockRemoveItem).toHaveBeenCalledWith('food-pending-me');
   expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
+  expect(mockRemoveItem).toHaveBeenCalledWith('health-export-me-food');
+});
+
+test('signOut clears the stored session when the server cannot be reached', async () => {
+  signOut.mockResolvedValueOnce({ error: null });
+  await signOutDevice();
+  expect(signOut).toHaveBeenCalledTimes(1);
+  expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
+  expect(mockRemoveItem).not.toHaveBeenCalled();
+  signOut.mockResolvedValueOnce({ error: new Error('Network request failed') }).mockResolvedValueOnce({ error: null });
+  await signOutDevice();
+  expect(mockRemoveItem).toHaveBeenCalledWith('sb-auth');
+  expect(signOut).toHaveBeenCalledTimes(3);
 });
 
 test('deleteFoodHistory clears the unsent food queue only after the server delete succeeds', async () => {

@@ -111,6 +111,8 @@ describe('cached and custom foods', () => {
     expect(validateCustomFood({ ...ok, per100g: { ...emptyNutrients(), fat_g: -1 } })).toContain('negative');
     expect(validateCustomFood({ ...ok, per100g: { ...emptyNutrients(), energy_kcal: 1001 } })).toContain('1000');
     expect(validateCustomFood({ ...ok, per100g: { ...emptyNutrients(), protein_g: 101 } })).toContain('100');
+    expect(validateCustomFood({ ...ok, per100g: { ...emptyNutrients(), fiber_g: 101 } })).toContain('100');
+    expect(validateCustomFood({ ...ok, per100g: { ...emptyNutrients(), sodium_mg: 100001 } })).toContain('Sodium');
   });
 
   test('createCustomFood inserts an owner row with unknown nutrients as null', async () => {

@@ -129,7 +129,8 @@ export function durationError(f: WorkoutForm): string | null {
   try {
     const minutes = num(f.durationMin, 'Duration');
     if (minutes === null) return 'Enter how long the workout lasted.';
-    return minutes === 0 ? 'The duration must be more than zero.' : null;
+    if (minutes === 0) return 'The duration must be more than zero.';
+    return minutes > 24 * 60 ? 'The duration must be 24 hours or less.' : null;
   } catch (e) {
     return (e as Error).message;
   }
@@ -147,6 +148,8 @@ export function buildWorkout(f: WorkoutForm): Built {
     const bad = durationError(f);
     if (bad) throw new Error(bad);
     const minutes = num(f.durationMin, 'Duration')!;
+    // The form starts at now, so the end may be ahead; only the start must have happened.
+    if (startedAt.getTime() > Date.now() + 60_000) throw new Error("The start time can't be in the future.");
     const exercises = f.exercises.map((e) => {
       if (!e.sets.length) throw new Error(`Add at least one set to ${e.name}, or remove it.`);
       return {
