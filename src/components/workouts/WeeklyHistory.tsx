@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Segmented } from '@/components/history/Segmented';
 import { Button, ErrorText, Section, Skeleton, styles as ui } from '@/components/ui';
 import { dateFromKey } from '@/lib/health/format';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import {
   historyStart, totalsParts, WEEK_RANGES, type WeekRange, type WeekTotals, weekLabel, weeklyTotals, weeksSummary,
 } from '@/lib/workout-history';
@@ -92,7 +93,7 @@ export function WeeklyHistoryView({ totals, unit, now = new Date() }: { totals: 
       <Section footer="Distance and calories add up only the workouts that recorded them. Weeks start on Monday.">
         {[...totals].reverse().map((t, i, all) => {
           const p = totalsParts(t, unit);
-          const from = [t.imported && `${t.imported} from Apple Health`, t.manual && `${t.manual} manual`, t.fromApps && `${t.fromApps} from other apps`].filter(Boolean).join(', ');
+          const from = [t.imported && `${t.imported} from ${healthProviderName()}`, t.manual && `${t.manual} manual`, t.fromApps && `${t.fromApps} from other apps`].filter(Boolean).join(', ');
           return (
             <View
               key={t.weekStart}

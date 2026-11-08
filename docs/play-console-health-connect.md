@@ -12,13 +12,14 @@ Keep this table equal to `android.permissions` in `app.config.ts`. Google reject
 | `android.permission.health.READ_SLEEP` | Sleep sessions | One nightly sleep total per day for history and opt-in group sharing. | Summary, Sleep history |
 | `android.permission.health.READ_WEIGHT` | Weight | Weight readings for the user's own history; the latest reading is shown to a group only if the user opts in for that group. | Weight history |
 | `android.permission.health.READ_EXERCISE` | Exercise sessions | Workout summaries (type, start, end, duration) for workout history and opt-in workout competitions. Routes are not read. | Workouts |
+| `android.permission.health.READ_HYDRATION` | Hydration | Water entries (time and mL) for the user's water history and opt-in group summaries. | Water |
 | `android.permission.health.READ_HEALTH_DATA_HISTORY` | Older data | First import reaches back about 90 days (steps, sleep) and further for weight, past Health Connect's default 30 days. Only if the build requests it. | First import |
 | `android.permission.health.WRITE_WEIGHT` | Weight | Saves weight the user types into the app to Health Connect, only after the user turns that on. | Weight entry |
 | `android.permission.health.WRITE_SLEEP` | Sleep sessions | Saves manually entered sleep, only after the user turns that on. | Sleep entry |
 | `android.permission.health.WRITE_EXERCISE` | Exercise sessions | Saves workouts logged in the app, only after the user turns that on. | Workout logging |
 | `android.permission.health.WRITE_NUTRITION` | Nutrition | Saves food logged in the app, only after the user turns that on. | Food diary |
 
-Not requested: background reads (`READ_HEALTH_DATA_IN_BACKGROUND`; sync runs only while the app is open), exercise routes, hydration (water is not built for Android yet), steps writes (left out on purpose so Health Connect's step totals never count the app's own entries).
+Not requested: background reads (`READ_HEALTH_DATA_IN_BACKGROUND`; sync runs only while the app is open), exercise routes, hydration writes (water logged in the app is not saved to Health Connect yet), steps writes (left out on purpose so Health Connect's step totals never count the app's own entries).
 
 Final list check before submitting:
 

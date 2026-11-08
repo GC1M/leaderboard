@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 
 import { Row, Section, styles } from '@/components/ui';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { readingDateLabel } from '@/lib/health/dates';
 import { formatSleep, type WeightUnit } from '@/lib/health/format';
 import { setText, sourceLabel, workoutSeconds } from '@/lib/workout-history';
@@ -21,7 +22,7 @@ export function WorkoutDetailView({ w, weightUnit, distanceUnit, now }: { w: Wor
       <Section
         footer={
           imported
-            ? "Imported from Apple Health. Change it in Health, and it updates here after the next import. Exercises and sets aren't part of an import."
+            ? `Imported from ${healthProviderName()}. Change it in Health, and it updates here after the next import. Exercises and sets aren't part of an import.`
             : w.source === 'import'
               ? `Imported from a ${sourceLabel(w)} export. Edits stay here: importing the file again won't change this workout.`
               : "Logged in this app. Calories aren't tracked for manual workouts."

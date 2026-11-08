@@ -8,6 +8,7 @@ import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/com
 import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { useEditorNavigation } from '@/lib/editor-navigation';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { readingDateLabel, startOfLocalDay } from '@/lib/health/dates';
 import { formatWeight, RANGES, type Range, type WeightUnit } from '@/lib/health/format';
 import { canExport, MANUAL_KINDS } from '@/lib/health/manual-export';
@@ -121,9 +122,9 @@ export default function Weight() {
     <Button label={editing ? 'Save Changes' : 'Save Weight'} busy={busy} disabled={!text.trim()} onPress={() => void save()} />
   </Screen>;
   if (view === 'detail' && selected) return <Screen title="Weight Reading" back onBack={() => { setSelected(null); setView('history'); }} headerActions={canExport(selected.source ?? '') && <Button plain label="Edit" disabled={busy} onPress={() => begin(selected)} />}>
-    <Section><Row wrap label="Weight" value={formatWeight(selected.kg, unit)} /><Row wrap label="Measured" value={new Date(selected.measuredAt).toLocaleString()} /><Row wrap label="Source" value={selected.source === 'manual' ? 'Manual' : 'Apple Health'} last /></Section>
+    <Section><Row wrap label="Weight" value={formatWeight(selected.kg, unit)} /><Row wrap label="Measured" value={new Date(selected.measuredAt).toLocaleString()} /><Row wrap label="Source" value={selected.source === 'manual' ? 'Manual' : healthProviderName()} last /></Section>
     <ErrorText>{formError}</ErrorText>
-    {canExport(selected.source ?? '') ? <Overflow name="weight reading"><Row wrap label="Delete Reading" danger disabled={busy} last onPress={remove} /></Overflow> : <Text style={[styles.body, { color: c.inkSoft }]}>Imported readings can be changed in Apple Health.</Text>}
+    {canExport(selected.source ?? '') ? <Overflow name="weight reading"><Row wrap label="Delete Reading" danger disabled={busy} last onPress={remove} /></Overflow> : <Text style={[styles.body, { color: c.inkSoft }]}>Imported readings can be changed in {healthProviderName()}.</Text>}
   </Screen>;
   return <Screen title="My Weight" back>
     {current?.error ? <View><ErrorText>{current.error}</ErrorText><Button plain label="Try Again" onPress={() => { setRes(null); setTries((t) => t + 1); }} /></View> : !current ? <Skeleton label="Loading weight" rows={2} /> : current.latest ? <>
@@ -131,7 +132,7 @@ export default function Weight() {
       <Text style={[styles.caption, { color: c.inkSoft }]}>Latest, {readingDateLabel(new Date(current.latest.measuredAt))}</Text>
       <Segmented label="Time range" options={RANGES.map((r) => ({ value: r, label: `${r}D` }))} value={days} onChange={setDays} />
       {current.rows?.length ? <WeightChart readings={current.rows} days={days} to={new Date()} unit={displayUnit} /> : <Text style={[styles.body, { color: c.inkSoft }]}>{`No readings in the last ${days} days. Try a wider range.`}</Text>}
-      <Section title="History">{[...(current.rows ?? [])].reverse().map((r, i, all) => <Row wrap key={r.id ?? r.measuredAt} label={formatWeight(r.kg, displayUnit)} value={`${new Date(r.measuredAt).toLocaleString()} · ${r.source === 'manual' ? 'Manual' : 'Apple Health'}`} last={i === all.length - 1} onPress={() => { setSelected(r); setUnit(preferred); setFormError(null); setView('detail'); }} />)}</Section>
+      <Section title="History">{[...(current.rows ?? [])].reverse().map((r, i, all) => <Row wrap key={r.id ?? r.measuredAt} label={formatWeight(r.kg, displayUnit)} value={`${new Date(r.measuredAt).toLocaleString()} · ${r.source === 'manual' ? 'Manual' : healthProviderName()}`} last={i === all.length - 1} onPress={() => { setSelected(r); setUnit(preferred); setFormError(null); setView('detail'); }} />)}</Section>
     </> : <Text style={[styles.body, { color: c.inkSoft }]}>No weight recorded yet.</Text>}
     <Button label="Add Weight" onPress={() => begin()} />
     {draft && <Button secondary label="Resume Weight Draft" onPress={() => { setText(draft.text); setWhen(new Date(draft.when)); setUnit(draft.unit); setEditing(draft.editing); setChanged(true); setView('edit'); }} />}

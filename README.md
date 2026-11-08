@@ -67,7 +67,7 @@ Without the key the function answers `not_configured`; the app then shows saved 
 Expo Go is not enough. It cannot load the HealthKit module or SQLCipher, so Health shows as unavailable there (`src/lib/health/healthkit.ts`). A Health build needs:
 
 - the HealthKit entitlement and usage strings, added by the `@kingstinct/react-native-healthkit` plugin in `app.config.ts`
-- `expo-sqlite` with `useSQLCipher: true` (also in `app.config.ts`). The on-device Health journal refuses to run on an unencrypted build (`src/lib/health/journal.ios.ts`), so an old dev build must be rebuilt.
+- `expo-sqlite` with `useSQLCipher: true` (also in `app.config.ts`). The on-device Health journal refuses to run on an unencrypted build (`src/lib/health/journal.native.ts`), so an old dev build must be rebuilt.
 
 See `docs/health-sync.md` for how import and reconciliation work.
 

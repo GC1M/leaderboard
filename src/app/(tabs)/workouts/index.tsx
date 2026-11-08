@@ -6,6 +6,7 @@ import { WeeklyHistory } from '@/components/workouts/WeeklyHistory';
 import { WorkoutRow } from '@/components/workouts/WorkoutRow';
 import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { listDrafts } from '@/lib/workout-draft';
 import { useDistanceUnit } from '@/lib/distance-unit';
 import { listWorkouts, listWorkoutsSince, type Workout } from '@/lib/workouts';
@@ -52,7 +53,7 @@ export default function Workouts() {
       ) : !rows ? (
         <Skeleton label="Loading workouts" />
       ) : rows.length === 0 ? (
-        <Text style={[styles.body, { color: c.inkSoft }]}>No workouts yet. Log one, or import them from Apple Health or another workout app.</Text>
+        <Text style={[styles.body, { color: c.inkSoft }]}>No workouts yet. Log one, or import them from {healthProviderName()} or another workout app.</Text>
       ) : (
         <Section>
           {rows.map((w, i) => (

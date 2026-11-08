@@ -7,6 +7,7 @@ import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/com
 import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { useEditorNavigation } from '@/lib/editor-navigation';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { dateFromKey, formatSleep } from '@/lib/health/format';
 import { hasSleepHistory } from '@/lib/history-presence';
 import { MANUAL_KINDS } from '@/lib/health/manual-export';
@@ -103,13 +104,13 @@ export default function Sleep() {
     <ErrorText>{error}</ErrorText><Button label={editing ? 'Save Changes' : 'Save Sleep'} busy={busy} onPress={() => void save()} />
   </Screen>;
   if (view === 'detail' && selected) return <Screen title="Sleep Entry" back onBack={() => { setSelected(null); setView('history'); }} headerActions={selected.source === 'manual' && <Button plain label="Edit" disabled={busy} onPress={() => begin(selected)} />}>
-    <Section><Row wrap label="Duration" value={formatSleep(selected.value)} /><Row wrap label="Fell asleep" value={new Date(selected.windowStart).toLocaleString()} /><Row wrap label="Woke up" value={new Date(selected.windowEnd).toLocaleString()} /><Row wrap label="Source" value={selected.source === 'manual' ? 'Manual' : 'Apple Health'} last /></Section>
-    <ErrorText>{error}</ErrorText>{selected.source === 'manual' ? <Overflow name="sleep entry"><Row wrap label="Delete Entry" danger last disabled={busy} onPress={remove} /></Overflow> : <Text style={[styles.body, { color: c.inkSoft }]}>Imported sleep can be changed in Apple Health.</Text>}
+    <Section><Row wrap label="Duration" value={formatSleep(selected.value)} /><Row wrap label="Fell asleep" value={new Date(selected.windowStart).toLocaleString()} /><Row wrap label="Woke up" value={new Date(selected.windowEnd).toLocaleString()} /><Row wrap label="Source" value={selected.source === 'manual' ? 'Manual' : healthProviderName()} last /></Section>
+    <ErrorText>{error}</ErrorText>{selected.source === 'manual' ? <Overflow name="sleep entry"><Row wrap label="Delete Entry" danger last disabled={busy} onPress={remove} /></Overflow> : <Text style={[styles.body, { color: c.inkSoft }]}>Imported sleep can be changed in {healthProviderName()}.</Text>}
   </Screen>;
   return <Screen title="My Sleep" back>
     <BarHistory fetch={fetchSleep} hasAny={hasSleepHistory} fmt={formatSleep} noun="sleep" refresh={tries} />
     <Button label="Add Sleep" onPress={() => begin()} />
     {draft && <Button secondary label="Resume Sleep Draft" onPress={() => { setTimes(draft.times); setEditing(draft.editing); setChanged(true); setView('edit'); }} />}
-    {loadError ? <View><ErrorText>{loadError}</ErrorText><Button plain label="Try Again" onPress={() => setTries((n) => n + 1)} /></View> : rows === null ? <Skeleton label="Loading sleep entries" /> : rows.length > 0 && <Section title="History · last 90 days">{rows.slice().reverse().map((d, i, all) => <Row wrap key={d.date} label={dateFromKey(d.date).toLocaleDateString(undefined, { dateStyle: 'medium' })} value={`${formatSleep(d.value)} · ${d.source === 'manual' ? 'Manual' : 'Apple Health'}`} last={i === all.length - 1} onPress={() => { setSelected(d); setError(null); setView('detail'); }} />)}</Section>}
+    {loadError ? <View><ErrorText>{loadError}</ErrorText><Button plain label="Try Again" onPress={() => setTries((n) => n + 1)} /></View> : rows === null ? <Skeleton label="Loading sleep entries" /> : rows.length > 0 && <Section title="History · last 90 days">{rows.slice().reverse().map((d, i, all) => <Row wrap key={d.date} label={dateFromKey(d.date).toLocaleDateString(undefined, { dateStyle: 'medium' })} value={`${formatSleep(d.value)} · ${d.source === 'manual' ? 'Manual' : healthProviderName()}`} last={i === all.length - 1} onPress={() => { setSelected(d); setError(null); setView('detail'); }} />)}</Section>}
   </Screen>;
 }

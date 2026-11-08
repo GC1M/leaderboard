@@ -34,6 +34,15 @@ const config: ExpoConfig = {
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
+    // Health Connect reads (#60). History lets the first import reach 90 days back instead of 30 days before the first grant.
+    permissions: [
+      'android.permission.health.READ_STEPS',
+      'android.permission.health.READ_SLEEP',
+      'android.permission.health.READ_WEIGHT',
+      'android.permission.health.READ_EXERCISE',
+      'android.permission.health.READ_HYDRATION',
+      'android.permission.health.READ_HEALTH_DATA_HISTORY',
+    ],
   },
   web: {
     favicon: './assets/images/favicon.png',
@@ -61,6 +70,9 @@ const config: ExpoConfig = {
         background: false,
       },
     ],
+    // Adds the Health Connect permission rationale intent filter and activity alias. The library needs Android 8 (API 26).
+    'react-native-health-connect',
+    ['expo-build-properties', { android: { minSdkVersion: 26 } }],
     'expo-apple-authentication',
     [
       'expo-image-picker',
