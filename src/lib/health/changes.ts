@@ -3,18 +3,20 @@ import { EXCLUDE_OWN_EXPORTS, isOwnExport } from './export-metadata';
 import { HEALTH_TYPES, loadHealthKit, type HealthMetric } from './healthkit';
 import { summarizeSleep } from './sleep';
 import { normalizeWeight, readLatestWeight } from './weight';
+import { queryWaterChanges, type WaterChange } from './water';
 import { queryWorkoutChanges, type WorkoutChange } from './workouts';
 
 export type StoredSample = { id: string; start: string; end: string; value: number; dates?: string[] };
-export type ChangePage = { samples: StoredSample[]; deleted: string[]; anchor: string; hasMore: boolean; workouts?: WorkoutChange[] };
+export type ChangePage = { samples: StoredSample[]; deleted: string[]; anchor: string; hasMore: boolean; workouts?: WorkoutChange[]; water?: WaterChange[] };
 export type DailyChange = { date: string; value: number; window_start?: string; window_end?: string };
-export type HealthChanges = { daily: DailyChange[]; removeDaily: string[]; weight: { measured_at: string; kg: number }[]; removeWeight: string[]; workouts?: WorkoutChange[]; removeWorkouts?: string[] };
+export type HealthChanges = { daily: DailyChange[]; removeDaily: string[]; weight: { measured_at: string; kg: number }[]; removeWeight: string[]; workouts?: WorkoutChange[]; removeWorkouts?: string[]; water?: WaterChange[]; removeWater?: string[] };
 export type JournalState = { from: string; anchor?: string; samples: StoredSample[]; dailyKeys?: string[]; resetAfterPending?: boolean; pending?: { anchor: string; changes: HealthChanges; hasMore: boolean } };
 export interface HealthJournal { read(metric: HealthMetric): Promise<JournalState | null>; write(metric: HealthMetric, state: JournalState): Promise<void> }
 export const CHANGE_PAGE_SIZE = 500;
 
 export async function queryChanges(metric: HealthMetric, state: JournalState): Promise<ChangePage> {
   if (metric === 'workouts') return queryWorkoutChanges(state, CHANGE_PAGE_SIZE);
+  if (metric === 'water') return queryWaterChanges(state, CHANGE_PAGE_SIZE);
   const hk = loadHealthKit();
   if (!hk) throw new Error('Apple Health requires a native iPhone build.');
   // Keep this lower bound fixed for the lifetime of an anchor; moving query predicates loses changes.
@@ -63,6 +65,12 @@ export async function deriveChanges(metric: HealthMetric, previous: readonly Sto
     const known = new Set(previous.map((s) => s.id));
     changes.workouts = page.workouts ?? [];
     changes.removeWorkouts = page.deleted.filter((id) => known.has(id));
+  } else if (metric === 'water') {
+    // Same as workouts: each sample is its own entry, never summed here. A correction in Health is a delete plus a new
+    // UUID, so it arrives as a tombstone and an upsert and the day's total does not grow.
+    const known = new Set(previous.map((s) => s.id));
+    changes.water = page.water ?? [];
+    changes.removeWater = page.deleted.filter((id) => known.has(id));
   } else if (metric === 'sleep') {
     const summarize = (samples: readonly StoredSample[]) => summarizeSleep(samples.map((s) => ({ uuid: s.id, startDate: new Date(s.start), endDate: new Date(s.end), value: s.value })));
     const before = summarize(previous), after = summarize(next);
@@ -139,10 +147,11 @@ export async function reconcileHealth(metric: HealthMetric, options: ReconcileOp
     await upload(metric, pending.changes);
     await checkOwner();
     written += pending.changes.daily.length + pending.changes.weight.length + pending.changes.removeDaily.length + pending.changes.removeWeight.length
-      + (pending.changes.workouts?.length ?? 0) + (pending.changes.removeWorkouts?.length ?? 0);
+      + (pending.changes.workouts?.length ?? 0) + (pending.changes.removeWorkouts?.length ?? 0)
+      + (pending.changes.water?.length ?? 0) + (pending.changes.removeWater?.length ?? 0);
     // Never advance an empty initial read: newly granted access must still import historical data.
     const recheck = state.resetAfterPending;
-    state = { ...state, anchor: recheck ? undefined : state.samples.length || state.anchor || pending.changes.removeDaily.length || pending.changes.removeWeight.length || pending.changes.removeWorkouts?.length ? pending.anchor : state.anchor, pending: undefined, resetAfterPending: undefined };
+    state = { ...state, anchor: recheck ? undefined : state.samples.length || state.anchor || pending.changes.removeDaily.length || pending.changes.removeWeight.length || pending.changes.removeWorkouts?.length || pending.changes.removeWater?.length ? pending.anchor : state.anchor, pending: undefined, resetAfterPending: undefined };
     await journal.write(metric, state);
     if (!pending.hasMore && !recheck) return { hasMore: false, written, knownSamples: state.samples.length };
   }

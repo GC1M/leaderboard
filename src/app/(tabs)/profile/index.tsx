@@ -4,13 +4,17 @@ import { AccessibilityInfo, Keyboard, Platform } from 'react-native';
 
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton } from '@/components/ui';
 import { alert } from '@/lib/alert';
+import { useAuth } from '@/lib/auth';
 import { exportedFood, settleFoodExport } from '@/lib/health/food-export';
 import { useHealthExport, useHealthSync } from '@/lib/health/sync';
+import { exportedWater, settleWaterExport } from '@/lib/health/water-export';
 import { NAME_MAX, deleteAccount, deleteFoodHistory, getDisplayName, signOut, updateDisplayName } from '@/lib/profile';
+import { deleteWaterHistory } from '@/lib/water/entries';
 
 export default function Profile() {
   const router = useRouter();
   const health = useHealthSync();
+  const uid = useAuth().session?.user.id ?? '';
   const healthExport = useHealthExport();
   const [saved, setSaved] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -59,7 +63,7 @@ export default function Profile() {
   const confirmDeleteImports = () =>
     alert(
       'Delete imported Health data?',
-      "This stops Health imports and deletes the steps, sleep, weight, and workouts Leaderboard imported from Apple Health, here and in your groups. Manual entries stay. Nothing is uploaded again until you reconnect Apple Health. Your data in the Health app isn't touched.",
+      "This stops Health imports and deletes the steps, sleep, weight, workouts, and water Leaderboard imported from Apple Health, here and in your groups. Manual entries stay. Nothing is uploaded again until you reconnect Apple Health. Your data in the Health app isn't touched.",
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete Imported Data', style: 'destructive', onPress: () => run(health.deleteImports) },
@@ -76,10 +80,20 @@ export default function Profile() {
       await settleFoodExport(healthExport, fromHealth);
       await deleteFoodHistory();
     });
+  // Same for water this app saved to Health.
+  const exportedW = exportedWater(healthExport.entries).length;
+  const deleteWater = (fromHealth: boolean) =>
+    run(async () => {
+      await settleWaterExport(healthExport, fromHealth);
+      await deleteWaterHistory(uid);
+    });
   // Health deletes must run while the account still exists, so they come first; if they fail the account stays.
   const removeAccount = (fromHealth: boolean) =>
     run(async () => {
-      if (fromHealth) await settleFoodExport(healthExport, true);
+      if (fromHealth) {
+        await settleFoodExport(healthExport, true);
+        await settleWaterExport(healthExport, true);
+      }
       await deleteAccount();
     });
 
@@ -96,17 +110,30 @@ export default function Profile() {
       ],
     );
 
+  const confirmDeleteWater = () =>
+    alert(
+      'Delete water history?',
+      `This deletes every water entry on your account, both added here and imported from Apple Health, and your water target. Your sharing choices stay, so groups you share water with will see no water logged. ${
+        exportedW ? `${count(exportedW)}: choose whether to remove ${exportedW === 1 ? 'it' : 'them'} from Health too. ` : ''
+      }Water from other apps stays in Health. This can't be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        ...(exportedW ? [{ text: 'Delete and Remove from Health', style: 'destructive' as const, onPress: () => deleteWater(true) }] : []),
+        { text: exportedW ? 'Delete, Keep in Health' : 'Delete Water History', style: 'destructive', onPress: () => deleteWater(false) },
+      ],
+    );
+
   const confirmDelete = () =>
     alert(
       'Delete your account?',
-      `This deletes your profile, your steps, sleep, weight, workouts and templates, your food entries and recipes, your sharing choices and your memberships. Groups you own are deleted for everyone in them. ${
-        exported ? `${count(exported)}: choose whether to remove ${exported === 1 ? 'it' : 'them'} from Health too. ` : ''
+      `This deletes your profile, your steps, sleep, weight, workouts and templates, your food entries and recipes, your water, your sharing choices and your memberships. Groups you own are deleted for everyone in them. ${
+        exported + exportedW ? `${count(exported + exportedW)}: choose whether to remove ${exported + exportedW === 1 ? 'it' : 'them'} from Health too. ` : ''
       }This can't be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         // The session ends after the delete, and the route guard takes over from there.
-        ...(exported ? [{ text: 'Delete Account and Remove from Health', style: 'destructive' as const, onPress: () => removeAccount(true) }] : []),
-        { text: exported ? 'Delete Account, Keep in Health' : 'Delete Account', style: 'destructive', onPress: () => removeAccount(false) },
+        ...(exported + exportedW ? [{ text: 'Delete Account and Remove from Health', style: 'destructive' as const, onPress: () => removeAccount(true) }] : []),
+        { text: exported + exportedW ? 'Delete Account, Keep in Health' : 'Delete Account', style: 'destructive', onPress: () => removeAccount(false) },
       ],
     );
 
@@ -135,7 +162,7 @@ export default function Profile() {
       {Platform.OS === 'ios' && (
         <Section
           title="Apple Health"
-          footer="Leaderboard reads steps, sleep, weight, and workouts that you allow, and saves food to Apple Health only if you turn that on in the Food Diary. Deleting imported data doesn't change Apple's permissions: to change what Leaderboard can read, open the Health app, tap your profile picture, then Apps, then Leaderboard."
+          footer="Leaderboard reads steps, sleep, weight, workouts, and water that you allow, and saves food or water to Apple Health only if you turn that on in the Food Diary or on the Water screen. Deleting imported data doesn't change Apple's permissions: to change what Leaderboard can read, open the Health app, tap your profile picture, then Apps, then Leaderboard."
         >
           <Row label="Health Access" icon={{ ios: 'heart.text.square', android: 'favorite', web: 'favorite' }} onPress={() => router.push('/steps/permission')} />
           <Row
@@ -156,6 +183,10 @@ export default function Profile() {
 
       <Section title="Food" footer="Food is private unless you share daily totals with a group in Group Info.">
         <Row label="Delete Food History" icon={{ ios: 'trash', android: 'delete', web: 'delete' }} danger last disabled={busy} onPress={confirmDeleteFood} />
+      </Section>
+
+      <Section title="Water" footer="Water is private unless you share daily totals with a group in Group Info.">
+        <Row label="Delete Water History" icon={{ ios: 'trash', android: 'delete', web: 'delete' }} danger last disabled={busy} onPress={confirmDeleteWater} />
       </Section>
 
       <Section title="Preferences">

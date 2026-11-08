@@ -38,7 +38,7 @@ export const IOS_MATRIX: PlatformMatrix = {
     weight: ios(true, true, { read: true, write: false }, [], 'Imported without a lower date bound.'),
     workouts: ios(true, true, { read: false, write: false }, ['read', 'write'], 'The app imports and exports workouts through src/lib/health directly; not wired through the adapter yet.'),
     nutrition: ios(true, true, { read: false, write: false }, ['read', 'write'], 'Food entries are exported (write only) through src/lib/health/food-export.ts directly; not wired through the adapter yet.'),
-    water: ios(true, true, { read: false, write: false }, ['read', 'write'], 'Not wired yet.'),
+    water: ios(true, true, { read: false, write: false }, ['read', 'write'], 'The app imports water through src/lib/health/water.ts directly; not wired through the adapter yet.'),
   },
 };
 

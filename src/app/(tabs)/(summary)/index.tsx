@@ -20,6 +20,8 @@ import { getMyLatestWeight } from '@/lib/weight';
 import { useWeightUnit } from '@/lib/weight-unit';
 import { historyStart, totalsParts, weeklyTotals, type WeekTotals } from '@/lib/workout-history';
 import { useDistanceUnit } from '@/lib/distance-unit';
+import { getWaterTotals } from '@/lib/water/entries';
+import { formatWater, useWaterUnit } from '@/lib/water/units';
 import { listWorkoutsSince } from '@/lib/workouts';
 import { useTheme } from '@/theme';
 
@@ -42,6 +44,9 @@ export default function Summary() {
   const [weight, setWeight] = useState<Latest<Weight>>();
   const [workouts, setWorkouts] = useState<Latest<WeekTotals>>();
   const [food, setFood] = useState<Latest<Food>>();
+  // Today's water in mL: null when nothing is logged (not 0 mL).
+  const [water, setWater] = useState<Latest<number>>();
+  const [waterUnit] = useWaterUnit();
   const [unit] = useWeightUnit();
   const [cards, setCards] = useState<Card[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,10 +62,11 @@ export default function Summary() {
       const boards = await Promise.allSettled(groups.map((g) => getLeaderboard(g.id, 'steps', 'day')));
       // Sleep, weight and workouts fail on their own: an error shows on that card, not on the whole summary.
       const todayKey = localDateKey(new Date());
-      const [sl, wt, wo, fd] = await Promise.allSettled([getMyRecentSleep(me, 30), getMyLatestWeight(me), listWorkoutsSince(historyStart(1)), getDailyTotals(todayKey, todayKey)]);
+      const [sl, wt, wo, fd, wa] = await Promise.allSettled([getMyRecentSleep(me, 30), getMyLatestWeight(me), listWorkoutsSince(historyStart(1)), getDailyTotals(todayKey, todayKey), getWaterTotals(todayKey, todayKey)]);
       setSleep(sl.status === 'fulfilled' ? (sl.value[sl.value.length - 1] ?? null) : 'error');
       setWeight(wt.status === 'fulfilled' ? wt.value : 'error');
       setFood(fd.status === 'fulfilled' ? (fd.value[0] ? { kcal: fd.value[0].energy_kcal, atLeast: fd.value[0].kcalIncomplete } : null) : 'error');
+      setWater(wa.status === 'fulfilled' ? (wa.value[0]?.totalMl ?? null) : 'error');
       setWorkouts(wo.status === 'fulfilled' ? weeklyTotals(wo.value, 1)[0] : 'error');
       setSteps(s);
       setCards(groups.map((g, i) => ({ ...g, standing: boards[i].status === 'fulfilled' ? myStanding(boards[i].value, me) : null })));
@@ -131,6 +137,15 @@ export default function Summary() {
             empty="No food logged"
             state={food === 'error' ? 'error' : typeof food === 'object' && food ? 'ok' : 'empty'}
             onPress={() => router.push('/food/diary')}
+          />
+          <MetricCard
+            title="Water"
+            icon={{ ios: 'drop.fill', android: 'water_drop', web: 'water_drop' }}
+            value={typeof water === 'number' ? formatWater(water, waterUnit) : null}
+            when="Today"
+            empty="No water logged"
+            state={water === 'error' ? 'error' : typeof water === 'number' ? 'ok' : 'empty'}
+            onPress={() => router.push('/water')}
           />
           <MetricCard
             title="Workouts"
