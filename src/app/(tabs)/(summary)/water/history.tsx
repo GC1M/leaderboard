@@ -49,7 +49,7 @@ export default function WaterHistory() {
         </Text>
       )}
       <Text style={[styles.caption, { color: c.inkSoft }]}>
-        {`Each bar is the total for one day.${target ? ' The dashed line is your target.' : ''} Days without entries are left blank, not counted as zero.`}
+        {`Each bar is the total for one day.${target ? ' The line across the bars is your target.' : ''} Days without entries are left blank, not counted as zero.`}
       </Text>
     </Screen>
   );

@@ -16,7 +16,7 @@ export const unitFromMl = (ml: number, unit: WaterUnit) => (unit === 'floz' ? ml
 // Whole mL; fl oz to one decimal. A stored amount is rounded only for display.
 export function formatWater(ml: number, unit: WaterUnit): string {
   if (unit === 'floz') return `${Math.round(unitFromMl(ml, 'floz') * 10) / 10} fl oz`;
-  return ml >= 1000 ? `${Math.round(ml / 10) / 100} L` : `${Math.round(ml)} mL`;
+  return Math.round(ml) >= 1000 ? `${Math.round(ml / 10) / 100} L` : `${Math.round(ml)} mL`;
 }
 
 // Entry amount in mL, rounded to 0.1 mL so a round trip through fl oz does not drift; null when not a valid single drink.

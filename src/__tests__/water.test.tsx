@@ -7,6 +7,7 @@ import { entryFromRow, type WaterEntry } from '@/lib/water/entries';
 
 const mockLoadDay = jest.fn();
 const mockLog = jest.fn();
+let mockNotices: string[] = [];
 let mockUnit = 'ml';
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), canGoBack: () => true, push: jest.fn() }),
@@ -27,7 +28,7 @@ jest.mock('@/lib/water/entries', () => ({
   loadWaterDay: (...a: unknown[]) => mockLoadDay(...a),
   logWater: (...a: unknown[]) => mockLog(...a),
   getWaterTarget: async () => null,
-  waterQueue: { flushPending: async () => 0 },
+  waterQueue: { flushPending: async () => 0, takeNotices: () => mockNotices.splice(0) },
 }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
@@ -64,6 +65,12 @@ test('a day with no entries says "No water logged", never 0 mL; a day with entri
   expect(text).toContain('Added here');
   expect(text).toContain('From Apple Health · WaterMinder');
   expect(text).not.toContain('Your target');
+});
+
+test('an edit dropped because the entry was deleted on another device is reported', async () => {
+  mockNotices = ['This entry was deleted on another device.'];
+  mockLoadDay.mockResolvedValue(loaded([]));
+  expect(dump(await render(<Water />))).toContain('This entry was deleted on another device.');
 });
 
 test('quick add in fl oz logs the amount in mL', async () => {

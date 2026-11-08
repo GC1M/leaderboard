@@ -170,10 +170,11 @@ describe('settling water in Health (keep or remove)', () => {
     expect(c.enqueue).not.toHaveBeenCalled();
     expect(c.getEntries().map((e) => e.recordId)).toEqual(['del', 'f']);
   });
-  it('remove queues a delete for every water save', async () => {
+  it('remove queues a delete for every save that reached Health and forgets one never attempted', async () => {
     const c = controls(all.filter((e) => e.recordId !== 'del'));
     await settleWaterExport(c, true);
-    expect(c.enqueue.mock.calls.map((x) => [x[1], x[2]]).sort()).toEqual([['sent', 'delete'], ['waiting', 'delete']]);
+    expect(c.enqueue.mock.calls.map((x) => [x[1], x[2]])).toEqual([['sent', 'delete']]);
+    expect(c.getEntries().map((e) => e.recordId)).toEqual(['f']);
   });
   it('remove says so when a delete has not finished, and bumps the sync generation before and after', async () => {
     const before = waterSyncGeneration();

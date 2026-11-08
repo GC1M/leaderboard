@@ -6,7 +6,7 @@ import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { getHealthWriteAccess, isHealthAvailable } from '@/lib/health/healthkit';
 import { useHealthExport } from '@/lib/health/sync';
-import { deletedWaterIds, exportedWater, fetchRecentWaterRows, pendingWaterSaves, settleWaterExport, WATER_KIND, WATER_TYPE, waterDeleteVersion, waterSyncGeneration } from '@/lib/health/water-export';
+import { bumpWaterSyncGeneration, deletedWaterIds, exportedWater, fetchRecentWaterRows, pendingWaterSaves, removeWaterExport, settleWaterExport, WATER_KIND, WATER_TYPE, waterSyncGeneration } from '@/lib/health/water-export';
 import { secureStorage } from '@/lib/secure-storage';
 import { useTheme } from '@/theme';
 
@@ -24,8 +24,9 @@ export function useWaterExport() {
   const [on, setOn] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const latest = useRef({ on, ready: exp.ready, entries: exp.entries, enqueue: exp.enqueue });
-  useEffect(() => { latest.current = { on, ready: exp.ready, entries: exp.entries, enqueue: exp.enqueue }; });
+  const fresh = () => ({ on, ready: exp.ready, entries: exp.entries, getEntries: exp.getEntries, enqueue: exp.enqueue, forget: exp.forget });
+  const latest = useRef(fresh());
+  useEffect(() => { latest.current = fresh(); });
   const running = useRef<Promise<void> | null>(null);
   useEffect(() => {
     let live = true;
@@ -41,9 +42,11 @@ export function useWaterExport() {
       const rows = await fetchRecentWaterRows();
       const { entries, enqueue } = latest.current;
       const gone = await deletedWaterIds(rows, entries);
-      if (gen !== waterSyncGeneration()) return;
-      for (const s of pendingWaterSaves(rows, entries)) await enqueue(WATER_KIND, s.id, 'save', s.payload, s.version);
-      for (const id of gone) await enqueue(WATER_KIND, id, 'delete', null, waterDeleteVersion(entries, id)!);
+      // Checked before every enqueue: each one waits for its Health write, and a settle, history deletion or
+      // switch-off can start during that wait.
+      const stale = () => gen !== waterSyncGeneration();
+      for (const s of pendingWaterSaves(rows, entries)) { if (stale()) return; await enqueue(WATER_KIND, s.id, 'save', s.payload, s.version); }
+      for (const id of gone) { if (stale()) return; await removeWaterExport(latest.current, id); }
     })().catch(() => {}).finally(() => { running.current = null; }); // a failure retries on the next load
     return running.current;
   }, []);
@@ -71,6 +74,7 @@ export function useWaterExport() {
         try { await exp.allowWrite([WATER_TYPE]); } catch { /* the access check below reports it */ }
         if (getHealthWriteAccess(WATER_TYPE) !== 'granted') return setMessage(DENIED);
       } else {
+        bumpWaterSyncGeneration(); // a sync in flight stops queuing saves
         await exp.discard(WATER_KIND);
       }
       setOn(next);
@@ -83,8 +87,7 @@ export function useWaterExport() {
     eligible: isHealthAvailable(), on, message, busy, set, sync,
     // After the server deleted an entry: one this device exported leaves Health too, whatever the clock says.
     deleted: useCallback(async (id: string) => {
-      const version = waterDeleteVersion(latest.current.entries, id);
-      if (version !== null) await latest.current.enqueue(WATER_KIND, id, 'delete', null, version).catch(() => {});
+      await removeWaterExport(latest.current, id).catch(() => {});
     }, []),
   };
 }

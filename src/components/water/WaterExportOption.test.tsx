@@ -76,11 +76,12 @@ test('turning off with water in Health asks Keep or Remove; Keep forgets the sav
   act(() => r.unmount());
 });
 
-test('Remove queues a Health delete for each water save', async () => {
+test('Remove queues a Health delete for each water save that reached Health, and forgets one never attempted', async () => {
   const r = await mount();
   await flip(r, false);
   await act(async () => mockAlert.mock.calls[0][2][1].onPress());
-  expect(mockEnqueue.mock.calls.map((c) => [c[0], c[1], c[2]])).toEqual([['water', 'e1', 'delete'], ['water', 'e2', 'delete']]);
+  expect(mockEnqueue.mock.calls.map((c) => [c[0], c[1], c[2]])).toEqual([['water', 'e1', 'delete']]);
+  expect(mockForget).toHaveBeenCalledWith('water', expect.any(Function));
   act(() => r.unmount());
 });
 

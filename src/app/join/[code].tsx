@@ -52,7 +52,7 @@ export default function JoinByLink() {
 
   return (
     <Screen title={`Join with code ${code.slice(0, 4)} ${code.slice(4)}?`}>
-      <Text style={[styles.body, { color: c.inkSoft }]}>You&apos;ll be added to the group that code belongs to. Your steps are shared with it; sleep, weight, workouts and food stay private unless you turn them on in Group Info.</Text>
+      <Text style={[styles.body, { color: c.inkSoft }]}>You&apos;ll be added to the group that code belongs to. Your steps are shared with it; sleep, weight, workouts, food and water stay private unless you turn them on in Group Info.</Text>
       {competition && <Text style={[styles.body, { color: c.inkSoft }]}>After joining the group, you can review the competition rules and choose whether to enroll. Joining this group does not enroll you.</Text>}
       <ErrorText>{error}</ErrorText>
       <Button label="Join Group" busy={busy} onPress={join} />

@@ -39,7 +39,7 @@ export default function JoinGroup() {
         }}
         onSubmitEditing={submit}
         placeholder="K74MQ29X"
-        helper="8 characters, no I, O, 0 or 1. Paste works too. Joining shares your steps with the group; sleep, weight, workouts and food stay private unless you turn them on in Group Info."
+        helper="8 characters, no I, O, 0 or 1. Paste works too. Joining shares your steps with the group; sleep, weight, workouts, food and water stay private unless you turn them on in Group Info."
         error={error}
       />
       <Button label="Join Group" busy={busy} disabled={!isValidCode(code)} onPress={submit} />
