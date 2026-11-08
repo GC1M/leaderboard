@@ -28,7 +28,8 @@ export function dateFromKey(key: string): Date {
 }
 
 // One sentence describing a bar chart, shown under it and used as its accessibility label. Days without a
-// value are not zeros: the average is over recorded days only, and says how many.
+// value are not zeros: the average is over recorded days only, and says how many. The top water day is "Most",
+// not "Best", since more water is not a goal.
 export function barSummary(
   dates: string[],
   values: (number | null)[],
@@ -42,7 +43,7 @@ export function barSummary(
   const average = recorded.reduce((a, b) => a + b, 0) / recorded.length;
   const max = Math.max(...recorded);
   const missing = dates.length - recorded.length;
-  return `Last ${dates.length} days: average ${fmt(average)} over ${plural(recorded.length, 'day')} with data${missing ? `, ${missing} without` : ''}. Best ${fmt(max)}, ${label(dateFromKey(dates[values.indexOf(max)]), now)}`;
+  return `Last ${dates.length} days: average ${fmt(average)} over ${plural(recorded.length, 'day')} with data${missing ? `, ${missing} without` : ''}. ${noun === 'water' ? 'Most' : 'Best'} ${fmt(max)}, ${label(dateFromKey(dates[values.indexOf(max)]), now)}`;
 }
 
 // Place readings by their real time: x is 0 at `from` and 1 at `to`, y is 0 at the lowest weight and 1 at the highest.
