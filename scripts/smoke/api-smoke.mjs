@@ -61,7 +61,7 @@ const adminCount = async (table, userId) => {
 };
 
 async function main() {
-  let a, b, bench, running, workoutId, templateId, group, copyId;
+  let a, b, bench, running, workoutId, templateId, group, copyId, competition, completed;
   const started = new Date(Date.now() - 2 * 3600e3);
   const ended = new Date(Date.now() - 3600e3);
   const workout = (extra = {}) => ({
@@ -212,6 +212,64 @@ async function main() {
     eq(await adminCount('food_entries', a.id), 0, 'entries left after delete_my_food_history');
   });
 
+  const day = (offset) => new Date(Date.now() + offset * 86400e3).toISOString().slice(0, 10);
+  await step('competition creation, invite preview and group membership never auto-enroll', async () => {
+    for (const u of [a, b]) ok(await u.client.from('profiles').update({ timezone: 'UTC' }).eq('id', u.id), 'set competition timezone');
+    competition = ok(await a.client.rpc('create_competition', { p_group_id: group.id, p_name: 'Smoke challenge', p_metric: 'steps', p_start_day: day(2), p_end_day: day(4), p_timezone: 'UTC' }), 'create competition');
+    eq(ok(await a.client.from('competition_participants').select('user_id').eq('competition_id', competition), 'participants before consent'), [], 'creator and group members are not enrolled');
+    const preview = ok(await b.client.rpc('competition_invite', { p_id: competition, p_code: group.invite_code }), 'preview invite');
+    eq(preview.id, competition, 'invite points at competition');
+    ok(await b.client.rpc('join_competition', { p_id: competition }), 'explicit opt-in');
+    ok(await b.client.rpc('leave_competition', { p_id: competition }), 'leave before start');
+    eq(ok(await b.client.from('competition_participants').select('status').eq('competition_id', competition).single(), 'left participation').status, 'left', 'historical participation is preserved');
+    rejected(await b.client.rpc('moderate_competition', { p_id: competition, p_action: 'cancel', p_reason: 'Unauthorized' }), 'member moderation');
+    ok(await a.client.rpc('moderate_competition', { p_id: competition, p_action: 'cancel', p_reason: 'Smoke test complete' }), 'cancel with reason');
+    rejected(await b.client.rpc('join_competition', { p_id: competition }), 'join cancelled competition');
+  });
+
+  await step('server scores distinguish zero, excluded manual entries and source corrections', async () => {
+    // Admin-only historical fixture: production clients cannot create backdated competitions or enroll late.
+    completed = randomUUID();
+    ok(await admin.from('competitions').insert({ id: completed, group_id: group.id, creator_id: a.id, name: 'Completed smoke', metric: 'steps', starts_at: `${day(-5)}T00:00:00Z`, ends_at: `${day(-2)}T00:00:00Z`, timezone: 'UTC' }), 'seed historical competition');
+    ok(await admin.from('competition_participants').insert([a, b].map((u) => ({ competition_id: completed, user_id: u.id }))), 'seed prior opt-ins');
+    ok(await admin.from('daily_metrics').insert([
+      { user_id: a.id, date: day(-4), metric: 'steps', value: 100, source: 'healthkit' },
+      { user_id: a.id, date: day(-3), metric: 'steps', value: 999, source: 'manual' },
+      { user_id: b.id, date: day(-4), metric: 'steps', value: 0, source: 'healthkit' },
+    ]), 'seed source readings');
+    let scores = ok(await b.client.rpc('competition_standings', { p_id: completed }), 'read provisional scores');
+    eq(scores.map((r) => Number(r.score)), [100, 0], 'excluded manual reading does not inflate score; recorded zero is ranked');
+    const mine = ok(await a.client.rpc('my_competition_contributions', { p_id: completed }), 'own source explanations');
+    check(mine.some((r) => r.reason === 'manual_entries_excluded' && !r.included), 'manual exclusion explanation missing');
+    check(ok(await b.client.rpc('my_competition_contributions', { p_id: completed }), 'B own records').every((r) => Number(r.value) === 0), 'own-record RPC leaked A readings');
+    ok(await admin.from('daily_metrics').update({ value: 150 }).match({ user_id: a.id, date: day(-4), metric: 'steps' }), 'correct source');
+    scores = ok(await a.client.rpc('competition_standings', { p_id: completed }), 'read corrected score');
+    eq(Number(scores.find((r) => r.user_id === a.id).score), 150, 'pre-finalization corrections recompute');
+    rejected(await b.client.from('competition_results').insert({ competition_id: completed, user_id: b.id, score: 999999 }), 'client cannot write a score');
+  });
+
+  await step('concurrent standings and finalization produce one immutable snapshot', async () => {
+    const results = await Promise.all([
+      a.client.rpc('finalize_competition', { p_id: completed }),
+      b.client.rpc('finalize_competition', { p_id: completed }),
+      b.client.rpc('competition_standings', { p_id: completed }),
+    ]);
+    results.forEach((r) => ok(r, 'concurrent scoring request'));
+    eq(ok(await admin.from('competition_results').select('user_id').eq('competition_id', completed), 'snapshot rows').length, 2, 'one snapshot row per participant');
+    eq(ok(await a.client.from('competition_audit').select('id').eq('competition_id', completed).eq('event', 'finalized'), 'finalization events').length, 1, 'one finalization audit event');
+    ok(await admin.from('daily_metrics').delete().match({ user_id: a.id, date: day(-4), metric: 'steps' }), 'delete source after snapshot');
+    eq(Number(ok(await b.client.rpc('competition_standings', { p_id: completed }), 'frozen scores').find((r) => r.user_id === a.id).score), 150, 'post-finalization deletion leaves snapshot unchanged');
+    ok(await a.client.from('metric_shares').delete().match({ group_id: group.id, user_id: a.id, metric: 'steps' }), 'revoke step sharing');
+    const hidden = ok(await b.client.rpc('competition_standings', { p_id: completed }), 'privacy after finalization');
+    const row = hidden.find((r) => r.user_id === a.id);
+    eq([row.score, row.rank, row.updated_at, row.health_entries, row.manual_entries, row.excluded_entries], [null, null, null, 0, 0, 0], 'revocation masks score, rank, freshness and sources');
+    eq(Number(hidden.find((r) => r.user_id === b.id).rank), 1, 'visible ranks recompute');
+    const outsider = await makeUser('outsider');
+    rejected(await outsider.client.rpc('competition_standings', { p_id: completed }), 'outsider standings');
+    rejected(await anon.rpc('competition_standings', { p_id: completed }), 'signed-out standings');
+    eq(ok(await outsider.client.from('competition_audit').select('id').eq('competition_id', completed), 'outsider audit'), [], 'outsider cannot read activity');
+  });
+
   await step('anonymous (signed-out) clients cannot read or write workout data', async () => {
     for (const table of ['workouts', 'workout_exercises', 'workout_sets', 'exercises', 'workout_templates', 'workout_template_exercises', 'workout_template_sets', 'metric_shares', 'profiles', 'groups']) {
       const { data, error } = await anon.from(table).select('*').limit(1);
@@ -235,6 +293,10 @@ async function main() {
     check(ok(await admin.from('profiles').select('id').eq('id', b.id).maybeSingle(), 'B profile'), 'deleting A also removed B');
     // A owned the group; it goes with them.
     eq(ok(await admin.from('groups').select('id').eq('id', group.id), 'group after owner deletion').length, 0, 'group left after owner deleted account');
+    for (const table of ['competitions', 'competition_results', 'competition_audit', 'competition_participants']) {
+      const field = table === 'competitions' ? 'id' : 'competition_id';
+      eq(ok(await admin.from(table).select(field).eq(field, completed), `${table} after account deletion`), [], `${table} cascades with the deleted group`);
+    }
   });
 
   console.log(`\n${passed} steps passed`);

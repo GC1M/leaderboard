@@ -14,6 +14,7 @@ export default function CompetitionDetail() {
   const { id, competitionId } = useLocalSearchParams<{ id: string; competitionId: string }>(); const uid = useAuth().session?.user.id ?? ''; const c = useTheme(); const now = useCompetitionClock();
   const [standings, setStandings] = useState<CompetitionStanding[] | null>(null);
   const [refreshed, setRefreshed] = useState<Date | null>(null);
+  const [showRules, setShowRules] = useState(false);
   const [row, setRow] = useState<Competition | null>(); const [participation, setParticipation] = useState<Participation | null>(null);
   const [error, setError] = useState<string | null>(null); const [tries, setTries] = useState(0); const [busy, setBusy] = useState(false); const lock = useRef(false);
   useFocusEffect(useCallback(() => {
@@ -36,7 +37,15 @@ export default function CompetitionDetail() {
     <ErrorText>{error}</ErrorText>{error && <Button plain label="Try Again" onPress={() => setTries((v) => v + 1)} />}
     {row === undefined ? !error && <Skeleton label="Loading competition" /> : !row ? <ErrorText>This competition is unavailable.</ErrorText> : <>
       <Section><Row label="Status" value={competitionState(row, now)} /><Row label="Metric" value="Steps" /><Row label="First day" value={competitionDay(row.starts_at, row.timezone)} /><Row label="Last day" value={competitionDay(new Date(Date.parse(row.ends_at) - 1).toISOString(), row.timezone)} /><Row label="Timezone" value={row.timezone} /><Row label="Sources" value={row.include_manual ? 'Health and manual entries' : 'Health entries only'} last /></Section>
-      <Text style={[styles.body, { color: c.inkSoft }]}>Joining shares your eligible step total and rank with current group members. Your step-sharing switch must stay on. Everyone must use {row.timezone}. Missing readings are unranked; ties share a rank. Results stay provisional until explicit finalization, at least 24 hours after the end.</Text>
+      <Text style={[styles.body, { color: c.inkSoft }]}>Joining shares your eligible step total, rank, source counts and data freshness with current group members. Your step-sharing switch must stay on, and your profile timezone must be {row.timezone}. Join before the first day begins; you can leave until the competition ends.</Text>
+      <Button plain label={showRules ? 'Hide Competition Rules' : 'Competition Rules and Privacy'} onPress={() => setShowRules((v) => !v)} />
+      {showRules && <Section title={`Scoring rules · version ${row.scoring_version}`}>
+        <Row wrap label="Scoring period" value={`Whole calendar days in ${row.timezone}, including the first day and all of the last day shown. Daylight saving changes can make a day shorter or longer.`} />
+        <Row wrap label="Scores and ties" value="Eligible entries are summed on the server. Missing readings are unranked; a recorded zero counts. Equal totals share a rank, with gaps afterward: 1, 1, 3." />
+        <Row wrap label="Uploads and corrections" value="Uploads, edits and deletions count until explicit finalization. A participant, creator or group owner can finalize at least 24 hours after the end. Final scores then freeze, including after later source deletions." />
+        <Row wrap label="Privacy and consent" value="Turning off step sharing hides your score, rank, source counts and freshness even in final results. Leaving the group ends participation; returning does not enroll you again. Your detailed contribution view is private to you." />
+        <Row wrap label="Moderation" value="The creator or current group owner can cancel or remove a participant before finalization, with a reason. Group members see these actions and generic source-change activity. Review flags never change your original measurements." last />
+      </Section>}
       {row.status === 'scheduled' && now.getTime() < Date.parse(row.starts_at) && !joined && participation?.status !== 'removed' && <Button label="Join Competition" busy={busy} onPress={() => void act(() => joinCompetition(competitionId))} />}
       {row.status === 'scheduled' && joined && now.getTime() < Date.parse(row.ends_at) && <Button secondary label="Leave Competition" disabled={busy} onPress={() => alert('Leave this competition?', 'You can rejoin only before it starts. You will be removed from its standings.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Leave', style: 'destructive', onPress: () => void act(() => leaveCompetition(competitionId)) }])} />}
       {row.status === 'scheduled' && now.getTime() < Date.parse(row.starts_at) && <Button secondary label="Share Competition Invite" disabled={busy} onPress={() => void act(invite)} />}

@@ -90,7 +90,7 @@ declare c public.competitions;
 begin
   select * into c from public.competitions where id=p_id for update;
   if not found or auth.uid() is null or not public.is_group_member(c.group_id) then raise exception 'competition unavailable'; end if;
-  if not(c.creator_id=auth.uid() or exists(select 1 from public.groups g where g.id=c.group_id and g.owner_id=auth.uid()) or exists(select 1 from public.competition_participants p where p.competition_id=p_id and p.user_id=auth.uid() and p.status='joined')) then raise exception 'only participants, the creator or group owner can finalize'; end if;
+  if not(coalesce(c.creator_id=auth.uid(),false) or exists(select 1 from public.groups g where g.id=c.group_id and g.owner_id=auth.uid()) or exists(select 1 from public.competition_participants p where p.competition_id=p_id and p.user_id=auth.uid() and p.status='joined')) then raise exception 'only participants, the creator or group owner can finalize'; end if;
   if c.status='finalized' then return; end if;
   if c.status='cancelled' then raise exception 'cancelled competitions cannot be finalized'; end if;
   if now()<c.ends_at+interval '24 hours' then raise exception 'finalization opens 24 hours after the end'; end if;
