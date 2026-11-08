@@ -10,6 +10,15 @@ import { clearAllTemplateDrafts } from './workout-template-draft';
 
 export const NAME_MAX = 40;
 
+// handle_new_user names an account without a name "Player" plus the first four characters of its id.
+export const defaultDisplayName = (uid: string) => `Player ${uid.replace(/-/g, '').slice(0, 4).toUpperCase()}`;
+
+// Stored on the account, so choosing "Not now" on one device stops the name prompt on every device.
+export async function skipNamePrompt(): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ data: { name_prompt_skipped: true } });
+  if (error) throw new Error("Couldn't save that. Check your connection and try again.");
+}
+
 async function myId(): Promise<string> {
   const { data } = await supabase.auth.getSession();
   const uid = data.session?.user.id;
