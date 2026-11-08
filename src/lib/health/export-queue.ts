@@ -33,6 +33,9 @@ export interface ExportWriter {
   intent?(entry: ExportEntry): number;
   // Turning the kind off also drops a delete stuck on a permission the user withdrew (otherwise it waits for a re-grant).
   dropRevokedDeletes?: boolean;
+  // The health store is on this phone only (Health Connect): another device's export says nothing about it, and this
+  // one's must not tell the others (Apple Health syncs through iCloud) that they are done. The shared mapping is skipped.
+  deviceLocal?: boolean;
   save(entry: ExportEntry, intended?: number): Promise<string | null>; // intended: the mask intent() returned, so the write uses that one snapshot; // must tag the sample with exportMetadata(); returns the Health sample uuid
   remove(entry: ExportEntry): Promise<void>; // must delete only samples this app saved
 }
@@ -55,6 +58,8 @@ export const initialExportState = (): ExportState => ({ ready: false, processing
 // Feature code adds its writer once at startup.
 export const exportWriters: Record<string, ExportWriter | undefined> = {};
 export const registerExportWriter = (kind: string, writer: ExportWriter) => { exportWriters[kind] = writer; };
+// The types a kind's switch asks permission for: the registered writer's, so each platform asks for its own.
+export const writeTypesFor = (kind: string): readonly HealthWriteType[] => { const w = exportWriters[kind]; return w ? w.writeTypes ?? [w.writeType] : []; };
 
 const same = (a: ExportEntry, b: ExportEntry) => a.kind === b.kind && a.recordId === b.recordId;
 
@@ -94,7 +99,7 @@ export function createExportQueue(deps: ExportDependencies) {
       if (entry.op === 'delete') {
         await writer.remove(entry);
         await account(token);
-        await deps.mapping.remove(entry.kind, entry.recordId);
+        if (!writer.deviceLocal) await deps.mapping.remove(entry.kind, entry.recordId);
         await account(token);
         if (current(entry)) {
           await deps.store.remove(entry.kind, entry.recordId);
@@ -103,7 +108,7 @@ export function createExportQueue(deps: ExportDependencies) {
         return;
       }
       // Another device already wrote this version (or newer): nothing to write, just record success.
-      const known = await deps.mapping.get(entry.kind, entry.recordId);
+      const known = writer.deviceLocal ? null : await deps.mapping.get(entry.kind, entry.recordId);
       await account(token);
       const done = known !== null && known.syncVersion >= entry.version;
       let uuid = entry.sampleUuid ?? null;
@@ -117,7 +122,7 @@ export function createExportQueue(deps: ExportDependencies) {
       }
       await account(token);
       // A failure after the save retries with the same sync identifier and version, which replaces rather than duplicates.
-      if (!done) await deps.mapping.record(entry.kind, entry.recordId, uuid, entry.version);
+      if (!done && !writer.deviceLocal) await deps.mapping.record(entry.kind, entry.recordId, uuid, entry.version);
       await update(entry, { status: 'success', reason: undefined, payload: null, sampleUuid: uuid, attemptVersion: attempt, writtenTypes: written }, token);
     } catch (e) {
       if (!alive || epoch !== token) throw e;

@@ -33,9 +33,9 @@ Names only. Copy `.env.example` to `.env`; never commit values.
 | --- | --- |
 | `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL (`http://localhost:54321` for the local stack). On a phone, use your Mac's LAN IP instead of `localhost` (`ipconfig getifaddr en0`); it changes when your network does |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (`npx supabase@2.122.0 status` prints the local one) |
-| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Google sign-in. Leave empty to hide the Google button |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Google sign-in. Leave empty to hide the Google button. The only Google value Android needs (see [docs/android-sign-in.md](docs/android-sign-in.md)) |
 | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | Google sign-in on iOS |
-| `GOOGLE_IOS_URL_SCHEME` | Build time only, read by `app.config.ts`. Reversed iOS client ID (`com.googleusercontent.apps.<id>`). The Google plugin is only added when it is set, so changing it needs a new native build |
+| `GOOGLE_IOS_URL_SCHEME` | Build time only, read by `app.config.ts`. Reversed iOS client ID (`com.googleusercontent.apps.<id>`). The Google plugin is only added when it is set, so changing it needs a new native build. Android builds don't need it: without Firebase the plugin only edits the iOS Info.plist |
 
 ## Supabase
 
@@ -67,7 +67,7 @@ Without the key the function answers `not_configured`; the app then shows saved 
 Expo Go is not enough. It cannot load the HealthKit module or SQLCipher, so Health shows as unavailable there (`src/lib/health/healthkit.ts`). A Health build needs:
 
 - the HealthKit entitlement and usage strings, added by the `@kingstinct/react-native-healthkit` plugin in `app.config.ts`
-- `expo-sqlite` with `useSQLCipher: true` (also in `app.config.ts`). The on-device Health journal refuses to run on an unencrypted build (`src/lib/health/journal.ios.ts`), so an old dev build must be rebuilt.
+- `expo-sqlite` with `useSQLCipher: true` (also in `app.config.ts`). The on-device Health journal refuses to run on an unencrypted build (`src/lib/health/journal.native.ts`), so an old dev build must be rebuilt.
 
 See `docs/health-sync.md` for how import and reconciliation work.
 
@@ -79,7 +79,7 @@ See `docs/health-sync.md` for how import and reconciliation work.
 
 ### Build and run on a device
 
-There is no `eas.json` in this repo yet, so there is no EAS build config. Use a local build:
+`eas.json` has build profiles, but they are only set up for Android so far (see [Android builds and releases](docs/android-release.md)). For iOS, use a local build:
 
 ```bash
 npx expo run:ios --device

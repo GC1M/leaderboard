@@ -3,6 +3,10 @@ import { Platform } from 'react-native';
 
 import { localDateKey, startOfLocalDay } from './dates';
 import { APP_RECORD_KEY, EXCLUDE_OWN_EXPORTS } from './export-metadata';
+import {
+  getHealthConnectAccess, getHealthConnectWriteAccess, healthConnectUnavailableMessage, isHealthConnectLoaded, requestHealthConnectAccess, requestHealthConnectWriteAccess,
+  type HealthConnectWriteType,
+} from './health-connect';
 
 type HealthKit = typeof import('@kingstinct/react-native-healthkit');
 
@@ -43,7 +47,8 @@ export function loadHealthKit(): HealthKit | null {
   return cached;
 }
 
-export const isHealthAvailable = () => loadHealthKit() !== null;
+// The phone's health store can be used from this build: HealthKit on iPhone, the Health Connect module on Android.
+export const isHealthAvailable = () => Platform.OS === 'android' ? isHealthConnectLoaded() : loadHealthKit() !== null;
 
 // Test hook so availability can be re-evaluated after mocking.
 export function resetHealthKitCache() {
@@ -51,6 +56,7 @@ export function resetHealthKitCache() {
 }
 
 export async function getHealthAccess(metric: HealthMetric): Promise<HealthAccess> {
+  if (Platform.OS === 'android') return getHealthConnectAccess(metric);
   const hk = loadHealthKit();
   if (!hk) return 'unavailable';
   const status = await hk.getRequestStatusForAuthorization({ toRead: [HEALTH_TYPES[metric]] });
@@ -65,10 +71,13 @@ export async function getAllHealthAccess(): Promise<Record<HealthMetric, HealthA
 // Shows the Health sheet for any metric not asked yet; iOS never shows it again for ones already asked.
 // Resolves when the sheet closes, which says nothing about what the user allowed.
 export async function requestHealthAccess(): Promise<void> {
+  if (Platform.OS === 'android') return requestHealthConnectAccess();
   const hk = loadHealthKit();
   if (!hk) return;
   await hk.requestAuthorization({ toRead: METRICS.map((m) => HEALTH_TYPES[m]) });
 }
+
+export const healthUnavailableMessage = async () => Platform.OS === 'android' ? healthConnectUnavailableMessage() : 'Apple Health requires the native iPhone app build.';
 
 // One cumulative-sum bucket per local calendar day. HealthKit de-duplicates overlapping sources (iPhone + Watch) inside the statistics query, so totals match the Health app.
 // Days with no samples are omitted: no data is not the same claim as zero steps.
@@ -87,24 +96,27 @@ export async function readDailySteps(days: number, now: Date = new Date()): Prom
 
 // Write access is requested per data type, never together with read access or social sharing. Pass only the types
 // the feature the user just turned on needs. The sheet appears once per type; later changes happen in Settings.
-export type HealthWriteType = Parameters<HealthKit['deleteObjects']>[0];
+type HealthKitWriteType = Parameters<HealthKit['deleteObjects']>[0];
+export type HealthWriteType = HealthKitWriteType | HealthConnectWriteType;
 export type HealthWriteAccess = 'unavailable' | 'not-asked' | 'denied' | 'granted';
 
 export function getHealthWriteAccess(type: HealthWriteType): HealthWriteAccess {
+  if (Platform.OS === 'android') return getHealthConnectWriteAccess(type as HealthConnectWriteType);
   const hk = loadHealthKit();
   if (!hk) return 'unavailable';
-  const status = hk.authorizationStatusFor(type);
+  const status = hk.authorizationStatusFor(type as HealthKitWriteType);
   return status === SHARING_AUTHORIZED ? 'granted' : status === SHARING_DENIED ? 'denied' : 'not-asked';
 }
 
 export async function requestHealthWriteAccess(types: readonly HealthWriteType[]): Promise<void> {
+  if (Platform.OS === 'android') return requestHealthConnectWriteAccess(types as HealthConnectWriteType[]);
   const hk = loadHealthKit();
   if (!hk) return;
-  await hk.requestAuthorization({ toShare: types });
+  await hk.requestAuthorization({ toShare: types as HealthKitWriteType[] });
 }
 
 // HealthKit lets an app delete only samples it saved. The record-id filter narrows that further to one export.
-export async function removeExportedSample(type: HealthWriteType, kind: string, recordId: string): Promise<void> {
+export async function removeExportedSample(type: HealthKitWriteType, kind: string, recordId: string): Promise<void> {
   const hk = loadHealthKit();
   if (!hk) throw new Error('Apple Health requires a native iPhone build.');
   await hk.deleteObjects(type, { metadata: { withMetadataKey: APP_RECORD_KEY, operatorType: EQUAL_TO, value: `${kind}:${recordId}` } });

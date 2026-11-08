@@ -5,6 +5,7 @@ export const HEALTH_METRICS: HealthMetric[] = ['steps','sleep','weight','workout
 export type MetricSyncState = {
   status: 'idle' | 'syncing' | 'unavailable' | 'needs-permission' | 'no-data' | 'importing' | 'synced' | 'unchanged' | 'error';
   lastSuccess: string | null; knownSamples: number; error: string | null;
+  truncatedFrom?: string; // Health Connect only let the import read back to this time (no history access)
 };
 export type HealthSyncState = { ready: boolean; connected: boolean; syncing: boolean; error: string | null; metrics: Record<HealthMetric, MetricSyncState> };
 export type HealthConnection = { connected: boolean; lastSuccess: Partial<Record<HealthMetric,string>> };
@@ -14,7 +15,7 @@ export type CoordinatorDependencies = {
   save: (connection: HealthConnection) => Promise<void>;
   requestAccess: () => Promise<void>;
   access: (metric: HealthMetric) => Promise<HealthAccess>;
-  reconcile: (metric: HealthMetric, checkOwner: ReconcileOptions['checkOwner']) => Promise<{ hasMore: boolean; knownSamples: number; written: number }>;
+  reconcile: (metric: HealthMetric, checkOwner: ReconcileOptions['checkOwner']) => Promise<{ hasMore: boolean; knownSamples: number; written: number; truncatedFrom?: string }>;
   recheck: () => Promise<void>;
   deleteImports: () => Promise<void>;
 };
@@ -61,7 +62,7 @@ export function createHealthCoordinator(deps: CoordinatorDependencies) {
           await checkOwner();
           metric(m,{
             status:result.hasMore?'importing':result.knownSamples===0?'no-data':result.written===0?'unchanged':'synced',
-            knownSamples:result.knownSamples,
+            knownSamples:result.knownSamples,truncatedFrom:result.truncatedFrom,
             ...(!result.hasMore && result.written>0 ? {lastSuccess:new Date().toISOString()} : {}),
           });
         }catch(e){if(alive && epoch===token)metric(m,{status:'error',error:e instanceof Error?e.message:'Health sync failed. Try again.'});}

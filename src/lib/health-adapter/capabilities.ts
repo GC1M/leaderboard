@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import type { CapabilityResult, HealthDataType, HealthPlatform, ProviderAvailability } from './types';
 
 // What each platform's health store lets us do, and how much of it this app has wired up. Details and sources are in
@@ -43,8 +45,8 @@ export const IOS_MATRIX: PlatformMatrix = {
 };
 
 // Health Connect: every row below is confirmed against developer.android.com unless `unverified` says otherwise.
-const android = (note?: string, unverified: CapabilityFact[] = []): CapabilityEntry => ({
-  read: true, write: true, implemented: { read: false, write: false },
+const android = (implemented: CapabilityEntry['implemented'], note?: string, unverified: CapabilityFact[] = []): CapabilityEntry => ({
+  read: true, write: true, implemented,
   history: { defaultDays: 30, extendedBy: 'permission' }, background: 'permission-required', unverified, note,
 });
 
@@ -61,16 +63,19 @@ export const ANDROID_MATRIX: PlatformMatrix = {
     'Apps cannot be notified of new data: poll on foreground and while foregrounded, or use the changes token (it expires after 30 days unused).',
   ],
   entries: {
-    steps: android('Use aggregation, not raw reads, to avoid double counting. Built-in step counting needs Android 14 with SDK extension 20.'),
-    sleep: android('One session record with optional stages; normalize with the shared sleep rule.'),
-    weight: android(),
-    workouts: android('Exercise sessions; routes need a separate permission.'),
-    nutrition: android('Nutrition and hydration are separate record types.'),
-    water: android('Hydration record.'),
+    steps: android({ read: true, write: false }, 'Read as aggregated totals per local day, so overlapping sources are not double counted. Never written: aggregation would count our own steps in the imported totals. Built-in step counting needs Android 14 with SDK extension 20. Imports start ~90 days back.'),
+    sleep: android({ read: true, write: false }, 'One session record with optional stages; asleep stages (or the whole session without stages) are summarized by the shared sleep rule. Imports start ~90 days back. Manual sleep is exported by the export queue directly.'),
+    weight: android({ read: true, write: false }, 'Imported without an app-chosen lower bound; Health Connect may limit it to its default window. Manual readings are exported by the export queue directly, not through the adapter.'),
+    workouts: android({ read: true, write: false }, 'Exercise sessions; distance and energy are not read or written. Routes need a separate permission and are not used. App-created workouts are exported by the export queue directly.'),
+    nutrition: android({ read: false, write: false }, 'Nutrition and hydration are separate record types. Food entries are exported (write only) by the export queue directly, not through the adapter.'),
+    water: android({ read: true, write: false }, 'Hydration records, imported as water entries in mL with this device\'s zone. Water logged in the app is exported by the export queue directly.'),
   },
 };
 
 export const CAPABILITY_MATRICES: Record<HealthPlatform, PlatformMatrix> = { ios: IOS_MATRIX, android: ANDROID_MATRIX };
+
+// The phone health store's name for screens: "Health Connect" on Android, "Apple Health" everywhere else.
+export const healthProviderName = () => CAPABILITY_MATRICES[Platform.OS === 'android' ? 'android' : 'ios'].provider;
 
 // Combines the static matrix with what this device reports right now. Order matters: a device that cannot run the
 // provider says so before we talk about individual data types.

@@ -1,6 +1,6 @@
 # Shared health adapter and Android capability matrix (#59)
 
-Design for keeping Apple HealthKit code isolated and planning Android (Health Connect) equivalents. Code lives in `src/lib/health-adapter/`; nothing under `src/lib/health/` was changed. No Android integration exists yet: every Android entry below is a plan, not a shipped feature.
+Design for keeping Apple HealthKit code isolated and planning Android (Health Connect) equivalents. Code lives in `src/lib/health-adapter/`. Android reads (steps, sleep, weight, workouts) shipped in #60: see "Android: Health Connect reads" in `docs/health-sync.md`. Android writes of app-created entries shipped in #61 (weight, sleep, workouts, food; never steps): see "Android: Health Connect writes" in `docs/health-sync.md`.
 
 ## What was added
 
@@ -24,11 +24,11 @@ Design for keeping Apple HealthKit code isolated and planning Android (Health Co
 
 | Type | iOS read | iOS write | Android read | Android write |
 | --- | --- | --- | --- | --- |
-| Steps | App: yes | Platform yes (U vs Apple docs); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_STEPS`); App: no | Platform yes (`WRITE_STEPS`); App: no |
-| Sleep | App: yes | Platform yes (U); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_SLEEP`, one session record with optional stages); App: no | Platform yes (`WRITE_SLEEP`); App: no |
-| Weight | App: yes | Platform yes (write permission path exercised in `healthkit.test.ts`); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_WEIGHT`); App: no | Platform yes (`WRITE_WEIGHT`); App: no |
-| Workouts | Platform yes (U); App: imported (#80), not wired through the adapter | Platform yes (U); App: exported (#35), not wired through the adapter | Platform yes (`READ_EXERCISE`, routes need `READ_EXERCISE_ROUTE`); App: no | Platform yes (`WRITE_EXERCISE`, `WRITE_EXERCISE_ROUTE`); App: no |
-| Nutrition | Platform yes (U); App: no | Platform yes (U); App: no | Platform yes (`READ_NUTRITION`); App: no | Platform yes (`WRITE_NUTRITION`); App: no |
+| Steps | App: yes | Platform yes (U vs Apple docs); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_STEPS`); App: yes (#60) | Platform yes (`WRITE_STEPS`); App: no, on purpose (aggregation would count our own steps) |
+| Sleep | App: yes | Platform yes (U); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_SLEEP`, one session record with optional stages); App: yes (#60) | Platform yes (`WRITE_SLEEP`); App: manual sleep, by the export queue (#61) |
+| Weight | App: yes | Platform yes (write permission path exercised in `healthkit.test.ts`); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_WEIGHT`); App: yes (#60) | Platform yes (`WRITE_WEIGHT`); App: manual weight, by the export queue (#61) |
+| Workouts | Platform yes (U); App: imported (#80), not wired through the adapter | Platform yes (U); App: exported (#35), not wired through the adapter | Platform yes (`READ_EXERCISE`, routes need `READ_EXERCISE_ROUTE`); App: yes, sessions without routes, distance or energy (#60) | Platform yes (`WRITE_EXERCISE`, `WRITE_EXERCISE_ROUTE`); App: app-created workouts without routes, distance or energy, by the export queue (#61) |
+| Nutrition | Platform yes (U); App: no | Platform yes (U); App: no | Platform yes (`READ_NUTRITION`); App: no | Platform yes (`WRITE_NUTRITION`); App: food entries, by the export queue (#61) |
 | Water | Platform yes (U); App: no | Platform yes (U); App: no | Platform yes (`READ_HYDRATION`, a separate record type from nutrition); App: no | Platform yes (`WRITE_HYDRATION`); App: no |
 
 | Limit | iOS (as the app uses it) | Android Health Connect |
@@ -50,7 +50,7 @@ Android (verified):
 - Use `getFeatureStatus` for newer features. System-module features stay unavailable on Android 13 and lower even with the app installed.
 - Built-in step counting needs Android 14 and SDK extension 20 (extension 22 to look up the device data source). From the June 2026 Health Connect update, on-device steps are attributed to a device-specific synthetic package name instead of `android`; aggregate reads with no origin filter are unaffected, and any source breakdown must not hardcode it.
 - The app must declare each data type it reads or writes in the Play Console, and declare matching permissions in the manifest, plus a privacy-policy rationale activity.
-- Apps older than Android 14 need a native Health Connect React Native module; none has been chosen or evaluated here (U).
+- The app uses `react-native-health-connect` (4.1.3) with its Expo config plugin, and `expo-build-properties` sets `minSdkVersion` 26 as the library requires.
 
 iOS: needs a native iPhone build; the module does not load in Expo Go, on Android or on web. Minimum iOS version is not set in `app.config.ts`; it comes from the React Native/Expo toolchain and was not confirmed (U).
 
@@ -79,7 +79,7 @@ iOS: needs a native iPhone build; the module does not load in Expo Go, on Androi
 
 Verified against the pages above: minimum Android 9; Android 14 framework vs Play app; work-profile exclusion; the six data types and their read/write permissions; 30-day default history and the history permission; own-data exception on Android 14+; foreground default and background permission plus feature check; no new-data notification; changes token 30-day expiry; upsert by client record id and version; 1000-record write chunks; on-device steps requirements and the June 2026 attribution change.
 
-Unverified (recorded as such in the matrix or here, not guessed): exact rate-limit numbers; whether writes work while the app is in the background; which feature flags work with the Play-installed app on Android 13 and lower (the docs only say system-module features do not; use `getFeatureStatus` at runtime); minimum Health Connect app version for history/background reads; iOS minimum OS version; Apple-side confirmation for iOS write support of steps and sleep and for workouts, nutrition and water (the iOS column reflects the code in this repo and the HealthKit usage in `docs/health-sync.md`, not a re-check of Apple documentation); the choice and maturity of an Android React Native library.
+Unverified (recorded as such in the matrix or here, not guessed): exact rate-limit numbers; whether writes work while the app is in the background; which feature flags work with the Play-installed app on Android 13 and lower (the docs only say system-module features do not; use `getFeatureStatus` at runtime); minimum Health Connect app version for history/background reads; iOS minimum OS version; Apple-side confirmation for iOS write support of steps and sleep and for workouts, nutrition and water (the iOS column reflects the code in this repo and the HealthKit usage in `docs/health-sync.md`, not a re-check of Apple documentation); the maturity of the chosen Android React Native library on real devices.
 
 ## Deferred: needs edits to files other open PRs touch
 

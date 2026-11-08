@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { useEffect, useMemo, useState } from 'react';
 import { Text } from 'react-native';
 
@@ -45,7 +46,7 @@ export default function WaterHistory() {
       />
       {totals.length > 0 && (
         <Text style={[styles.caption, { color: c.inkSoft }]}>
-          {`In this range: ${formatWater(manual, unit)} added here, ${formatWater(fromHealth, unit)} from Apple Health.${lastEntry ? ` Last entry ${new Date(lastEntry).toLocaleString()}.` : ''}${lastHealth ? ` Last received from Health ${new Date(lastHealth).toLocaleString()}.` : ''}`}
+          {`In this range: ${formatWater(manual, unit)} added here, ${formatWater(fromHealth, unit)} from ${healthProviderName()}.${lastEntry ? ` Last entry ${new Date(lastEntry).toLocaleString()}.` : ''}${lastHealth ? ` Last received from Health ${new Date(lastHealth).toLocaleString()}.` : ''}`}
         </Text>
       )}
       <Text style={[styles.caption, { color: c.inkSoft }]}>

@@ -1,4 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { useCallback, useState } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
 
@@ -194,7 +195,7 @@ export default function Water() {
       <WaterExportOption choice={choice} />
       {health.connected && m && (
         <View accessibilityLiveRegion="polite">
-          <Text style={[styles.caption, { color: m.status === 'error' ? c.danger : c.inkSoft }]}>{`Apple Health: ${describeHealthSync(m)}`}</Text>
+          <Text style={[styles.caption, { color: m.status === 'error' ? c.danger : c.inkSoft }]}>{`${healthProviderName()}: ${describeHealthSync(m)}`}</Text>
           {m.lastSuccess && <Text style={[styles.caption, { color: c.inkSoft }]}>{`Last completed import: ${new Date(m.lastSuccess).toLocaleString()}`}</Text>}
         </View>
       )}

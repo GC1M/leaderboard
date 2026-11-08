@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 
 import { Screen, styles } from '@/components/ui';
 import { useTheme } from '@/theme';
@@ -69,11 +69,30 @@ const SECTIONS: { title: string; body: string[] }[] = [
   },
 ];
 
+// Android uses Health Connect. Same policy, with the provider's own names and settings path, and what it does not save.
+const ANDROID: [string, string][] = [
+  ['To change what Leaderboard can read, open the Health app, tap your profile picture, then Apps, then Leaderboard.', 'To change what Leaderboard can read, open Health Connect, then App permissions, then Leaderboard.'],
+  ['After that, imports run only while the app is open.', 'If you do not allow access to past data, Health Connect limits the first import to about 30 days. After that, imports run only while the app is open.'],
+  ['delete it in the Health app', 'delete it in Health Connect'],
+  ['You allow each type separately on your iPhone: workouts, weight, sleep, steps, and each nutrient.', 'You allow each type separately in Health Connect: workouts, weight, sleep, and nutrition. Steps are not saved to Health Connect.'],
+  ['Steps: steps you entered by hand. ', ''],
+  [' (stored in Health with it)', ''],
+  [', plus distance or energy only if you recorded them', ''],
+  [', and only the nutrients you allow are saved', ''],
+  ['the iPhone keychain', 'the Android Keystore'],
+  ['with Apple’s text recognition', 'with on-device text recognition'],
+  ['Apple Health', 'Health Connect'],
+  ['on your iPhone', 'on your phone'],
+  ['this iPhone', 'this phone'],
+];
+const androidText = (text: string) => ANDROID.reduce((s, [from, to]) => s.split(from).join(to), text);
+const sections = () => Platform.OS !== 'android' ? SECTIONS : SECTIONS.map((s) => ({ title: androidText(s.title), body: s.body.map(androidText) }));
+
 export default function Privacy() {
   const t = useTheme();
   return (
     <Screen title="Privacy" back>
-      {SECTIONS.map((s) => (
+      {sections().map((s) => (
         <View key={s.title} style={{ gap: 8, marginBottom: 20 }}>
           <Text accessibilityRole="header" style={[styles.heading, { color: t.ink }]}>
             {s.title}

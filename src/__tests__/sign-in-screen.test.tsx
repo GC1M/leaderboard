@@ -148,3 +148,16 @@ test('the shared Screen scroll view dismisses number pads on drag and clears the
   // A content container stretched to the frame plus the automatic inset would make short screens scroll.
   expect(StyleSheet.flatten(scroll.props.contentContainerStyle).flexGrow).toBeUndefined();
 });
+
+test('Android: Sign in with Apple is never shown, email codes are', async () => {
+  const { Platform } = jest.requireActual('react-native');
+  const ios = Platform.OS;
+  Platform.OS = 'android';
+  try {
+    const { text } = await setup();
+    expect(text()).not.toContain('Apple button');
+    expect(text()).toContain('Send Me a Code');
+  } finally {
+    Platform.OS = ios;
+  }
+});

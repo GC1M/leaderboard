@@ -10,6 +10,7 @@ import { useWorkoutExport, WorkoutExportOption } from '@/components/workouts/Wor
 import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { localDateKey, readingDateLabel } from '@/lib/health/dates';
 import { loadWeightUnit } from '@/lib/weight-unit';
 import { clearDraft, loadDraft, saveDraft } from '@/lib/workout-draft';
@@ -202,7 +203,7 @@ function ImportedWorkout({ w, unit }: { w: WorkoutDetail; unit: DistanceUnit }) 
   const c = useTheme();
   return (
     <Screen title={w.activity_type} back>
-      <Section footer="Imported from Apple Health. Change it in Health, and it updates here after the next import.">
+      <Section footer={`Imported from ${healthProviderName()}. Change it in Health, and it updates here after the next import.`}>
         <Row label="Date" value={readingDateLabel(new Date(w.started_at))} />
         <Row label="Summary" value={workoutSummary(w, unit)} last />
       </Section>

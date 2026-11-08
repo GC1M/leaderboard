@@ -6,6 +6,7 @@ import { Text } from 'react-native';
 
 import { Segmented } from '@/components/history/Segmented';
 import { Button, ErrorText, Row, Screen, Section, styles } from '@/components/ui';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import type { WeightUnit } from '@/lib/health/format';
 import { useWeightUnit } from '@/lib/weight-unit';
 import { defaultDistanceUnit, type DistanceUnit } from '@/lib/workout-form';
@@ -140,7 +141,7 @@ export default function ImportWorkouts() {
             </Section>
           )}
           <Text style={[styles.caption, { color: c.inkSoft }]}>
-            Not saved to Apple Health: {preview.format.label} usually does that already. When Apple Health has the same session, Leaderboard counts it once, using the detailed one from this file.
+            Not saved to {healthProviderName()}: {preview.format.label} usually does that already. When {healthProviderName()} has the same session, Leaderboard counts it once, using the detailed one from this file.
           </Text>
           <Button
             label={preview.workouts.length === 1 ? 'Import 1 Workout' : `Import ${preview.workouts.length} Workouts`}

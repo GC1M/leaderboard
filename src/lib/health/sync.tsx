@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
 import { secureStorage } from '@/lib/secure-storage';
@@ -7,7 +7,9 @@ import { reconcileHealth } from './changes';
 import { createHealthCoordinator, HEALTH_METRICS, initialHealthState, type HealthConnection, type HealthCoordinator } from './coordinator';
 import { createExportQueue, exportWriters, initialExportState, type ExportQueue } from './export-queue';
 import { healthExportMapping } from './export-mapping';
-import { getHealthAccess, getHealthWriteAccess, requestHealthAccess, requestHealthWriteAccess, type HealthWriteType } from './healthkit';
+import { refreshHealthConnectWriteAccess } from './health-connect';
+import { registerHealthConnectWriters } from './health-connect-export';
+import { getHealthAccess, getHealthWriteAccess, healthUnavailableMessage, requestHealthAccess, requestHealthWriteAccess, type HealthWriteType } from './healthkit';
 import { deleteImportedJournal, getHealthDeviceId, healthExportStore, healthJournal, resetHealthAnchors } from './journal';
 import './manual-export'; // registers the manual weight/sleep/steps writers
 import { assertHealthOwner } from './owner';
@@ -15,6 +17,10 @@ import { deleteHealthImports, uploadHealthChanges } from './upload';
 import './workout-export'; // registers the app-created workout writer
 import './food-export'; // registers the app-created food writer
 import './water-export'; // registers the app-created water writer
+
+if (Platform.OS === 'android') registerHealthConnectWriters(); // replaces the HealthKit writers above
+// Health Connect reports write grants asynchronously; refresh the cached grants before the queue reads them.
+const refreshWrites = () => (Platform.OS === 'android' ? refreshHealthConnectWriteAccess().catch(() => {}) : Promise.resolve());
 
 export const SYNC_DAYS = 7; // existing My Steps view; import history is 90 days, not seven
 const HealthContext = createContext<HealthCoordinator | null>(null);
@@ -32,7 +38,7 @@ function createAccountSync(userId: string) {
     checkAccount:()=>assertHealthOwner(userId),
     load:async()=>{const raw=await secureStorage.getItem(key);return raw?JSON.parse(raw) as HealthConnection:null;},
     save:async(value)=>{await secureStorage.setItem(key,JSON.stringify(value));},
-    requestAccess:async()=>{if(await getHealthAccess('steps')==='unavailable')throw new Error('Apple Health requires the native iPhone app build.');await requestHealthAccess();},
+    requestAccess:async()=>{if(await getHealthAccess('steps')==='unavailable')throw new Error(await healthUnavailableMessage());await requestHealthAccess();},
     access:getHealthAccess,
     recheck:()=>resetHealthAnchors(userId),
     // Local journal first: if the server delete then fails, a retry still finds nothing to re-upload.
@@ -68,8 +74,8 @@ export function HealthSyncProvider({children}:{children:ReactNode}) {
   const state=useSyncExternalStore(controller?.subscribe ?? subscribeIdle,controller?.getSnapshot ?? idleSnapshot);
   useEffect(()=>{
     if(!exporter)return;
-    void exporter.initialize().then(()=>exporter.process());
-    const subscription=AppState.addEventListener('change',(s)=>{if(s==='active')void exporter.process();});
+    void exporter.initialize().then(refreshWrites).then(()=>exporter.process());
+    const subscription=AppState.addEventListener('change',(s)=>{if(s==='active')void refreshWrites().then(()=>exporter.process());});
     // Sign-out or account switch stops this queue; its entries stay in that account's own local store.
     return()=>{exporter.stop();subscription.remove();};
   },[exporter]);

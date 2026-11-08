@@ -1,11 +1,14 @@
 import * as ImagePicker from 'expo-image-picker';
 
-import { pickPhoto, PhotoError, readPhoto } from './photo';
+import { photoPrivacyNote, photoScanAvailable, pickPhoto, PhotoError, readPhoto } from './photo';
 
 const mockRecognize = jest.fn();
 const mockDeleted: string[] = [];
 
-jest.mock('expo', () => ({ requireOptionalNativeModule: () => ({ recognize: (uri: string) => mockRecognize(uri) }) }));
+// A test sets globalThis.mockNoRecognizer to load photo.ts as in Expo Go or on the web, where the module is missing.
+jest.mock('expo', () => ({
+  requireOptionalNativeModule: () => ((globalThis as { mockNoRecognizer?: boolean }).mockNoRecognizer ? null : { recognize: (uri: string) => mockRecognize(uri) }),
+}));
 jest.mock('expo-file-system', () => ({
   File: jest.fn().mockImplementation((path: string) => ({ exists: true, delete: () => mockDeleted.push(path) })),
 }));
@@ -33,6 +36,30 @@ describe('readPhoto', () => {
     mockRecognize.mockRejectedValue(new Error('vision'));
     await expect(readPhoto('file:///cache/b.jpg')).rejects.toBeInstanceOf(PhotoError);
     expect(mockDeleted).toEqual(['file:///cache/b.jpg']);
+  });
+});
+
+describe('platforms', () => {
+  it('names the iPhone on iOS and the device elsewhere', () => {
+    expect(photoPrivacyNote('ios')).toBe('The photo is read on this iPhone and deleted right after. It is never uploaded or saved.');
+    expect(photoPrivacyNote('android')).toBe('The photo is read on this device and deleted right after. It is never uploaded or saved.');
+  });
+
+  it('offers scanning when the native recognizer is linked', () => {
+    expect(photoScanAvailable()).toBe(true);
+  });
+
+  it('hides scanning and still deletes the photo without the native module (Expo Go, web)', async () => {
+    let photo!: typeof import('./photo');
+    jest.isolateModules(() => {
+      (globalThis as { mockNoRecognizer?: boolean }).mockNoRecognizer = true;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      photo = require('./photo');
+      delete (globalThis as { mockNoRecognizer?: boolean }).mockNoRecognizer;
+    });
+    expect(photo.photoScanAvailable()).toBe(false);
+    await expect(photo.readPhoto('file:///cache/d.jpg')).rejects.toThrow('not available on this device');
+    expect(mockDeleted).toEqual(['file:///cache/d.jpg']);
   });
 });
 

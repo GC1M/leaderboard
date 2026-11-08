@@ -1,6 +1,6 @@
 # Health import and reconciliation
 
-Health reads run only on a native iPhone build, after the account explicitly connects this device. HealthKit cannot disclose whether read permission is granted: empty results are not evidence of deletion.
+Health reads run only on a native iPhone build (Apple Health) or a native Android build (Health Connect, see below), after the account explicitly connects this device. HealthKit cannot disclose whether read permission is granted: empty results are not evidence of deletion.
 
 ## Normalization
 
@@ -41,6 +41,35 @@ Foreground orchestration and user-visible status are implemented separately in i
 Summary exposes per-metric state, last completed import, retry, history recheck, and Stop Health Imports. My Steps uses the same coordinator. After replacing a manual override with Health, it explicitly rechecks history to refill the row even if Health has no new anchored events. A recheck preserves pending upload retries and old date keys, so it can safely repair calendar-date reassignment after a device timezone change.
 
 Sign-out disposes the coordinator and invalidates its upload guards; the SQL owner check independently rejects an old account payload authenticated with a new account's token. Connection-metadata writes are serialized so a pending successful sync cannot re-enable consent after Stop Health Imports. Local journal cleanup is exposed separately for the data-control feature; stopping imports does not erase existing history.
+
+## Android: Health Connect reads (#60)
+
+Android uses the same coordinator, journal, upload RPCs and server rows as iOS. Only the native seams dispatch on `Platform.OS`: access and permission requests (`healthkit.ts`), the change query and the per-day steps total (`changes.ts`), and the latest-weight seed (`weight.ts`). All Health Connect details live in `src/lib/health/health-connect.ts` (library: `react-native-health-connect`, loaded lazily on Android only, never in Expo Go). The SQLCipher journal is `journal.native.ts`, shared by both platforms; `journal.ts` is the web stub.
+
+- Server: rows keep `source = 'healthkit'`, which means "imported from the phone's health store" on both platforms, and go only through `apply_health_changes` / `apply_health_workouts`. Each installation has its own `health_device_id`, so tombstones only touch rows this device wrote. No migration.
+- Availability: `getSdkStatus` maps to `unsupported` (Android older than 9), `provider-update-required` (Health Connect missing or too old; Health Connect does not say which, so the copy says "install or update" and links to Google Play) or available. Expo Go and builds without the native module are `native-build-required`. A work profile cannot be detected through the library and is not handled.
+- Permissions: Connect asks for read access to steps, sleep, weight and exercise plus history in one Health Connect sheet; the user can allow any subset. Unlike iOS, granted reads are reported truthfully, and the coordinator re-checks them before every sync, so a revoked type becomes "needs permission" without affecting the others. The history grant is not reported by the library, so it is inferred from read errors (below). No background permission is declared or used: imports run in the foreground only.
+- Change feed: for a journal with no anchor, a changes token is taken first, then history is read with `readRecords` page by page (the opaque anchor holds the token, the page token and the range start), then `getChanges` takes over and deletions arrive as ids. An expired token (30 days unused) starts a fresh full read that keeps known samples and never infers deletions, like `resetHealthAnchors`. Changes to records older than the import window are ignored, as the bounded iOS anchored query does.
+- History window: steps, sleep and workouts start ~90 days back and weight is unbounded, as on iOS. Without the history permission Health Connect refuses reads older than 30 days before the first grant; the first history page then retries from 29 days back, the journal keeps `truncatedFrom`, and the Health status says "Showing data since <date>; allow access to past data in Health Connect to import more". A later recheck with full access clears it. This assumes Health Connect errors on such reads (as documented); if it silently returns less, the truncation note never appears.
+- Steps: daily totals use `aggregateRecord` (COUNT_TOTAL) per affected local day, so overlapping sources are de-duplicated by Health Connect, and day boundaries are local midnights (a DST day is 23 or 25 hours). The app never writes steps to Health Connect, so aggregation cannot count our own exports.
+- Sleep: each `SleepSessionRecord` becomes asleep intervals (sleeping, light, deep and REM stages; awake, out of bed, awake in bed and unknown stages never count), or the whole session when it has no stages, and goes through the same `summarizeSleep` rule as iOS. The journal keeps one entry per interval (`<session id>#<n>`); editing or deleting a session replaces all of its intervals.
+- Weight: `WeightRecord` in kg; the id is `metadata.id`.
+- Workouts: `ExerciseSessionRecord` maps to the existing workout shape (`health_uuid` is the record's UUID), with activity names shared with iOS; single exercises and unknown types are `Other`. Duration is end minus start; distance and energy stay null (they are separate record types behind separate permissions).
+- Own records: anything whose `metadata.dataOrigin` is this app's package is skipped on import.
+
+Only a real device can verify: the permission sheet and partial grants, history grant behavior and whether old reads error, token expiry, sleep stage data from real trackers (Samsung Health, Fitbit, Pixel Watch), Android 13 with the Play Store app vs Android 14+, and the Play Console data-type declaration.
+
+## Android: Health Connect writes (#61)
+
+The export queue is the same on both platforms; on Android `registerHealthConnectWriters()` (`src/lib/health/health-connect-export.ts`, called from `sync.tsx`) replaces the HealthKit writers for the same kinds.
+
+- Every record carries `clientRecordId` = the shared export id `leaderboard:<kind>:<recordId>` (`syncIdentifier`) and `clientRecordVersion` = the queue version (food: the queue's attempt version, which grows on every attempt). Health Connect keeps the highest version, so a retry never duplicates and an edit replaces. A delete uses `deleteRecordsByUuids` with that client record id, which Health Connect limits to this app's own records.
+- Written: manual weight (`Weight`, kg), manual sleep (`SleepSession` without stages), app-created workouts (`ExerciseSession` with the mapped exercise type and the activity as title; no distance or energy, which are separate record types), food (`NutritionRecord`: energy, protein, carbs, fat, fiber, sugar, saturated fat, sodium; unknown nutrients absent; one second long because interval records need an end after the start). One nutrition permission covers every nutrient, so the allowed-nutrient mask is all or nothing.
+- Steps are never written to Health Connect (aggregation would add our own steps into imported totals). The steps "save to Health" switch is replaced by "Saving steps to Health Connect isn't supported yet", and a stray steps entry fails visibly (no writer).
+- Write permission is requested per kind (one switch, one request, write only). Health Connect answers grants asynchronously while the queue asks synchronously, so grants are cached and refreshed before the queue runs (launch, foreground), after every request, and after a failed write; a failed write without the grant is shown as a permission problem, not an error.
+- No export loop: imports skip records whose `dataOrigin` is this app's package.
+
+Only a real device can verify: upsert by client record id and version, deletes by client record id, the per-type write sheet, and how Health Connect and other apps show the written records.
 
 ## Export to Apple Health (#34)
 

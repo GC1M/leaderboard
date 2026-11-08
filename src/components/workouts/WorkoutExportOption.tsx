@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Switch, Text, View } from 'react-native';
+import { Platform, Switch, Text, View } from 'react-native';
 
 import { Button, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
+import { writeTypesFor } from '@/lib/health/export-queue';
 import { getHealthWriteAccess, isHealthAvailable } from '@/lib/health/healthkit';
 import { useHealthExport } from '@/lib/health/sync';
-import { canExportWorkout, WORKOUT_KIND, WORKOUT_WRITE_TYPE, workoutPayload } from '@/lib/health/workout-export';
+import { canExportWorkout, WORKOUT_KIND, workoutPayload } from '@/lib/health/workout-export';
 import { secureStorage } from '@/lib/secure-storage';
 import { useTheme } from '@/theme';
 
-const DENIED = 'Health did not allow saving workouts. Turn it on in Settings, Health, Data Access & Devices, then try again.';
+const denied = () => Platform.OS === 'android' ? 'Health Connect did not allow saving this. Allow it in Health Connect, App permissions, Leaderboard, then try again.' : 'Health did not allow saving workouts. Turn it on in Settings, Health, Data Access & Devices, then try again.';
 const NOTE = 'Saves the activity, start and end time as a Health workout. Exercises, sets, reps, load and notes stay in this app.';
 
 // The "Also save to Apple Health" choice for a workout. A workout already in Health starts on, so turning it off
@@ -37,8 +39,8 @@ export function useWorkoutExport(source: string) {
     setBusy(true);
     try {
       if (next) {
-        try { await exp.allowWrite([WORKOUT_WRITE_TYPE]); } catch { /* the access check below reports it */ }
-        if (getHealthWriteAccess(WORKOUT_WRITE_TYPE) !== 'granted') return setMessage(DENIED);
+        try { await exp.allowWrite(writeTypesFor(WORKOUT_KIND)); } catch { /* the access check below reports it */ }
+        if (!writeTypesFor(WORKOUT_KIND).some((t) => getHealthWriteAccess(t) === 'granted')) return setMessage(denied());
       }
       setChosen(next);
       try { await secureStorage.setItem(key, next ? '1' : '0'); } catch { /* applies until the screen closes */ }
@@ -64,21 +66,22 @@ export function WorkoutExportOption({ id, choice }: { id?: string; choice: Retur
   const c = useTheme();
   const exp = useHealthExport();
   if (!choice.eligible) return null;
+  const provider = healthProviderName();
   const failed = exp.entries.filter((e) => e.kind === WORKOUT_KIND && e.status === 'failed' && e.recordId === id);
   const denied = failed.some((e) => e.reason === 'permission');
   // Entries stay on the phone until they save, so Retry never loses an entry.
-  const retry = () => (denied ? exp.allowWrite([WORKOUT_WRITE_TYPE]) : exp.retry());
+  const retry = () => (denied ? exp.allowWrite(writeTypesFor(WORKOUT_KIND)) : exp.retry());
   return (
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <Text style={[styles.bodyStrong, { color: c.ink, flex: 1 }]}>Also save to Apple Health</Text>
-        <Switch accessibilityLabel="Also save to Apple Health" value={choice.on(id)} disabled={choice.busy} onValueChange={(v) => void choice.set(v)} />
+        <Text style={[styles.bodyStrong, { color: c.ink, flex: 1 }]}>Also save to {provider}</Text>
+        <Switch accessibilityLabel={`Also save to ${provider}`} value={choice.on(id)} disabled={choice.busy} onValueChange={(v) => void choice.set(v)} />
       </View>
-      <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: choice.message ? c.danger : c.inkSoft }]}>{choice.busy ? 'Waiting for Apple Health…' : choice.message ?? NOTE}</Text>
+      <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: choice.message ? c.danger : c.inkSoft }]}>{choice.busy ? `Waiting for ${provider}…` : choice.message ?? NOTE}</Text>
       {failed.length > 0 && (
         <View>
           <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: c.danger }]}>
-            {denied ? 'Not saved to Apple Health yet. Allow saving workouts in Health, then retry. Your workout is kept here.' : "Couldn't save to Apple Health. Your workout is kept here."}
+            {denied ? `Not saved to ${provider} yet. Allow saving workouts in Health, then retry. Your workout is kept here.` : `Couldn't save to ${provider}. Your workout is kept here.`}
           </Text>
           <Button plain label="Retry Saving to Health" busy={exp.processing} onPress={() => void retry()} />
         </View>

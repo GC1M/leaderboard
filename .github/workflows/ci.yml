@@ -47,13 +47,43 @@ jobs:
           path: coverage/
           if-no-files-found: ignore
           retention-days: 14
-      - name: Bundle for iOS and web
+      - name: Bundle for iOS, Android and web
         env:
           EXPO_PUBLIC_SUPABASE_URL: http://localhost:54321
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-dummy
         run: |
           npx expo export --platform ios --output-dir /tmp/export-ios
+          npx expo export --platform android --output-dir /tmp/export-android
           npx expo export --platform web --output-dir /tmp/export-web
+
+  # Prebuilds android/ from app.config.ts and compiles every native module with Gradle. The only place Android
+  # native code (Kotlin modules, config plugins) is compiled; debug variant, arm64 only, so no signing secrets.
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17 # React Native 0.88 compiles with JDK 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - run: npx expo prebuild --platform android --no-install
+      - name: Gradle assembleDebug
+        working-directory: android
+        run: ./gradlew :app:assembleDebug --no-daemon -PreactNativeArchitectures=arm64-v8a
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
 
   db:
     runs-on: ubuntu-latest
@@ -206,7 +236,7 @@ jobs:
   # One status for branch protection: green only when every job above succeeded (skipped counts as not green).
   ci-ok:
     if: always()
-    needs: [check, db, supply-chain, smoke-api, smoke-web]
+    needs: [check, android, db, supply-chain, smoke-api, smoke-web]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

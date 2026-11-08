@@ -26,12 +26,29 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'com.shivamlalakiya.leaderboard',
+    // No versionCode here: eas.json uses appVersionSource "remote", so EAS owns it and bumps it on every production
+    // build. Local and CI builds fall back to 1. See docs/android-release.md.
     adaptiveIcon: {
       backgroundColor: '#2340D8',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
+    // Health Connect reads (#60) and writes of app-created entries (#61; never steps). History lets the first import reach
+    // 90 days back instead of 30 days before the first grant.
+    permissions: [
+      'android.permission.health.READ_STEPS',
+      'android.permission.health.READ_SLEEP',
+      'android.permission.health.READ_WEIGHT',
+      'android.permission.health.READ_EXERCISE',
+      'android.permission.health.READ_HYDRATION',
+      'android.permission.health.READ_HEALTH_DATA_HISTORY',
+      'android.permission.health.WRITE_WEIGHT',
+      'android.permission.health.WRITE_SLEEP',
+      'android.permission.health.WRITE_EXERCISE',
+      'android.permission.health.WRITE_NUTRITION',
+      'android.permission.health.WRITE_HYDRATION',
+    ],
   },
   web: {
     favicon: './assets/images/favicon.png',
@@ -59,6 +76,9 @@ const config: ExpoConfig = {
         background: false,
       },
     ],
+    // Adds the Health Connect permission rationale intent filter and activity alias. The library needs Android 8 (API 26).
+    'react-native-health-connect',
+    ['expo-build-properties', { android: { minSdkVersion: 26 } }],
     'expo-apple-authentication',
     [
       'expo-image-picker',
@@ -75,6 +95,8 @@ const config: ExpoConfig = {
   experiments: {
     typedRoutes: true,
   },
+  // EAS project link, kept out of git. Set EAS_PROJECT_ID locally and as an EAS variable (docs/android-release.md).
+  ...(process.env.EAS_PROJECT_ID ? { extra: { eas: { projectId: process.env.EAS_PROJECT_ID } } } : {}),
 };
 
 export default config;

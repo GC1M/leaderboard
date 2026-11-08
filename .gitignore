@@ -3,7 +3,8 @@
 node_modules/
 .expo/
 ios/
-android/
+/android/
+modules/*/android/build/
 .DS_Store
 
 # Expo
@@ -16,6 +17,9 @@ npm-debug.*
 
 # Native signing
 *.jks
+*.keystore
+google-services.json
+credentials.json
 *.p8
 *.p12
 *.key

@@ -1,5 +1,6 @@
 import * as SplashScreen from 'expo-splash-screen';
 import { act } from 'react';
+import { BackHandler } from 'react-native';
 import { createRoot } from 'test-renderer';
 
 import RootLayout from '@/app/_layout';
@@ -9,6 +10,7 @@ const mockAuth = jest.fn();
 const mockReplace = jest.fn();
 let mockParams: { code?: string | string[]; competition?: string } = {};
 let mockSegments: string[] = [];
+let mockCanGoBack = false;
 jest.mock('@/lib/auth', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
   useAuth: () => mockAuth(),
@@ -32,7 +34,7 @@ jest.mock('expo-router', () => {
       return null;
     },
   });
-  return { Stack, Redirect: () => null, useRouter: () => ({ replace: mockReplace }), useGlobalSearchParams: () => mockParams, useLocalSearchParams: () => mockParams, useSegments: () => mockSegments };
+  return { Stack, Redirect: () => null, useRouter: () => ({ replace: mockReplace, canGoBack: () => mockCanGoBack }), useGlobalSearchParams: () => mockParams, useLocalSearchParams: () => mockParams, useSegments: () => mockSegments };
 });
 
 const render = async () => {
@@ -138,4 +140,23 @@ test('a competition invitation survives sign-in without automatic enrollment', a
   await act(async () => r.render(<RootLayout />));
   expect(mockReplace).toHaveBeenCalledWith(`/join/ABCD2345?competition=${id}`);
   await act(async () => r.unmount());
+});
+
+test('Android back on a join link opened from outside goes home instead of closing the app', async () => {
+  const back = jest.spyOn(BackHandler, 'addEventListener');
+  mockParams = { code: 'ABCD2345' };
+  mockAuth.mockReturnValue({ session: { user: { id: 'me' } }, loading: false });
+  mockReplace.mockClear();
+  const r = createRoot();
+  await act(async () => r.render(<JoinByLink />));
+  const onBack = back.mock.calls.at(-1)![1] as () => boolean;
+  expect(onBack()).toBe(true);
+  expect(mockReplace).toHaveBeenCalledWith('/');
+  mockReplace.mockClear();
+  mockCanGoBack = true;
+  expect(onBack()).toBe(false); // normal back when there is a screen underneath
+  expect(mockReplace).not.toHaveBeenCalled();
+  mockCanGoBack = false;
+  await act(async () => r.unmount());
+  back.mockRestore();
 });
