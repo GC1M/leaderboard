@@ -1,6 +1,6 @@
 import { localDateKey, startOfLocalDay } from '../health/dates';
 import {
-  getHealthConnectAvailability, loadHealthConnect, mapExercise, OWN_PACKAGE, readSince, RECORD_TYPES, refreshHealthConnectWriteAccess, sleepSamples, WRITE_TYPES,
+  getHealthConnectAvailability, isTransient, loadHealthConnect, mapExercise, OWN_PACKAGE, readSince, RECORD_TYPES, refreshHealthConnectWriteAccess, sleepSamples, WRITE_TYPES,
   type HealthConnectAvailability, type HealthRecord as Rec,
 } from '../health/health-connect';
 import type { HealthMetric } from '../health/healthkit';
@@ -80,7 +80,7 @@ async function dailySteps(range: DateRange) {
       const total = await hc.aggregateRecord({ recordType: 'Steps', timeRangeFilter: { operator: 'between', startTime: start.toISOString(), endTime: startOfLocalDay(start, -1).toISOString() } });
       if (total.COUNT_TOTAL > 0) data.unshift({ date: localDateKey(start), count: total.COUNT_TOTAL }); // no steps is no data, not a zero day
     } catch (e) {
-      if (i < 29) throw e; // inside the default window an error is a real failure
+      if (i < 29 || isTransient(e)) throw e; // inside the default window, or a failed call, an error is a real failure
       truncatedFrom = localDateKey(startOfLocalDay(now, i - 1));
       break;
     }
