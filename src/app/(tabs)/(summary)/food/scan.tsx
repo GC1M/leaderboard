@@ -7,7 +7,7 @@ import { NumberField } from '@/components/inputs';
 import { Button, ErrorText, Field, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { NUTRIENT_NAMES } from '@/lib/food/format';
 import { emptyNutrients, NUTRIENT_KEYS, type NutrientKey } from '@/lib/food/nutrition';
-import { pickPhoto, PhotoError, readPhoto } from '@/lib/food/photo';
+import { photoPrivacyNote, pickPhoto, PhotoError, readPhoto } from '@/lib/food/photo';
 import { type Basis, labelToPer100g, linesFromText, MENU_NOTE, type MenuItem, parseLabel, parseMenu, type ScanLine } from '@/lib/food/scan';
 import { createCustomFood, ESTIMATE_NOTE } from '@/lib/food/search';
 import { decimalValue } from '@/lib/numeric-input';
@@ -16,7 +16,7 @@ import { useTheme } from '@/theme';
 const UNIT: Record<NutrientKey, string> = { energy_kcal: 'kcal', protein_g: 'g', carbs_g: 'g', fat_g: 'g', fiber_g: 'g', sugars_g: 'g', sat_fat_g: 'g', sodium_mg: 'mg' };
 const BASES = [{ value: 'serving', label: 'Per Serving' }, { value: '100g', label: 'Per 100 g' }] as const;
 
-// Photo of a nutrition label or menu (#51 to #53). The text is read on this iPhone and the photo is deleted
+// Photo of a nutrition label or menu (#51 to #53). The text is read on the device and the photo is deleted
 // right after. Nothing is saved until the person reviews the values: a label becomes a custom food, a menu
 // dish goes to food search with the entry marked as an estimate.
 export default function FoodScan() {
@@ -136,7 +136,7 @@ export default function FoodScan() {
         <ErrorText>{error}</ErrorText>
         <Button label="Take Photo" onPress={() => run('camera')} />
         <Button secondary label="Choose Photo" onPress={() => run('library')} />
-        <Text style={[styles.caption, { color: c.inkSoft }]}>The photo is read on this iPhone and deleted right after. It is never uploaded or saved.</Text>
+        <Text style={[styles.caption, { color: c.inkSoft }]}>{photoPrivacyNote()}</Text>
       </Screen>
     );
   }

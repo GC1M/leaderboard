@@ -33,6 +33,7 @@ const SHARE_ROWS: { metric: SharedMetric; label: string }[] = [
   { metric: 'weight', label: 'Weight' },
   { metric: 'workouts', label: 'Workouts' },
   { metric: 'food', label: 'Food' },
+  { metric: 'water', label: 'Water' },
 ];
 
 export default function GroupInfo() {
@@ -241,7 +242,7 @@ export default function GroupInfo() {
 
       <Section
         title="What you share with this group"
-        footer="Health access on your iPhone decides what this app can read. These switches decide what this group sees, and you can change them any time. Sleep shares nightly totals only. Weight shares your latest reading and goal progress. Workouts share a weekly count and total time only, never exercises, sets or notes. Food shares daily calorie and macro totals only, never what you ate."
+        footer="Health access on your iPhone decides what this app can read. These switches decide what this group sees, and you can change them any time. Sleep shares nightly totals only. Weight shares your latest reading and goal progress. Workouts share a weekly count and total time only, never exercises, sets or notes. Food shares daily calorie and macro totals only, never what you ate. Water shares daily totals only."
       >
         {SHARE_ROWS.map(({ metric, label }, i) => {
           const on = shares.includes(metric);
@@ -251,7 +252,7 @@ export default function GroupInfo() {
                 <Text style={[styles.bodyStrong, { color: c.ink, flex: 1 }]}>{label}</Text>
                 <Switch accessibilityLabel={`Share ${label.toLowerCase()} with this group`} accessibilityState={{ busy: pendingShare === metric }} value={on} disabled={busy || pendingShare !== null} onValueChange={(value) => void changeShare(metric, value)} />
               </View>
-              <Text style={[styles.caption, { color: c.inkSoft }]}>{metric === 'steps' ? 'Daily step totals and leaderboard rank.' : metric === 'sleep' ? 'Nightly sleep totals, without sleep stages or exact times.' : metric === 'weight' ? 'Latest weight and goal progress.' : metric === 'workouts' ? 'Weekly workout count and total time. Exercises, sets and notes stay private.' : 'Daily calories, protein, carbs and fat totals. Foods, meals, recipes and amounts stay private.'}</Text>
+              <Text style={[styles.caption, { color: c.inkSoft }]}>{metric === 'steps' ? 'Daily step totals and leaderboard rank.' : metric === 'sleep' ? 'Nightly sleep totals, without sleep stages or exact times.' : metric === 'weight' ? 'Latest weight and goal progress.' : metric === 'workouts' ? 'Weekly workout count and total time. Exercises, sets and notes stay private.' : metric === 'food' ? 'Daily calories, protein, carbs and fat totals. Foods, meals, recipes and amounts stay private.' : 'Daily water totals only. Each drink, its time and the app it came from stay private.'}</Text>
               {pendingShare === metric && <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: c.inkSoft }]}>Saving sharing choice…</Text>}
             </View>
           );

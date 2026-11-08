@@ -1,4 +1,4 @@
-import { buildMemberSummaries, foodText, sleepText, weightText, workoutsText } from './group-summaries';
+import { buildMemberSummaries, foodText, sleepText, waterText, weightText, workoutsText } from './group-summaries';
 
 const members = [
   { userId: 'a', name: 'Ann' },
@@ -108,5 +108,28 @@ describe('food', () => {
     expect(foodText({ state: 'not_shared' }, now)).toBe('Not shared');
     const none = { value: null, incomplete: true };
     expect(foodText({ state: 'recorded', date: '2026-10-25', energy: none, protein: none, carbs: none, fat: none }, now)).toBe('Logged, amounts unknown, yesterday');
+  });
+});
+
+describe('water', () => {
+  const day = (user_id: string, local_date: string, total_ml: number) => ({ user_id, local_date, total_ml });
+  const out = buildMemberSummaries(
+    members,
+    { a: ['water'], b: ['water'], c: ['food'] },
+    [], [], [], [],
+    [day('a', '2026-10-24', 900), day('a', '2026-10-26', 1500), day('c', '2026-10-26', 2000)],
+  );
+  it('takes the latest day per member', () => {
+    expect(out[0].water).toEqual({ state: 'recorded', value: 1500, date: '2026-10-26' });
+  });
+  it('shared with no entries is no data, and unshared is not shared even with rows', () => {
+    expect(out[1].water).toEqual({ state: 'no_data' });
+    expect(out[2].water).toEqual({ state: 'not_shared' });
+  });
+  it('formats in the viewer unit and never shows no water as 0', () => {
+    expect(waterText(out[0].water, 'ml', now)).toBe('1.5 L, today');
+    expect(waterText({ state: 'recorded', value: 473.2, date: '2026-10-25' }, 'floz', now)).toBe('16 fl oz, yesterday');
+    expect(waterText({ state: 'no_data' }, 'ml', now)).toBe('No water logged this week');
+    expect(waterText({ state: 'not_shared' }, 'ml', now)).toBe('Not shared');
   });
 });

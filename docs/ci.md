@@ -6,7 +6,8 @@ One workflow, `.github/workflows/ci.yml`. It runs on every pull request, on push
 
 | Job | What it checks | Needs Docker to run locally |
 | --- | --- | --- |
-| `check` | `npm run typecheck`, `npm run lint`, `npm test -- --coverage` (fails below the coverage floor), then `expo export` for iOS and web with dummy env | no |
+| `check` | `npm run typecheck`, `npm run lint`, `npm test -- --coverage` (fails below the coverage floor), then `expo export` for iOS, Android and web with dummy env | no |
+| `android` | `expo prebuild --platform android`, then `./gradlew :app:assembleDebug` (JDK 17, arm64 only, Gradle cache). Compiles every native module and config plugin output; uploads the debug APK as `android-debug-apk` (7 days). See [android-release.md](android-release.md) | no, but needs JDK 17 and the Android SDK |
 | `db` | `supabase start` applies every migration from scratch, `supabase test db` runs the pgTAP tests, and `supabase gen types typescript --local` must equal `src/lib/database.types.ts` byte for byte | yes |
 | `smoke-api` | `scripts/smoke/api-smoke.mjs` against the local stack: two users, profile row, `save_manual_workout` round trip, owner-only RLS, `save_workout_template` then apply, group create and join by invite code, workout sharing (off by default, count and duration only, revoke hides it again), anonymous access denied, `delete_my_account` cleanup | yes |
 | `smoke-web` | Exports the web build against the local stack, serves it, and loads it in headless Chromium (`scripts/smoke/web-smoke.mjs`): the sign-in screen renders, no uncaught page errors, "Send Me a Code" reaches the real auth service, and with every Supabase call failing the app still renders and shows an error message instead of going blank | yes |

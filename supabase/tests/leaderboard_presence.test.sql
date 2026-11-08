@@ -14,7 +14,9 @@ $$;
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000a3');
 create temp table g as select id, invite_code from create_group('G');
 grant select on g to authenticated;
+reset role; -- Health rows arrive through the import RPCs, so seed them as the database owner
 insert into daily_metrics (user_id, date, metric, value, source) values (auth.uid(), current_date, 'steps', 4000, 'healthkit');
+set local role authenticated;
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000b3');
 select join_group((select invite_code from g));
 insert into daily_metrics (user_id, date, metric, value, source) values (auth.uid(), current_date, 'steps', 0, 'manual');

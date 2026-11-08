@@ -163,6 +163,51 @@ try {
     await page.getByRole('button', { name: 'Log Workout', exact: true }).waitFor();
   });
 
+  await visit(browser, base, 'competition invite requires separate consent and standings preserve zero', async (page) => {
+    const uid = '12345678-1234-1234-1234-123456789abc';
+    const groupId = '22345678-1234-1234-1234-123456789abc';
+    const id = '32345678-1234-1234-1234-123456789abc';
+    const user = { id: uid, aud: 'authenticated', role: 'authenticated', email: 'competition@example.com', user_metadata: {}, app_metadata: {}, created_at: new Date().toISOString() };
+    const competition = { id, group_id: groupId, creator_id: groupId, name: 'Weekend steps', metric: 'steps', starts_at: new Date(Date.now() + 2 * 86400e3).toISOString(), ends_at: new Date(Date.now() + 4 * 86400e3).toISOString(), timezone: 'UTC', include_manual: false, status: 'scheduled', scoring_version: 1 };
+    let participation = null;
+    await page.route(/\/auth\/v1\//, (route) => {
+      const path = new URL(route.request().url()).pathname;
+      return route.fulfill({ json: path.endsWith('/verify') ? { access_token: 'ui-test-access-token', refresh_token: 'ui-test-refresh-token', token_type: 'bearer', expires_in: 3600, user } : path.endsWith('/user') ? user : {} });
+    });
+    await page.route(/\/rest\/v1\//, (route) => {
+      const path = new URL(route.request().url()).pathname;
+      let body = [];
+      if (path.endsWith('/profiles')) body = { display_name: 'Test Player', timezone: 'UTC' };
+      if (path.endsWith('/rpc/join_group')) body = groupId;
+      if (path.endsWith('/competitions')) body = competition;
+      if (path.endsWith('/competition_participants')) body = new URL(route.request().url()).searchParams.has('user_id') ? participation : participation ? [participation] : [];
+      if (path.endsWith('/rpc/join_competition')) { participation = { competition_id: id, user_id: uid, status: 'joined' }; body = null; }
+      if (path.endsWith('/rpc/competition_standings')) body = [
+        { user_id: uid, display_name: 'Zero Player', score: 0, rank: 1, eligibility: 'eligible', manual_entries: 0, health_entries: 1, excluded_entries: 0, updated_at: new Date().toISOString() },
+        { user_id: groupId, display_name: 'Missing Player', score: null, rank: null, eligibility: 'no_data', manual_entries: 0, health_entries: 0, excluded_entries: 0, updated_at: null },
+      ];
+      return route.fulfill({ json: body });
+    });
+  }, async (page) => {
+    let optIns = 0;
+    page.on('request', (req) => { if (req.url().includes('/rpc/join_competition')) optIns++; });
+    await page.goto(`${base}/join/ABCD2345?competition=32345678-1234-1234-1234-123456789abc`);
+    await page.getByPlaceholder('you@example.com').fill('competition@example.com');
+    await page.getByText('Send Me a Code', { exact: true }).click();
+    await page.getByLabel('6-digit code', { exact: true }).fill('123456');
+    await page.getByText('Joining this group does not enroll you.', { exact: false }).waitFor();
+    await page.getByRole('button', { name: 'Join Group', exact: true }).click();
+    await page.getByRole('button', { name: 'Join Competition', exact: true }).waitFor();
+    if (optIns) throw new Error('Group consent also enrolled in competition');
+    await page.getByText('Health entries only', { exact: true }).waitFor();
+    await page.getByText('0 steps', { exact: true }).waitFor();
+    await page.getByText('No data', { exact: true }).waitFor();
+    for (const name of ['Summary', 'Workouts', 'Groups', 'Profile']) await page.getByRole('tab', { name, exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Join Competition', exact: true }).click();
+    await page.getByRole('button', { name: 'Leave Competition', exact: true }).waitFor();
+    if (optIns !== 1) throw new Error(`Expected one explicit opt-in, got ${optIns}`);
+  });
+
   // Backend unreachable: requests to Supabase fail at the network level.
   await visit(browser, base, 'failed network calls do not blank the app', (page) => page.route(/\/(auth|rest)\/v1\//, (route) => route.abort('connectionrefused')), async (page) => {
     await page.getByPlaceholder('you@example.com').fill('offline@example.com');

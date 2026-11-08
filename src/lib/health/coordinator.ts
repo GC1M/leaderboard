@@ -1,7 +1,7 @@
 import type { HealthAccess, HealthMetric } from './healthkit';
 import type { ReconcileOptions } from './changes';
 
-export const HEALTH_METRICS: HealthMetric[] = ['steps','sleep','weight','workouts'];
+export const HEALTH_METRICS: HealthMetric[] = ['steps','sleep','weight','workouts','water'];
 export type MetricSyncState = {
   status: 'idle' | 'syncing' | 'unavailable' | 'needs-permission' | 'no-data' | 'importing' | 'synced' | 'unchanged' | 'error';
   lastSuccess: string | null; knownSamples: number; error: string | null;
@@ -20,7 +20,7 @@ export type CoordinatorDependencies = {
   deleteImports: () => Promise<void>;
 };
 const initialMetric = (): MetricSyncState => ({ status:'idle',lastSuccess:null,knownSamples:0,error:null });
-export const initialHealthState = (): HealthSyncState => ({ ready:false,connected:false,syncing:false,error:null,metrics:{steps:initialMetric(),sleep:initialMetric(),weight:initialMetric(),workouts:initialMetric()} });
+export const initialHealthState = (): HealthSyncState => ({ ready:false,connected:false,syncing:false,error:null,metrics:{steps:initialMetric(),sleep:initialMetric(),weight:initialMetric(),workouts:initialMetric(),water:initialMetric()} });
 
 // One controller per signed-in account. Callers share the active promise; reconnect/sign-out
 // invalidate every in-flight continuation, including writes after long-running native queries.

@@ -7,6 +7,7 @@ import { OWN_PACKAGE, refreshHealthConnectWriteAccess, resetHealthConnectCache }
 import { registerHealthConnectWriters } from './health-connect-export';
 import { getHealthWriteAccess } from './healthkit';
 import { MANUAL_KINDS } from './manual-export';
+import { WATER_KIND } from './water-export';
 import { WORKOUT_KIND, workoutPayload } from './workout-export';
 
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
@@ -138,6 +139,21 @@ test('workouts and food map to Health Connect records; unknown nutrients stay ab
   expect(food.dietaryFiber).toBeUndefined();
   expect(food.metadata.clientRecordVersion).toBeGreaterThanOrEqual(7); // the queue's attempt version, above every earlier attempt
   expect(entry(q, FOOD_KIND)?.writtenTypes).toBe(255); // one permission covers every nutrient
+});
+
+test('water saves as a Hydration record in mL, asks for the Hydration write grant, and an edit replaces it', async () => {
+  expect(writeTypesFor(WATER_KIND)).toEqual(['Hydration']);
+  grants.add('write:Hydration');
+  await refreshHealthConnectWriteAccess();
+  const q = makeQueue();
+  await q.initialize();
+  await q.enqueue(WATER_KIND, 'w1', 'save', { ml: 250, at }, 1);
+  await q.enqueue(WATER_KIND, 'w1', 'save', { ml: 300, at }, 2);
+  const water = records.filter((r) => r.recordType === 'Hydration');
+  expect(water).toHaveLength(1);
+  expect(water[0]).toMatchObject({ startTime: at, endTime: '2026-10-25T08:00:01.000Z', volume: { value: 300, unit: 'milliliters' }, metadata: { clientRecordId: 'leaderboard:water:w1' } });
+  await q.enqueue(WATER_KIND, 'w1', 'delete', null, 3);
+  expect(records.filter((r) => r.recordType === 'Hydration')).toHaveLength(0);
 });
 
 test('records this app wrote are never imported back', async () => {

@@ -1,6 +1,6 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Text } from 'react-native';
+import { BackHandler, Text } from 'react-native';
 
 import { Button, ErrorText, Screen, styles } from '@/components/ui';
 import { useTheme } from '@/theme';
@@ -23,6 +23,16 @@ export default function JoinByLink() {
   }, [loading, session, code, competition]);
 
   const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
+  // Android: a link opened from outside makes this the only screen, so the back button would close the app.
+  // Go home instead, like Not Now.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (router.canGoBack()) return false;
+      router.replace('/');
+      return true;
+    });
+    return () => sub.remove();
+  }, [router]);
 
   if (!isValidCode(code)) {
     return (

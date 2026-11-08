@@ -7,7 +7,7 @@ import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { HEALTH_METRICS, type MetricSyncState } from '@/lib/health/coordinator';
 import { useTheme } from '@/theme';
 
-const names={steps:'Steps',sleep:'Sleep',weight:'Weight',workouts:'Workouts'};
+const names={steps:'Steps',sleep:'Sleep',weight:'Weight',workouts:'Workouts',water:'Water'};
 // Health Connect refused the full import window because history access is off.
 const truncation=(from:string)=>`Showing data since ${new Date(from).toLocaleDateString()}; allow access to past data in Health Connect to import more.`;
 export function describeHealthSync(m:MetricSyncState):string {
@@ -34,7 +34,7 @@ export function HealthSyncStatus(){
   const action=async(fn:()=>Promise<void>)=>{setBusy(true);setError(null);try{await fn();}catch(e){setError(e instanceof Error?e.message:'Could not connect to Health.');}finally{setBusy(false);}};
   return <View style={{gap:8,marginBottom:16}}>
     <Text style={[styles.heading,{color:t.ink}]}>{provider}</Text>
-    <Text style={[styles.caption,{color:t.inkSoft}]}>{health.connected?'Imports run while you use the app and when you return. Reading access can be limited separately for each metric.':'Connect this account to import steps, sleep summaries, weight readings, and workouts to your private account. Group sharing is controlled separately.'}</Text>
+    <Text style={[styles.caption,{color:t.inkSoft}]}>{health.connected?'Imports run while you use the app and when you return. Reading access can be limited separately for each metric.':'Connect this account to import steps, sleep summaries, weight readings, workouts, and water to your private account. Group sharing is controlled separately.'}</Text>
     <ErrorText>{error ?? health.error}</ErrorText>
     {health.connected && HEALTH_METRICS.map((metric)=>{
       const m=health.metrics[metric];

@@ -21,9 +21,9 @@ describe.each([IOS_MATRIX, ANDROID_MATRIX])('$platform matrix', (matrix: Platfor
 });
 
 describe('iOS entries match the existing Apple Health behavior', () => {
-  // The app imports workouts (src/lib/health/workouts.ts) but the adapter has no readWorkouts yet. Listing the gap here keeps
+  // The app imports workouts and water (src/lib/health/workouts.ts, water.ts) but the adapter has no reader for them yet. Listing the gap here keeps
   // the check strict: a newly imported metric fails this test until it is wired or added here on purpose.
-  const IMPORTED_BUT_NOT_WIRED = ['workouts'];
+  const IMPORTED_BUT_NOT_WIRED = ['workouts', 'water'];
   it('reads exactly the imported metrics the adapter wires', () => {
     const imported = Object.keys(HEALTH_TYPES).filter((t) => !IMPORTED_BUT_NOT_WIRED.includes(t)).sort();
     const read = HEALTH_DATA_TYPES.filter((t) => IOS_MATRIX.entries[t].implemented.read).sort();

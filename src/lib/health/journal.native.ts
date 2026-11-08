@@ -83,7 +83,7 @@ export function healthExportStore(userId: string): ExportStore {
 // while the account coordinator is idle; pending uploads are replayed before the fresh query.
 export async function resetHealthAnchors(userId: string): Promise<void> {
   const store = healthJournal(userId);
-  for (const metric of ['steps','sleep','weight','workouts'] as const) {
+  for (const metric of ['steps','sleep','weight','workouts','water'] as const) {
     const state = await store.read(metric);
     if (state) await store.write(metric, { ...state, anchor: undefined, resetAfterPending: !!state.pending });
   }

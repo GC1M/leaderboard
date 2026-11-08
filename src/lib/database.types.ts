@@ -439,6 +439,66 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"water_entries": {
+                  Row: {
+                    "client_id": string | null,"consumed_at": string,"created_at": string,"health_device_id": string | null,"health_uuid": string | null,"id": string,"local_date": string,"ml": number,"source": string,"source_name": string | null,"timezone": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "client_id"?: string | null,"consumed_at": string,"created_at"?: string,"health_device_id"?: string | null,"health_uuid"?: string | null,"id"?: string,"local_date"?: string,"ml": number,"source": string,"source_name"?: string | null,"timezone": string,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "client_id"?: string | null,"consumed_at"?: string,"created_at"?: string,"health_device_id"?: string | null,"health_uuid"?: string | null,"id"?: string,"local_date"?: string,"ml"?: number,"source"?: string,"source_name"?: string | null,"timezone"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "water_entries_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"water_history_cutoffs": {
+                  Row: {
+                    "deleted_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "deleted_at": string,"user_id": string
+                  }
+                  Update: {
+                    "deleted_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "water_history_cutoffs_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: true
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"water_targets": {
+                  Row: {
+                    "daily_ml": number,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "daily_ml": number,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "daily_ml"?: number,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "water_targets_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: true
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"weight_measurements": {
                   Row: {
                     "health_device_id": string | null,"id": string,"kg": number,"measured_at": string,"source": string,"updated_at": string,"user_id": string
@@ -614,6 +674,9 @@ isOneToOne: false
             "apply_health_changes":
 { Args: { "p_daily": Json,"p_device": string,"p_metric": string,"p_owner": string,"p_remove_daily": (string)[],"p_remove_weight": (string)[],"p_weight": Json }; Returns: undefined
                            },
+"apply_health_water":
+{ Args: { "p_device": string,"p_owner": string,"p_remove": (string)[],"p_samples": Json }; Returns: undefined
+                           },
 "apply_health_workouts":
 { Args: { "p_device": string,"p_owner": string,"p_remove": (string)[],"p_workouts": Json }; Returns: undefined
                            },
@@ -659,6 +722,9 @@ isOneToOne: false
 "delete_my_health_imports":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
+"delete_my_water_history":
+{ Args: Record<PropertyKey, never>; Returns: undefined
+                           },
 "finalize_competition":
 { Args: { "p_id": string }; Returns: undefined
                            },
@@ -696,6 +762,11 @@ isOneToOne: false
 "group_steps":
 { Args: { "p_from": string,"p_group_id": string,"p_to": string }; Returns: {
               "date": string,"source": string,"steps": number,"user_id": string
+            }[]
+                           },
+"group_water":
+{ Args: { "p_from": string,"p_group_id": string,"p_to": string }; Returns: {
+              "local_date": string,"total_ml": number,"user_id": string
             }[]
                            },
 "group_workouts":
@@ -746,6 +817,11 @@ isOneToOne: false
                            },
 "shares_group_with":
 { Args: { "p_user_id": string }; Returns: boolean
+                           },
+"water_daily_totals":
+{ Args: { "p_from": string,"p_to": string }; Returns: {
+              "entries": number,"health_ml": number,"health_received_at": string,"last_entry_at": string,"local_date": string,"manual_ml": number,"total_ml": number
+            }[]
                            }
           }
           Enums: {

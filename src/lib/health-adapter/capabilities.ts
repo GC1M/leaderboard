@@ -40,7 +40,7 @@ export const IOS_MATRIX: PlatformMatrix = {
     weight: ios(true, true, { read: true, write: false }, [], 'Imported without a lower date bound.'),
     workouts: ios(true, true, { read: false, write: false }, ['read', 'write'], 'The app imports and exports workouts through src/lib/health directly; not wired through the adapter yet.'),
     nutrition: ios(true, true, { read: false, write: false }, ['read', 'write'], 'Food entries are exported (write only) through src/lib/health/food-export.ts directly; not wired through the adapter yet.'),
-    water: ios(true, true, { read: false, write: false }, ['read', 'write'], 'Not wired yet.'),
+    water: ios(true, true, { read: false, write: false }, ['read', 'write'], 'The app imports water through src/lib/health/water.ts directly; not wired through the adapter yet.'),
   },
 };
 
@@ -68,7 +68,7 @@ export const ANDROID_MATRIX: PlatformMatrix = {
     weight: android({ read: true, write: false }, 'Imported without an app-chosen lower bound; Health Connect may limit it to its default window. Manual readings are exported by the export queue directly, not through the adapter.'),
     workouts: android({ read: true, write: false }, 'Exercise sessions; distance and energy are not read or written. Routes need a separate permission and are not used. App-created workouts are exported by the export queue directly.'),
     nutrition: android({ read: false, write: false }, 'Nutrition and hydration are separate record types. Food entries are exported (write only) by the export queue directly, not through the adapter.'),
-    water: android({ read: false, write: false }, 'Hydration record.'),
+    water: android({ read: true, write: false }, 'Hydration records, imported as water entries in mL with this device\'s zone. Water logged in the app is exported by the export queue directly.'),
   },
 };
 

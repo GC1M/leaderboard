@@ -5,6 +5,7 @@ import type { HealthChanges } from './changes';
 
 export async function uploadHealthChanges(userId: string, deviceId: string, metric: HealthMetric, changes: HealthChanges): Promise<void> {
   if (metric === 'workouts') return uploadWorkoutChanges(userId, deviceId, changes);
+  if (metric === 'water') return uploadWaterChanges(userId, deviceId, changes);
   if (!changes.daily.length && !changes.removeDaily.length && !changes.weight.length && !changes.removeWeight.length) return;
   await assertHealthOwner(userId);
   const { error } = await supabase.rpc('apply_health_changes', {
@@ -28,5 +29,14 @@ async function uploadWorkoutChanges(userId: string, deviceId: string, changes: H
   if (!workouts.length && !remove.length) return;
   await assertHealthOwner(userId);
   const { error } = await supabase.rpc('apply_health_workouts', { p_owner: userId, p_device: deviceId, p_workouts: workouts.map((w) => ({ ...w })), p_remove: remove });
+  if (error) throw new Error("Couldn't upload Health changes. Your data is saved on this device; retry sync.");
+}
+
+// Imported water: same contract as workouts, one row per Health sample UUID.
+async function uploadWaterChanges(userId: string, deviceId: string, changes: HealthChanges): Promise<void> {
+  const samples = changes.water ?? [], remove = changes.removeWater ?? [];
+  if (!samples.length && !remove.length) return;
+  await assertHealthOwner(userId);
+  const { error } = await supabase.rpc('apply_health_water', { p_owner: userId, p_device: deviceId, p_samples: samples.map((s) => ({ ...s })), p_remove: remove });
   if (error) throw new Error("Couldn't upload Health changes. Your data is saved on this device; retry sync.");
 }

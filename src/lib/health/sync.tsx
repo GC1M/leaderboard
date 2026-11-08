@@ -16,6 +16,7 @@ import { assertHealthOwner } from './owner';
 import { deleteHealthImports, uploadHealthChanges } from './upload';
 import './workout-export'; // registers the app-created workout writer
 import './food-export'; // registers the app-created food writer
+import './water-export'; // registers the app-created water writer
 
 if (Platform.OS === 'android') registerHealthConnectWriters(); // replaces the HealthKit writers above
 // Health Connect reports write grants asynchronously; refresh the cached grants before the queue reads them.

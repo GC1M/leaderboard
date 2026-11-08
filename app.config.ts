@@ -26,6 +26,8 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'com.shivamlalakiya.leaderboard',
+    // No versionCode here: eas.json uses appVersionSource "remote", so EAS owns it and bumps it on every production
+    // build. Local and CI builds fall back to 1. See docs/android-release.md.
     adaptiveIcon: {
       backgroundColor: '#2340D8',
       foregroundImage: './assets/images/android-icon-foreground.png',
@@ -39,11 +41,13 @@ const config: ExpoConfig = {
       'android.permission.health.READ_SLEEP',
       'android.permission.health.READ_WEIGHT',
       'android.permission.health.READ_EXERCISE',
+      'android.permission.health.READ_HYDRATION',
       'android.permission.health.READ_HEALTH_DATA_HISTORY',
       'android.permission.health.WRITE_WEIGHT',
       'android.permission.health.WRITE_SLEEP',
       'android.permission.health.WRITE_EXERCISE',
       'android.permission.health.WRITE_NUTRITION',
+      'android.permission.health.WRITE_HYDRATION',
     ],
   },
   web: {
@@ -91,6 +95,8 @@ const config: ExpoConfig = {
   experiments: {
     typedRoutes: true,
   },
+  // EAS project link, kept out of git. Set EAS_PROJECT_ID locally and as an EAS variable (docs/android-release.md).
+  ...(process.env.EAS_PROJECT_ID ? { extra: { eas: { projectId: process.env.EAS_PROJECT_ID } } } : {}),
 };
 
 export default config;
