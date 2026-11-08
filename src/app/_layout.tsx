@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { isValidCode, isValidGroupId, normalizeCode, pendingInvite } from '@/lib/groups';
+import { FirstRunName } from '@/components/FirstRunName';
 import { WebDialogHost } from '@/components/WebDialogHost';
 import { authGate } from '@/lib/auth-gate';
 import { HealthSyncProvider } from '@/lib/health/sync';
@@ -50,6 +51,7 @@ function Routes() {
         <Stack.Screen name="join/[code]" />
         <Stack.Screen name="+not-found" />
       </Stack>
+      {gate === 'signed-in' && <FirstRunName />}
       <WebDialogHost />
     </>
   );

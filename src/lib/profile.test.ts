@@ -1,4 +1,4 @@
-import { deleteAccount, deleteFoodHistory, signOut as signOutDevice, updateDisplayName } from './profile';
+import { defaultDisplayName, deleteAccount, deleteFoodHistory, signOut as signOutDevice, updateDisplayName } from './profile';
 import { supabase } from './supabase';
 
 jest.mock('./supabase', () => ({
@@ -68,4 +68,10 @@ test('deleteFoodHistory clears the unsent food queue only after the server delet
   expect(rpc.mock.calls.filter((c) => c[0] === 'delete_my_food_history')).toHaveLength(2);
   expect(mockRemoveItem).toHaveBeenCalledWith('food-pending-me');
   expect(signOut).not.toHaveBeenCalled();
+});
+
+test('defaultDisplayName matches the server default from handle_new_user', () => {
+  // Checked against the SQL expression: 'Player ' || upper(left(replace(id, '-', ''), 4)).
+  expect(defaultDisplayName('0a-bc1d2e3f-4a5b-6c7d-8e9f-0123456789ab')).toBe('Player 0ABC');
+  expect(defaultDisplayName('3f2a9c1e-0000-4000-8000-000000000000')).toBe('Player 3F2A');
 });
