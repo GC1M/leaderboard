@@ -7,6 +7,7 @@ import { HealthSyncStatus } from '@/components/HealthSyncStatus';
 import { WeekChart } from '@/components/steps/WeekChart';
 import { Button, ErrorText, Icon, Screen, Section, Skeleton, styles as ui } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { flushLocalLogs } from '@/lib/flush-logs';
 import { getDailyTotals } from '@/lib/food/diary';
 import { listMyGroups, type MyGroup } from '@/lib/groups';
 import { lastNDates, localDateKey, readingDateLabel } from '@/lib/health/dates';
@@ -56,6 +57,7 @@ export default function Summary() {
 
   const load = useCallback(async () => {
     try {
+      await flushLocalLogs(me);
       const [s, groups] = await Promise.all([getMyRecentSteps(7), listMyGroups()]);
       // ponytail: one leaderboard call per group; fine for a handful of groups, add a batched RPC if people join dozens.
       // One group failing (e.g. you were just removed) shouldn't blank the whole summary.

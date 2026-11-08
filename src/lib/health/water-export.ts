@@ -4,7 +4,7 @@ import { localDateKey, startOfLocalDay } from './dates';
 import { exportMetadata } from './export-metadata';
 import { healthProviderName } from '@/lib/health-adapter/capabilities';
 
-import { registerExportWriter, type ExportEntry, type ExportWriter } from './export-queue';
+import { neverWritten, registerExportWriter, type ExportEntry, type ExportWriter } from './export-queue';
 import { loadHealthKit, removeExportedSample } from './healthkit';
 
 // Water logged in this app that the user chose to also save to Apple Health (#56). recordId is the `water_entries.id`,
@@ -29,9 +29,7 @@ export const waterDeleteVersion = (known: readonly ExportEntry[], id: string, no
   return prev ? Math.max(now, prev.version + 1) : null;
 };
 
-// A save never attempted has nothing in Health to delete: forget it instead of queueing a delete that could wait for
-// write access forever.
-export const neverWritten = (e: ExportEntry) => e.op === 'save' && e.status !== 'success' && e.attemptVersion === undefined;
+export { neverWritten };
 
 // Saves that reached Health, or may have (an attempt was made).
 export const exportedWater = (entries: readonly ExportEntry[]) => entries.filter((e) => e.kind === WATER_KIND && e.op === 'save' && (e.status === 'success' || e.attemptVersion !== undefined));

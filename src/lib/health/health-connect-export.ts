@@ -52,7 +52,7 @@ export function registerHealthConnectWriters() {
   }));
   // One nutrition permission covers every nutrient. attemptVersions makes each attempt's version higher than the last,
   // which the food backfill relies on when the allowed nutrients change at the same updated_at.
-  const food = writer(WRITE_TYPES.nutrition, nutrition, { writeTypes: [WRITE_TYPES.nutrition], attemptVersions: true, dropRevokedDeletes: true, intent: () => allowedFoodMask() });
+  const food = writer(WRITE_TYPES.nutrition, nutrition, { writeTypes: [WRITE_TYPES.nutrition], attemptVersions: true, dropRevokedDeletes: true, intent: (e) => (payloadMask(e.payload as FoodPayload) ? allowedFoodMask() : 0) });
   registerExportWriter(FOOD_KIND, { ...food, async save(e) {
     // Nothing known to save: remove an earlier copy instead of writing an empty record.
     if (!payloadMask(e.payload as FoodPayload)) { await food.remove(e); return null; }
