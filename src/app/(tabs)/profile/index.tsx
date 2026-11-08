@@ -164,7 +164,7 @@ export default function Profile() {
       {Platform.OS === 'android' && (
         <Section
           title="Health Connect"
-          footer="Leaderboard reads steps, sleep, weight, and workouts that you allow, and saves what you log here only if you turn on saving for it. Deleting imported data doesn't change Health Connect permissions: to change what Leaderboard can read, open Health Connect, then App permissions, then Leaderboard."
+          footer="Leaderboard reads steps, sleep, weight, workouts, and water that you allow, and saves what you log here only if you turn on saving for it. Deleting imported data doesn't change Health Connect permissions: to change what Leaderboard can read, open Health Connect, then App permissions, then Leaderboard."
         >
           <Row label="Health Access" icon={{ ios: 'heart.text.square', android: 'favorite', web: 'favorite' }} onPress={() => router.push('/steps/permission')} />
           <Row label="Delete Imported Health Data" icon={{ ios: 'trash', android: 'delete', web: 'delete' }} danger last disabled={busy || !health.ready} onPress={confirmDeleteImports} />
