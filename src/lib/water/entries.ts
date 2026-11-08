@@ -11,7 +11,7 @@ import { createPendingQueue, type PendingOp } from '@/lib/pending-queue';
 import { supabase } from '@/lib/supabase';
 import { deviceTimezone } from '@/lib/timezone';
 
-import { MAX_ENTRY_ML } from './units';
+import { MAX_ENTRY_ML, MAX_TARGET_ML } from './units';
 
 export const waterQueue = createPendingQueue('water_entries', 'water-pending');
 
@@ -198,7 +198,7 @@ export async function setWaterTarget(uid: string, dailyMl: number | null): Promi
     if (error) throw new Error("Couldn't clear your target. Try again.");
     return;
   }
-  if (!Number.isFinite(dailyMl) || dailyMl <= 0 || dailyMl > 20000) throw new Error('Enter a target above 0 and up to 20 L.');
+  if (!Number.isFinite(dailyMl) || dailyMl <= 0 || dailyMl > MAX_TARGET_ML) throw new Error('Enter a target above 0 and up to 20 L.');
   const { error } = await supabase.from('water_targets').upsert({ user_id: uid, daily_ml: dailyMl });
   if (error) throw new Error("Couldn't save your target. Try again.");
 }

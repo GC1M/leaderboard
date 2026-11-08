@@ -22,7 +22,7 @@ test('formats whole mL, litres from 1000 mL, and fl oz to one decimal', () => {
   expect(formatWater(249.6, 'ml')).toBe('250 mL');
   expect(formatWater(1250, 'ml')).toBe('1.25 L');
   expect(formatWater(250, 'floz')).toBe('8.5 fl oz');
-  expect(amountError('floz')).toContain('169 fl oz');
+  expect(amountError('floz')).toContain('169.1 fl oz');
   expect(amountError('ml')).toContain('5000 mL');
 });
 

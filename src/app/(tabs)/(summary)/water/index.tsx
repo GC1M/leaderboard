@@ -14,7 +14,7 @@ import { dateFromKey } from '@/lib/health/format';
 import { useHealthSync } from '@/lib/health/sync';
 import { decimalValue } from '@/lib/numeric-input';
 import { dayTotal, getWaterTarget, loadWaterDay, logWater, setWaterTarget, sourceLabel, waterQueue, type WaterEntry } from '@/lib/water/entries';
-import { amountError, entryMl, formatWater, mlFromUnit, QUICK_ADD, unitFromMl, useWaterUnit, type WaterUnit } from '@/lib/water/units';
+import { amountError, entryMl, formatWater, limitText, MAX_TARGET_ML, QUICK_ADD, unitFromMl, useWaterUnit, type WaterUnit } from '@/lib/water/units';
 import { useTheme } from '@/theme';
 
 const UNITS = [{ value: 'ml', label: 'mL' }, { value: 'floz', label: 'fl oz', a11y: 'fluid ounces' }] as const;
@@ -132,7 +132,7 @@ export default function Water() {
           {/* With a load error only the entries saved on this iPhone are known, so no total: it would read low. */}
           {!error && (
             <View accessible accessibilityLabel={total === null ? 'No water logged' : `${isToday ? 'Today' : 'Day total'}, ${formatWater(total, unit)}${target ? ` of ${formatWater(target, unit)} target` : ''}`} style={{ gap: 8 }}>
-              <Text maxFontSizeMultiplier={1.5} style={[styles.heading, { color: total === null ? c.inkSoft : c.ink }]}>
+              <Text style={[styles.heading, { color: total === null ? c.inkSoft : c.ink }]}>
                 {total === null ? `No water logged${isToday ? ' today' : ''}` : formatWater(total, unit)}
               </Text>
               {target !== null && (
@@ -181,10 +181,12 @@ export default function Water() {
           <View style={{ padding: 16, gap: 12 }}>
             <NumberField label={`Daily target (${unit === 'ml' ? 'mL' : 'fl oz'})`} value={targetText} onChangeText={setTargetText} error={targetError} />
             <Button label="Save Target" disabled={decimalValue(targetText) === null} onPress={() => {
-              // Unchanged prefilled text saves nothing, so a rounded fl oz value never drifts the stored mL.
-              if (target !== null && targetText === amountText(target, unit)) return setTargetText(null);
               const v = decimalValue(targetText);
-              if (v !== null) void saveTarget(Math.round(mlFromUnit(v, unit) * 10) / 10);
+              const ml = v === null ? null : entryMl(v, unit, MAX_TARGET_ML);
+              if (ml === null) return setTargetError(`Enter a target above 0 and up to ${limitText(unit, MAX_TARGET_ML)}.`);
+              // An unchanged prefilled amount saves nothing, so a rounded fl oz value never drifts the stored mL.
+              if (target !== null && ml === entryMl(Number(amountText(target, unit)), unit, MAX_TARGET_ML)) return setTargetText(null);
+              void saveTarget(ml);
             }} />
             {target !== null && <Button plain danger label="Clear Target" onPress={() => void saveTarget(null)} />}
             <Button plain label="Cancel" onPress={() => { setTargetText(null); setTargetError(null); }} />

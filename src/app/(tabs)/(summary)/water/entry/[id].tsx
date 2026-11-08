@@ -79,8 +79,8 @@ export default function WaterEntryDetail() {
     setBusy(true);
     setError(null);
     try {
-      // An unchanged amount text keeps the stored mL, so a round trip through fl oz does not drift.
-      const same = amount === String(Math.round(unitFromMl(entry.ml, unit) * 10) / 10);
+      // An unchanged amount keeps the stored mL, so a round trip through fl oz does not drift. Compared as numbers, so "8.50" matches "8.5".
+      const same = ml === entryMl(Math.round(unitFromMl(entry.ml, unit) * 10) / 10, unit);
       await saveWaterEdit(uid, entry, { ml: same ? undefined : ml, consumedAt: at });
       void choice.sync();
       router.back();
