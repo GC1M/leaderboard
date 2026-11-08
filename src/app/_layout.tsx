@@ -1,3 +1,4 @@
+import { Newsreader_500Medium, Newsreader_600SemiBold, useFonts } from '@expo-google-fonts/newsreader';
 import { Stack, useGlobalSearchParams, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
@@ -17,7 +18,9 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 function Routes() {
   const { session, loading } = useAuth();
   const { bg } = useTheme();
-  const gate = authGate(loading, session);
+  // Titles use Newsreader; hold the splash until it loads (or fails, falling back to the system font).
+  const [fontsLoaded, fontError] = useFonts({ Newsreader_500Medium, Newsreader_600SemiBold });
+  const gate = fontsLoaded || fontError ? authGate(loading, session) : 'loading';
   const router = useRouter();
   const segments = useSegments();
   const { code, competition } = useGlobalSearchParams<{ code?: string | string[]; competition?: string | string[] }>();

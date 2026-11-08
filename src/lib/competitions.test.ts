@@ -1,4 +1,4 @@
-import { competitionDay, competitionGap, competitionInviteLink, competitionState, createCompetition, joinCompetition, leaveCompetition } from './competitions';
+import { competitionDay, competitionDays, competitionGap, dailySteps, rivalPace, competitionInviteLink, competitionState, createCompetition, joinCompetition, leaveCompetition } from './competitions';
 const mockRpc = jest.fn();
 jest.mock('./supabase', () => ({ supabase: { rpc: (...args: unknown[]) => mockRpc(...args) } }));
 beforeEach(() => { jest.clearAllMocks(); mockRpc.mockResolvedValue({ data: null, error: null }); });
@@ -38,4 +38,22 @@ test('competition gap names the next place up, leads, ties, and skips unranked r
   expect(competitionGap([r('a', 5, 3), r('b', 9, 1), r('c', 9, 1)], 'a', 'steps')).toBe('4 steps behind 1st place');
   expect(competitionGap([r('a', 0, 1)], 'a', 'steps')).toBe('You are in 1st');
   expect(competitionGap([r('a', 600, 2), r('b', 1800, 1)], 'a', 'workout_duration')).toBe('20 min behind b for 1st');
+});
+test('competition days follow the competition timezone across daylight saving', () => {
+  expect(competitionDays({ starts_at: '2026-11-01T04:00:00Z', ends_at: '2026-11-03T05:00:00Z', timezone: 'America/New_York' })).toEqual(['2026-11-01', '2026-11-02']);
+  expect(competitionDays({ starts_at: '2026-11-01T04:00:00Z', ends_at: '2026-11-02T05:00:00Z', timezone: 'America/New_York' })).toEqual(['2026-11-01']);
+});
+test('daily steps keep missing days apart from recorded zeroes and excluded entries', () => {
+  const rows = dailySteps(['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'], [
+    { measured_on: '2026-11-01', value: 4000, included: true }, { measured_on: '2026-11-01', value: 500, included: true },
+    { measured_on: '2026-11-02', value: 0, included: true }, { measured_on: '2026-11-03', value: 900, included: false },
+  ], '2026-11-03');
+  expect(rows.map((r) => [r.value, r.excluded, r.future])).toEqual([[4500, 0, false], [0, 0, false], [null, 900, false], [null, 0, true]]);
+});
+test('rival pace chases the nearest person ahead, or the runner-up when you lead', () => {
+  const rows = [{ user_id: 'a', display_name: 'Maya', score: 90 }, { user_id: 'b', display_name: 'Theo', score: 60 }, { user_id: 'me', display_name: 'Sam', score: 50 }, { user_id: 'c', display_name: 'Ana', score: null }];
+  expect(rivalPace(rows, 'me', 3)).toEqual({ name: 'Theo', perDay: 20 });
+  expect(rivalPace(rows, 'a', 3)).toEqual({ name: 'Theo', perDay: 20 });
+  expect(rivalPace([rows[2]], 'me', 3)).toBeNull();
+  expect(rivalPace(rows, 'c', 3)).toBeNull();
 });
