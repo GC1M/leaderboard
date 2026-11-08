@@ -237,7 +237,17 @@ export async function queryHealthConnectChanges(metric: HealthMetric, state: Jou
   const from = metric === 'weight' ? EPOCH : state.from;
   // History access granted after a truncated import: the full window reads now, so start a fresh full read (as for an
   // expired token) instead of waiting for "Recheck Health History". Health Connect can't report that grant, so probe.
-  if (cursor && cursor.p === undefined && state.truncatedFrom && await reads(hc, type, from, state.truncatedFrom)) cursor = null;
+  // Deletions since the last sync are drained from the old token first: the fresh read only upserts.
+  let deleted: string[] = [];
+  if (cursor && cursor.p === undefined && state.truncatedFrom && await reads(hc, type, from, state.truncatedFrom)) {
+    for (let token = cursor.t, more = true; more;) {
+      const res = await hc.getChanges({ changesToken: token });
+      if (res.changesTokenExpired) break;
+      deleted = [...deleted, ...res.deletionChanges.map((d) => d.recordId)];
+      token = res.nextChangesToken; more = res.hasMore;
+    }
+    cursor = null;
+  }
   if (cursor && cursor.p === undefined) {
     const res = await hc.getChanges({ changesToken: cursor.t });
     if (!res.changesTokenExpired) {
@@ -250,7 +260,7 @@ export async function queryHealthConnectChanges(metric: HealthMetric, state: Jou
   const t = cursor?.t ?? (await hc.getChanges({ recordTypes: [type] })).nextChangesToken;
   const page = await readSince<RecordType>(hc, type, cursor?.f ?? from, { ascendingOrder: true, pageSize: limit, pageToken: cursor?.p });
   const next: Cursor = page.pageToken ? { t, p: page.pageToken, f: page.from } : { t };
-  return { ...toPage(metric, state, page.records as HealthRecord[], [], JSON.stringify(next), !!page.pageToken), ...(cursor ? {} : { truncatedFrom: page.truncated ? page.from : undefined }) };
+  return { ...toPage(metric, state, page.records as HealthRecord[], deleted, JSON.stringify(next), !!page.pageToken), ...(cursor ? {} : { truncatedFrom: page.truncated ? page.from : undefined }) };
 }
 
 // Aggregation de-duplicates overlapping sources (phone + watch) the way the Health Connect app does; raw records are never summed.
@@ -267,13 +277,14 @@ export async function readHealthConnectWeightTies(now: Date): Promise<WeightSamp
   const hc = await client();
   if (!hc) return [];
   // Newest first, paging past readings this app wrote (a user who logs weight here daily can have hundreds).
+  // At most 10 pages (500 readings), so a history of only our own readings is not scanned in full on every sync.
   // ponytail: ties split across a page boundary lose the later half; normalizeWeight then picks among fewer.
-  let others: HealthRecord[] = [], pageToken: string | undefined, start = EPOCH;
+  let others: HealthRecord[] = [], pageToken: string | undefined, start = EPOCH, pages = 0;
   do {
     const page = await readSince(hc, 'Weight', start, { ascendingOrder: false, pageSize: 50, pageToken }, now.toISOString());
     start = page.from;
     pageToken = page.pageToken;
     others = (page.records as HealthRecord[]).filter((r) => !isOwn(r) && r.metadata?.id);
-  } while (!others.length && pageToken);
+  } while (!others.length && pageToken && ++pages < 10);
   return others.filter((r) => r.time === others[0].time).map((r) => ({ uuid: r.metadata!.id!, startDate: new Date(r.time!), quantity: r.weight!.inKilograms, unit: 'kg' }));
 }

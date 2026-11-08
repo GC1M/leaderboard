@@ -107,6 +107,24 @@ describe('QA suspected bugs', () => {
     expect({ truncatedFrom: second.truncatedFrom, imported: [...new Set(uploadedWater(upload))].sort() }).toEqual({ truncatedFrom: undefined, imported: ['new', 'old'] });
   });
 
+  it('1d: a deletion made while truncated still reaches the server when history access is granted', async () => {
+    grants.add('read:Hydration');
+    historyFloor = startOfLocalDay(new Date(), 30).toISOString();
+    put('Hydration', drink('old', 60, 250)); put('Hydration', drink('new', 3, 300)); put('Hydration', drink('gone', 2, 200));
+    const mem = memory(), upload = jest.fn(async () => {});
+    await sync('water', mem, upload);
+    del('Hydration', 'gone'); // deleted in Health Connect before the next sync
+    historyFloor = null;
+    await sync('water', mem, upload);
+    expect(upload).toHaveBeenLastCalledWith('water', expect.objectContaining({ removeWater: ['gone'] }));
+    expect(mem.state().samples.map((x) => x.id)).not.toContain('gone');
+  });
+  it('weight: the latest-reading scan stops after a bounded number of pages of our own readings', async () => {
+    grants.add('read:Weight');
+    for (let i = 0; i < 2000; i++) put('Weight', { metadata: meta(`mine-${i}`, OWN_PACKAGE), time: new Date(NOW.getTime() - (i + 1) * 3600000).toISOString(), weight: { inKilograms: 79 } });
+    expect(await readLatestWeight(NOW)).toBeNull();
+    expect(mockHc.readRecords.mock.calls.length).toBeLessThanOrEqual(10);
+  });
   it('1d workaround: "Recheck Health History" (anchor reset like resetHealthAnchors) does import the older data', async () => {
     grants.add('read:Hydration');
     historyFloor = startOfLocalDay(new Date(), 30).toISOString();
