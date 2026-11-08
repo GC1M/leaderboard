@@ -1,9 +1,10 @@
 // Food photos (#51): take or choose a photo, read its text on the device, then delete the copy. Nothing is
-// uploaded, so there is no server copy to retain or delete. iOS only (Apple Vision); elsewhere the scan buttons
-// are hidden and food is entered by search or as a custom food.
+// uploaded, so there is no server copy to retain or delete. Native builds only (Apple Vision on iOS, ML Kit on
+// Android); in Expo Go and on the web the scan buttons are hidden and food is entered by search or as a custom food.
 import { requireOptionalNativeModule } from 'expo';
 import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
 
 import { toLines, type ScanLine, type TextBox } from './scan';
 
@@ -11,6 +12,9 @@ type Recognizer = { recognize: (uri: string) => Promise<TextBox[]> };
 const recognizer = requireOptionalNativeModule<Recognizer>('LeaderboardTextRecognizer');
 
 export const photoScanAvailable = () => recognizer != null;
+
+export const photoPrivacyNote = (os: string = Platform.OS) =>
+  `The photo is read on this ${os === 'ios' ? 'iPhone' : 'device'} and deleted right after. It is never uploaded or saved.`;
 
 export const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
 
