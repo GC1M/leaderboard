@@ -74,14 +74,15 @@ export default function WaterEntryDetail() {
   const save = async () => {
     const v = decimalValue(amount);
     const ml = v === null ? null : entryMl(v, unit);
-    if (ml === null) return setError(amountError(unit));
+    // An unchanged amount keeps the stored mL, so a round trip through fl oz does not drift. Compared as numbers, so
+    // "8.50" matches "8.5", and before validation, so a tiny stored amount that shows as 0 can still be re-saved.
+    const same = v !== null && v === Math.round(unitFromMl(entry.ml, unit) * 10) / 10;
+    if (!same && ml === null) return setError(amountError(unit));
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
-      // An unchanged amount keeps the stored mL, so a round trip through fl oz does not drift. Compared as numbers, so "8.50" matches "8.5".
-      const same = ml === entryMl(Math.round(unitFromMl(entry.ml, unit) * 10) / 10, unit);
-      await saveWaterEdit(uid, entry, { ml: same ? undefined : ml, consumedAt: at });
+      await saveWaterEdit(uid, entry, { ml: same ? undefined : ml!, consumedAt: at });
       void choice.sync();
       router.back();
     } catch (e) {

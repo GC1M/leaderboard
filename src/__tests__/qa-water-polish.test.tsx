@@ -80,6 +80,24 @@ test('the target limit is stated in fl oz when entering fl oz', async () => {
   expect(mockSetTarget).not.toHaveBeenCalled();
 });
 
+test('a tiny stored entry shown as 0 fl oz can still be saved unchanged, for example after a time edit', async () => {
+  mockUnit = 'floz';
+  mockLoadDay.mockResolvedValue(loaded([entry({ ml: 0.4 })]));
+  const c = await render(<WaterEntryDetail />); // prefilled "0"
+  await press(c, 'Save Changes');
+  expect(mockSaveEdit).toHaveBeenCalledWith('u1', expect.anything(), expect.objectContaining({ ml: undefined }));
+});
+
+test('an unchanged target that rounds to 0 in fl oz closes the editor instead of showing an error', async () => {
+  mockUnit = 'floz';
+  mockTarget = 0.4;
+  const c = await render(<Water />);
+  await act(async () => (c as any).queryAll((n: any) => n.props.accessibilityLabel?.startsWith('Target') && n.props.onClick)[0].props.onClick());
+  await press(c, 'Save Target');
+  expect(dump(c)).not.toContain('Enter a target above 0');
+  expect(mockSetTarget).not.toHaveBeenCalled();
+});
+
 test('the day total scales with text size at least as much as the target caption', async () => {
   mockTarget = 2000;
   const c = await render(<Water />);

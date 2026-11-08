@@ -182,10 +182,11 @@ export default function Water() {
             <NumberField label={`Daily target (${unit === 'ml' ? 'mL' : 'fl oz'})`} value={targetText} onChangeText={setTargetText} error={targetError} />
             <Button label="Save Target" disabled={decimalValue(targetText) === null} onPress={() => {
               const v = decimalValue(targetText);
+              // An unchanged prefilled amount saves nothing, so a rounded fl oz value never drifts the stored mL. Compared as
+              // numbers ("8.50" matches "8.5") and before validation, so a stored target is never rejected unchanged.
+              if (target !== null && v !== null && v === Number(amountText(target, unit))) return setTargetText(null);
               const ml = v === null ? null : entryMl(v, unit, MAX_TARGET_ML);
               if (ml === null) return setTargetError(`Enter a target above 0 and up to ${limitText(unit, MAX_TARGET_ML)}.`);
-              // An unchanged prefilled amount saves nothing, so a rounded fl oz value never drifts the stored mL.
-              if (target !== null && ml === entryMl(Number(amountText(target, unit)), unit, MAX_TARGET_ML)) return setTargetText(null);
               void saveTarget(ml);
             }} />
             {target !== null && <Button plain danger label="Clear Target" onPress={() => void saveTarget(null)} />}
