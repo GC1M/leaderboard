@@ -46,7 +46,9 @@ export function registerHealthConnectWriters() {
   // Distance and energy are separate record types behind separate permissions; only the session is written.
   registerExportWriter(WORKOUT_KIND, writer(WRITE_TYPES.workouts, (e) => {
     const p = e.payload as WorkoutPayload;
-    return { recordType: 'ExerciseSession', startTime: p.start, endTime: p.end, exerciseType: exerciseType(activityCode(p.activity)), title: p.activity };
+    // Health Connect needs the end after the start; a workout logged with no duration spans one second, like food and water.
+    const endTime = Date.parse(p.end) > Date.parse(p.start) ? p.end : plusSecond(p.start);
+    return { recordType: 'ExerciseSession', startTime: p.start, endTime, exerciseType: exerciseType(activityCode(p.activity)), title: p.activity };
   }));
   // One nutrition permission covers every nutrient. attemptVersions makes each attempt's version higher than the last,
   // which the food backfill relies on when the allowed nutrients change at the same updated_at.

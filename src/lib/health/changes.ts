@@ -156,9 +156,10 @@ export async function reconcileHealth(metric: HealthMetric, options: ReconcileOp
     written += pending.changes.daily.length + pending.changes.weight.length + pending.changes.removeDaily.length + pending.changes.removeWeight.length
       + (pending.changes.workouts?.length ?? 0) + (pending.changes.removeWorkouts?.length ?? 0)
       + (pending.changes.water?.length ?? 0) + (pending.changes.removeWater?.length ?? 0);
-    // Never advance an empty initial read: newly granted access must still import historical data.
+    // Never advance an empty initial read: newly granted access must still import historical data. A page with more
+    // after it was not empty, only filtered (records this app wrote), so it advances; otherwise page 1 is read forever.
     const recheck = state.resetAfterPending;
-    state = { ...state, anchor: recheck ? undefined : state.samples.length || state.anchor || pending.changes.removeDaily.length || pending.changes.removeWeight.length || pending.changes.removeWorkouts?.length || pending.changes.removeWater?.length ? pending.anchor : state.anchor, pending: undefined, resetAfterPending: undefined };
+    state = { ...state, anchor: recheck ? undefined : state.samples.length || state.anchor || pending.hasMore || pending.changes.removeDaily.length || pending.changes.removeWeight.length || pending.changes.removeWorkouts?.length || pending.changes.removeWater?.length ? pending.anchor : state.anchor, pending: undefined, resetAfterPending: undefined };
     await journal.write(metric, state);
     const truncated = state.truncatedFrom ? { truncatedFrom: state.truncatedFrom } : {};
     if (!pending.hasMore && !recheck) return { hasMore: false, written, knownSamples: state.samples.length, ...truncated };

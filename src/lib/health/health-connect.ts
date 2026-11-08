@@ -154,6 +154,11 @@ export async function healthConnectUnavailableMessage(): Promise<string> {
   }
 }
 
+// Codes the native module gives IOException, RemoteException and an unbound service: a failed read, not the history limit,
+// so it is retried later from the same start instead of being cut to the default window.
+const TRANSIENT = new Set(['IO_EXCEPTION', 'UNDERLYING_ERROR', 'SERVICE_UNAVAILABLE', 'CLIENT_NOT_INITIALIZED']);
+export const isTransient = (e: unknown) => TRANSIENT.has((e as { code?: unknown } | null)?.code as string);
+
 // Health Connect errors, rather than returning less, when a read reaches further back than it allows without the history
 // permission. Retry once from inside the default window and report where the data now starts. A page token continues the
 // original request, so it is never retried with a different range.
@@ -163,7 +168,7 @@ export async function readSince<T extends RecordType>(hc: HealthConnect, type: T
     return { ...(await read(from)), from, truncated: false };
   } catch (e) {
     const floor = startOfLocalDay(new Date(), DEFAULT_HISTORY_DAYS).toISOString();
-    if (options.pageToken || from >= floor) throw e;
+    if (options.pageToken || from >= floor || isTransient(e)) throw e;
     return { ...(await read(floor)), from: floor, truncated: true };
   }
 }
@@ -214,6 +219,9 @@ function toPage(metric: HealthMetric, state: JournalState, records: readonly Hea
   return { samples, deleted, anchor, hasMore, ...(workouts ? { workouts } : {}), ...(water ? { water } : {}) };
 }
 
+const reads = (hc: HealthConnect, type: RecordType, start: string, end: string) =>
+  hc.readRecords(type, { timeRangeFilter: { operator: 'between', startTime: start, endTime: end }, pageSize: 1 }).then(() => true, () => false);
+
 // Opaque journal anchor. t: changes token. While the history import pages through readRecords, p holds the next page token
 // and f the range start it was requested with (page tokens are only valid for the same request).
 type Cursor = { t: string; p?: string; f?: string };
@@ -226,6 +234,10 @@ export async function queryHealthConnectChanges(metric: HealthMetric, state: Jou
   if (!hc) throw new Error(await healthConnectUnavailableMessage());
   const type = RECORD_TYPES[metric];
   let cursor = state.anchor ? JSON.parse(state.anchor) as Cursor : null;
+  const from = metric === 'weight' ? EPOCH : state.from;
+  // History access granted after a truncated import: the full window reads now, so start a fresh full read (as for an
+  // expired token) instead of waiting for "Recheck Health History". Health Connect can't report that grant, so probe.
+  if (cursor && cursor.p === undefined && state.truncatedFrom && await reads(hc, type, from, state.truncatedFrom)) cursor = null;
   if (cursor && cursor.p === undefined) {
     const res = await hc.getChanges({ changesToken: cursor.t });
     if (!res.changesTokenExpired) {
@@ -236,7 +248,7 @@ export async function queryHealthConnectChanges(metric: HealthMetric, state: Jou
     cursor = null;
   }
   const t = cursor?.t ?? (await hc.getChanges({ recordTypes: [type] })).nextChangesToken;
-  const page = await readSince<RecordType>(hc, type, cursor?.f ?? (metric === 'weight' ? EPOCH : state.from), { ascendingOrder: true, pageSize: limit, pageToken: cursor?.p });
+  const page = await readSince<RecordType>(hc, type, cursor?.f ?? from, { ascendingOrder: true, pageSize: limit, pageToken: cursor?.p });
   const next: Cursor = page.pageToken ? { t, p: page.pageToken, f: page.from } : { t };
   return { ...toPage(metric, state, page.records as HealthRecord[], [], JSON.stringify(next), !!page.pageToken), ...(cursor ? {} : { truncatedFrom: page.truncated ? page.from : undefined }) };
 }
@@ -254,7 +266,14 @@ export async function readHealthConnectSteps(start: Date, end: Date): Promise<nu
 export async function readHealthConnectWeightTies(now: Date): Promise<WeightSample[]> {
   const hc = await client();
   if (!hc) return [];
-  const { records } = await readSince(hc, 'Weight', EPOCH, { ascendingOrder: false, pageSize: 50 }, now.toISOString());
-  const others = (records as HealthRecord[]).filter((r) => !isOwn(r) && r.metadata?.id);
+  // Newest first, paging past readings this app wrote (a user who logs weight here daily can have hundreds).
+  // ponytail: ties split across a page boundary lose the later half; normalizeWeight then picks among fewer.
+  let others: HealthRecord[] = [], pageToken: string | undefined, start = EPOCH;
+  do {
+    const page = await readSince(hc, 'Weight', start, { ascendingOrder: false, pageSize: 50, pageToken }, now.toISOString());
+    start = page.from;
+    pageToken = page.pageToken;
+    others = (page.records as HealthRecord[]).filter((r) => !isOwn(r) && r.metadata?.id);
+  } while (!others.length && pageToken);
   return others.filter((r) => r.time === others[0].time).map((r) => ({ uuid: r.metadata!.id!, startDate: new Date(r.time!), quantity: r.weight!.inKilograms, unit: 'kg' }));
 }
