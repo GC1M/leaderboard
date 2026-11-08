@@ -33,9 +33,9 @@ Names only. Copy `.env.example` to `.env`; never commit values.
 | --- | --- |
 | `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL (`http://localhost:54321` for the local stack). On a phone, use your Mac's LAN IP instead of `localhost` (`ipconfig getifaddr en0`); it changes when your network does |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (`npx supabase@2.122.0 status` prints the local one) |
-| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Google sign-in. Leave empty to hide the Google button |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Google sign-in. Leave empty to hide the Google button. The only Google value Android needs (see [docs/android-sign-in.md](docs/android-sign-in.md)) |
 | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | Google sign-in on iOS |
-| `GOOGLE_IOS_URL_SCHEME` | Build time only, read by `app.config.ts`. Reversed iOS client ID (`com.googleusercontent.apps.<id>`). The Google plugin is only added when it is set, so changing it needs a new native build |
+| `GOOGLE_IOS_URL_SCHEME` | Build time only, read by `app.config.ts`. Reversed iOS client ID (`com.googleusercontent.apps.<id>`). The Google plugin is only added when it is set, so changing it needs a new native build. Android builds don't need it: without Firebase the plugin only edits the iOS Info.plist |
 
 ## Supabase
 
