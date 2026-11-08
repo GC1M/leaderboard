@@ -1,30 +1,32 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { styles as ui, useLargeText } from '@/components/ui';
-import { foodText, sleepText, weightText, workoutsText, type MemberSummary } from '@/lib/group-summaries';
+import { foodText, sleepText, waterText, weightText, workoutsText, type MemberSummary } from '@/lib/group-summaries';
 import type { WeightUnit } from '@/lib/health/format';
+import type { WaterUnit } from '@/lib/water/units';
 import { useTheme } from '@/theme';
 
-// Plain latest values, no ranking: sleep, weight, workouts and food are not competitions.
-export function MemberSummaries({ items, me, unit }: { items: MemberSummary[]; me?: string; unit: WeightUnit }) {
+// Plain latest values, no ranking: sleep, weight, workouts, food and water are not competitions.
+export function MemberSummaries({ items, me, unit, waterUnit }: { items: MemberSummary[]; me?: string; unit: WeightUnit; waterUnit: WaterUnit }) {
   const c = useTheme();
   const large = useLargeText();
   return (
     <View style={styles.wrap}>
       <Text accessibilityRole="header" style={[ui.bodyStrong, { color: c.ink }]}>
-        Sleep, weight, workouts and food
+        Sleep, weight, workouts, food and water
       </Text>
       {items.map((m) => {
         const sleep = `Sleep: ${sleepText(m.sleep)}`;
         const weight = `Weight: ${weightText(m.weight, unit)}`;
         const workouts = `Workouts: ${workoutsText(m.workouts)}`;
         const food = `Food: ${foodText(m.food)}`;
+        const water = `Water: ${waterText(m.water, waterUnit)}`;
         const name = m.userId === me ? `${m.name}, you` : m.name;
         return (
           <View
             key={m.userId}
             accessible
-            accessibilityLabel={`${name}. ${sleep}. ${weight}. ${workouts}. ${food}`}
+            accessibilityLabel={`${name}. ${sleep}. ${weight}. ${workouts}. ${food}. ${water}`}
             style={[styles.row, { borderBottomColor: c.line }]}
           >
             <Text numberOfLines={large ? undefined : 1} style={[ui.bodyStrong, { color: c.ink }]}>
@@ -34,6 +36,7 @@ export function MemberSummaries({ items, me, unit }: { items: MemberSummary[]; m
             <Text style={[ui.caption, { color: c.inkSoft }]}>{weight}</Text>
             <Text style={[ui.caption, { color: c.inkSoft }]}>{workouts}</Text>
             <Text style={[ui.caption, { color: c.inkSoft }]}>{food}</Text>
+            <Text style={[ui.caption, { color: c.inkSoft }]}>{water}</Text>
           </View>
         );
       })}

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/images/icon.png" alt="Leaderboard logo" width="96" />
+</p>
+
 # Leaderboard
 
 Free social leaderboard app for friend groups: steps, workouts, weight goals, and screen time. Expo Router / React Native / TypeScript on Supabase.
@@ -29,9 +33,9 @@ Names only. Copy `.env.example` to `.env`; never commit values.
 | --- | --- |
 | `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL (`http://localhost:54321` for the local stack). On a phone, use your Mac's LAN IP instead of `localhost` (`ipconfig getifaddr en0`); it changes when your network does |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (`npx supabase@2.122.0 status` prints the local one) |
-| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Google sign-in. Leave empty to hide the Google button |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Google sign-in. Leave empty to hide the Google button. The only Google value Android needs (see [docs/android-sign-in.md](docs/android-sign-in.md)) |
 | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | Google sign-in on iOS |
-| `GOOGLE_IOS_URL_SCHEME` | Build time only, read by `app.config.ts`. Reversed iOS client ID (`com.googleusercontent.apps.<id>`). The Google plugin is only added when it is set, so changing it needs a new native build |
+| `GOOGLE_IOS_URL_SCHEME` | Build time only, read by `app.config.ts`. Reversed iOS client ID (`com.googleusercontent.apps.<id>`). The Google plugin is only added when it is set, so changing it needs a new native build. Android builds don't need it: without Firebase the plugin only edits the iOS Info.plist |
 
 ## Supabase
 
@@ -75,7 +79,7 @@ See `docs/health-sync.md` for how import and reconciliation work.
 
 ### Build and run on a device
 
-There is no `eas.json` in this repo yet, so there is no EAS build config. Use a local build:
+`eas.json` has build profiles, but they are only set up for Android so far (see [Android builds and releases](docs/android-release.md)). For iOS, use a local build:
 
 ```bash
 npx expo run:ios --device
@@ -177,6 +181,35 @@ Run on a signed physical-device build with Apple Health, after the Phase 1 and 2
 - [ ] Turn it off, choose Keep, then On again: nothing is written twice. Turn it off, choose Remove: the samples go
 - [ ] Delete Food History and Delete Account offer Remove from Health or Keep in Health, and do what they say
 
+## Phase 6 regression checklist (water, issue #58)
+
+Run on a signed physical-device build with Apple Health, after the Phase 1, 2 and 4 checklists. CI covers the conversions, the pending queue, RLS and the group summaries. The data rules are in `docs/water.md`; the Health write steps are in `docs/water-export.md`.
+
+**Logging**
+- [ ] Log 250 mL and 8 fl oz with "Save water to Apple Health" on: Health shows the same amounts (8 fl oz is 236.6 mL)
+- [ ] Each quick-add button logs once, with the time now; a custom amount above 5000 mL or 0 shows an error and logs nothing
+- [ ] Edit an entry's amount and time, then delete another: Health shows the change once, with no duplicate or leftover sample
+- [ ] A day with no entries says "No water logged", never 0 mL. A target shows only after you set one, and Clear Target removes it
+
+**Health permissions**
+- [ ] Deny water write, log water: the entries stay here and show a retry. Allow water in Health and retry: each is saved once
+- [ ] Deny water read only: steps, sleep, weight and workouts still sync, and Water says access may be limited
+- [ ] Log water in another app (for example WaterMinder): it appears once, labelled "From Apple Health · WaterMinder", and is read-only
+- [ ] Change and then delete that sample in Health: the day updates after the next import
+- [ ] Water this app saved to Health is not imported back as a second entry
+
+**Days, offline and history**
+- [ ] Log water late in the evening, then change the phone's time zone: the entry stays on the day it was drunk
+- [ ] Log offline (airplane mode): the entry shows Not synced, then syncs once online, exactly once
+- [ ] History 7, 30 and 90 days: days with water show totals, days without are gaps, the target line shows only with a target
+- [ ] Compare several day totals with the Health app's water totals for the same days
+
+**Sharing and deletion**
+- [ ] Group Info: Water is off after joining. Turn it on: a group-mate sees only your daily total. Turn it off: they see Not shared on their next load
+- [ ] Sign out and sign in as another account: no water, pending entries or target from the first account show
+- [ ] Profile, Delete Water History: entries and target are gone, sharing choices stay, the group shows no water. Keep in Health and Remove from Health do what they say
+- [ ] Delete Account: water is gone, and the Remove from Health choice removes the water this app saved
+
 ## Competition rules (version 1, issue #43)
 
 These are the defaults the server enforces (`supabase/migrations/20261107*_competition_*.sql`). The app shows the same rules on the create, detail and standings screens.
@@ -188,7 +221,8 @@ These are the defaults the server enforces (`supabase/migrations/20261107*_compe
 - Missing data is unranked, recorded zeroes count, and ties share a rank.
 - Leaving the competition, leaving the group, turning off sharing or deleting the account removes the score from live and final standings.
 - Results stay provisional until a participant, the creator or the group owner finalizes them, at least 24 hours after the end. Finalizing freezes a server snapshot; later edits do not change it.
-- The creator or group owner can remove a participant or cancel, with a reason that is kept in the audit log.
+- The creator or group owner can cancel before the end, or remove a participant until results are finalized, with a reason that is kept in the audit log.
+- Health-labelled steps, sleep, weight and workouts reach the server only through the Health import functions; direct writes must be manual. This stops a client from relabelling manual entries as Health, but the import still trusts the values the phone read. Step days over 100,000 are flagged for review in the participant's contributions.
 
 ## Competition checklist (issue #43)
 

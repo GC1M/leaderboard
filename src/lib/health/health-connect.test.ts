@@ -98,12 +98,12 @@ describe('availability', () => {
 
 describe('permissions', () => {
   it('asks for every read type plus history in one sheet and reports partial grants per metric', async () => {
-    expect(await getAllHealthAccess()).toEqual({ steps: 'not-asked', sleep: 'not-asked', weight: 'not-asked', workouts: 'not-asked' });
+    expect(await getAllHealthAccess()).toEqual({ steps: 'not-asked', sleep: 'not-asked', weight: 'not-asked', workouts: 'not-asked', water: 'not-asked' });
     grantOnly = ['Steps', 'Weight'];
     await requestHealthAccess();
-    expect(mockHc.requestPermission.mock.calls[0][0].map((p) => p.recordType)).toEqual(['Steps', 'SleepSession', 'Weight', 'ExerciseSession', 'ReadHealthDataHistory']);
+    expect(mockHc.requestPermission.mock.calls[0][0].map((p) => p.recordType)).toEqual(['Steps', 'SleepSession', 'Weight', 'ExerciseSession', 'Hydration', 'ReadHealthDataHistory']);
     expect(mockHc.requestPermission.mock.calls[0][0].every((p) => p.accessType === 'read')).toBe(true);
-    expect(await getAllHealthAccess()).toEqual({ steps: 'asked', sleep: 'not-asked', weight: 'asked', workouts: 'not-asked' });
+    expect(await getAllHealthAccess()).toEqual({ steps: 'asked', sleep: 'not-asked', weight: 'asked', workouts: 'not-asked', water: 'not-asked' });
   });
   it('re-checks grants before every sync, so a revocation stops that metric only', async () => {
     grants.add('read:Steps').add('read:SleepSession');
@@ -224,5 +224,16 @@ describe('records', () => {
       { health_uuid: '11111111-1111-4111-8111-111111111111', activity_type: 'Running', started_at: local(25, 7), ended_at: local(25, 7, 30), timezone: TZ, duration_s: 1800, distance_m: null, energy_kcal: null },
       { health_uuid: '22222222-2222-4222-8222-222222222222', activity_type: 'Other', started_at: local(26, 7), ended_at: local(26, 8), timezone: TZ, duration_s: 3600, distance_m: null, energy_kcal: null },
     ] }));
+  });
+  it('imports hydration as water entries in mL, skipping entries this app wrote, and removes deleted ones', async () => {
+    const drink = (id: string, d: number, ml: number, origin?: string): Rec => ({ metadata: meta(id, origin), startTime: local(d, 9), endTime: local(d, 9, 1), volume: { inMilliliters: ml } });
+    put('Hydration', drink('h-1', 25, 250));
+    put('Hydration', drink('h-mine', 26, 500, OWN_PACKAGE));
+    const mem = memory(), upload = jest.fn(async () => {});
+    await sync('water', mem, upload);
+    expect(upload).toHaveBeenLastCalledWith('water', expect.objectContaining({ water: [{ health_uuid: 'h-1', consumed_at: local(25, 9), timezone: TZ, ml: 250, source_name: null }] }));
+    del('Hydration', 'h-1');
+    await sync('water', mem, upload);
+    expect(upload).toHaveBeenLastCalledWith('water', expect.objectContaining({ removeWater: ['h-1'] }));
   });
 });

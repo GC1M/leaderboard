@@ -5,6 +5,7 @@ import type { ChangePage, JournalState, StoredSample } from './changes';
 import { startOfLocalDay } from './dates';
 import type { HealthAccess, HealthMetric } from './healthkit';
 import type { SleepSample } from './sleep';
+import type { WaterChange } from './water';
 import type { WeightSample } from './weight';
 import { activityName, type WorkoutChange } from './workouts';
 
@@ -14,12 +15,12 @@ type HealthConnect = typeof import('react-native-health-connect');
 type RecordType = import('react-native-health-connect').RecordType;
 type RecordResult<T extends RecordType> = import('react-native-health-connect').RecordResult<T>;
 // readRecords results carry no recordType (getChanges results do), so records are told apart by the query that returned them.
-export type HealthRecord = Partial<RecordResult<'Steps'> & RecordResult<'Weight'> & RecordResult<'SleepSession'> & RecordResult<'ExerciseSession'>>;
+export type HealthRecord = Partial<RecordResult<'Steps'> & RecordResult<'Weight'> & RecordResult<'SleepSession'> & RecordResult<'ExerciseSession'> & RecordResult<'Hydration'>>;
 type ReadOptions = Omit<import('react-native-health-connect').ReadRecordsOptions, 'timeRangeFilter'>;
 
 export const OWN_PACKAGE = 'com.shivamlalakiya.leaderboard'; // dataOrigin of records this app wrote; never imported back
 const PROVIDER_PACKAGE = 'com.google.android.apps.healthdata';
-export const RECORD_TYPES = { steps: 'Steps', sleep: 'SleepSession', weight: 'Weight', workouts: 'ExerciseSession' } as const satisfies Record<HealthMetric, RecordType>;
+export const RECORD_TYPES = { steps: 'Steps', sleep: 'SleepSession', weight: 'Weight', workouts: 'ExerciseSession', water: 'Hydration' } as const satisfies Record<HealthMetric, RecordType>;
 const SDK_UNAVAILABLE = 1, SDK_AVAILABLE = 3; // SdkAvailabilityStatus; 2 is "provider missing or needs an update"
 // Without the history permission, reads may reach 30 days before the first grant. 29 days back is inside that window whatever the grant date.
 const DEFAULT_HISTORY_DAYS = 29;
@@ -144,7 +145,7 @@ export function mapExercise(r: HealthRecord, timezone: string): WorkoutChange | 
 function toPage(metric: HealthMetric, state: JournalState, records: readonly HealthRecord[], deletedIds: string[], anchor: string, hasMore: boolean): ChangePage {
   const rows = records.filter((r) => !isOwn(r) && r.metadata?.id);
   const id = (r: HealthRecord) => r.metadata!.id!;
-  let samples: StoredSample[] = [], workouts: WorkoutChange[] | undefined, deleted = deletedIds;
+  let samples: StoredSample[] = [], workouts: WorkoutChange[] | undefined, water: WaterChange[] | undefined, deleted = deletedIds;
   if (metric === 'steps') samples = rows.map((r) => ({ id: id(r), start: iso(r.startTime!), end: iso(r.endTime!), value: r.count! }));
   else if (metric === 'weight') samples = rows.map((r) => ({ id: id(r), start: iso(r.time!), end: iso(r.time!), value: r.weight!.inKilograms }));
   else if (metric === 'sleep') {
@@ -152,12 +153,19 @@ function toPage(metric: HealthMetric, state: JournalState, records: readonly Hea
     // The journal holds one entry per asleep interval (<session id>#<n>). A deleted or edited session drops all of its old intervals.
     const sessions = new Set([...deletedIds, ...rows.map(id)]);
     deleted = state.samples.filter((s) => sessions.has(s.id.split('#')[0])).map((s) => s.id);
+  } else if (metric === 'water') {
+    // Hydration carries a zone offset, not a zone name, so entries take this device's zone like iOS samples without HKTimeZone.
+    // dataOrigin is a package name, not an app name, so source_name stays unknown.
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    water = rows.filter((r) => Number.isFinite(r.volume?.inMilliliters) && r.volume!.inMilliliters >= 0)
+      .map((r) => ({ health_uuid: id(r), consumed_at: iso(r.startTime!), timezone, ml: r.volume!.inMilliliters, source_name: null }));
+    samples = water.map((w) => ({ id: w.health_uuid, start: w.consumed_at, end: w.consumed_at, value: w.ml }));
   } else {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     workouts = rows.map((r) => mapExercise(r, timezone)).filter((w): w is WorkoutChange => w !== null);
     samples = workouts.map((w) => ({ id: w.health_uuid, start: w.started_at, end: w.ended_at, value: w.duration_s ?? 0 }));
   }
-  return { samples, deleted, anchor, hasMore, ...(workouts ? { workouts } : {}) };
+  return { samples, deleted, anchor, hasMore, ...(workouts ? { workouts } : {}), ...(water ? { water } : {}) };
 }
 
 // Opaque journal anchor. t: changes token. While the history import pages through readRecords, p holds the next page token

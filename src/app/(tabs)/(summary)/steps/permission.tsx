@@ -59,7 +59,7 @@ export default function HealthPermission() {
   return (
     <Screen title={`Connect ${provider}`} back>
       <Text style={[styles.body, { color: t.ink }]}>
-        Leaderboard can read your steps, sleep, weight, and workouts from {provider}. You can allow any of them. It uploads daily step totals, nightly sleep summaries, weight readings, and workout summaries to your private account.
+        Leaderboard can read your steps, sleep, weight, workouts, and water from {provider}. You can allow any of them. It uploads daily step totals, nightly sleep summaries, weight readings, workout summaries, and water entries to your private account.
         Choose what to share separately in each group. Imports run while you use the app. Never your location.
       </Text>
       {android && unavailable ? (

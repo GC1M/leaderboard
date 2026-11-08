@@ -18,9 +18,13 @@ create temp table gone as select id, invite_code from create_group('Gone');
 grant select on gone to authenticated;
 select join_group((select invite_code from kept));
 insert into daily_metrics (user_id, date, metric, value, source) values (auth.uid(), current_date, 'steps', 500, 'manual');
+reset role; -- Health rows arrive through the import RPCs, so seed them as the database owner
 insert into daily_metrics (user_id, date, metric, value, source, window_start, window_end)
   values (auth.uid(), current_date, 'sleep_min', 420, 'healthkit', now() - interval '8 hours', now() - interval '1 hour');
+set local role authenticated;
+reset role; -- Health rows arrive through the import RPCs, so seed them as the database owner
 insert into weight_measurements (user_id, measured_at, kg, source) values (auth.uid(), now(), 80, 'healthkit');
+set local role authenticated;
 insert into goals (user_id, metric, start_value, target_value, start_date) values (auth.uid(), 'weight_kg', 82, 78, current_date);
 insert into metric_shares (group_id, user_id, metric) values ((select id from kept), auth.uid(), 'weight');
 insert into exercises (user_id, name, category) values (auth.uid(), 'My Lift', 'strength');

@@ -4,6 +4,7 @@ import {
   deleteMemberManualSteps,
   friendlyError,
   getGroupFood,
+  getGroupWater,
   getGroupWorkouts,
   getMyShares,
   inviteLink,
@@ -210,6 +211,17 @@ test('getGroupFood asks for the last days through tomorrow, and rethrows errors 
     const err = { message: 'not a member of this group' };
     rpc.mockResolvedValue({ data: null, error: err });
     await expect(getGroupFood('g')).rejects.toBe(err);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('getGroupWater asks for the last days through tomorrow', async () => {
+  jest.useFakeTimers().setSystemTime(new Date(2026, 9, 28, 12));
+  try {
+    rpc.mockResolvedValue({ data: [{ user_id: 'a', local_date: '2026-10-28', total_ml: 500 }], error: null });
+    await expect(getGroupWater('g', 7)).resolves.toHaveLength(1);
+    expect(rpc).toHaveBeenCalledWith('group_water', { p_group_id: 'g', p_from: '2026-10-22', p_to: '2026-10-29' });
   } finally {
     jest.useRealTimers();
   }

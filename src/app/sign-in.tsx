@@ -1,6 +1,6 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Image, StyleSheet, Text, useColorScheme, View } from 'react-native';
 
 import { Button, Field, Screen, styles } from '@/components/ui';
 
@@ -88,7 +88,7 @@ export default function SignIn() {
   };
 
   return (
-    <Screen title="Leaderboard">
+    <Screen title="Leaderboard" aboveTitle={<Image source={require('../../assets/images/icon.png')} style={local.logo} accessible={false} />}>
       <Text style={[styles.body, { color: c.inkSoft }]}>Compete with your friends. Steps first.</Text>
       {(apple || googleAvailable()) && (
         <View style={local.providers}>
@@ -176,6 +176,7 @@ export default function SignIn() {
 }
 
 const local = StyleSheet.create({
+  logo: { width: 72, height: 72, borderRadius: 16, marginBottom: 8 },
   providers: { gap: 12, marginTop: 8 },
   apple: { height: 48 },
   row: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16 },

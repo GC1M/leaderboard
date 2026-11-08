@@ -36,17 +36,23 @@ select throws_ok($$insert into workout_sets (workout_exercise_id, position, reps
   '23505', null, 'set positions are unique within an exercise');
 select throws_ok($$insert into workouts (user_id, source, activity_type, started_at, ended_at, timezone)
   values (auth.uid(), 'manual', 'run', now(), now() - interval '1 minute', 'UTC')$$, '23514', null, 'end cannot precede start');
+reset role; -- checks on Health rows, which only the import RPCs write, run as the database owner
 select throws_ok($$insert into workouts (user_id, source, activity_type, started_at, ended_at, timezone)
   values (auth.uid(), 'healthkit', 'run', now(), now(), 'UTC')$$, '23514', null, 'imported workouts need Health ids');
+set local role authenticated;
 select throws_ok($$insert into workouts (user_id, source, activity_type, started_at, ended_at, timezone, health_uuid, health_device_id)
   values (auth.uid(), 'manual', 'run', now(), now(), 'UTC', gen_random_uuid(), gen_random_uuid())$$, '23514', null, 'manual workouts carry no Health ids');
 
+reset role; -- Health rows arrive through the import RPCs, so seed them as the database owner
 insert into workouts (id, user_id, source, activity_type, started_at, ended_at, timezone, health_uuid, health_device_id)
   values ('00000000-0000-0000-0000-00000000a502', auth.uid(), 'healthkit', 'running', now() - interval '1 hour', now(), 'UTC',
     '00000000-0000-0000-0000-00000000f001', '00000000-0000-0000-0000-00000000d001');
+set local role authenticated;
+reset role; -- checks on Health rows, which only the import RPCs write, run as the database owner
 select throws_ok($$insert into workouts (user_id, source, activity_type, started_at, ended_at, timezone, health_uuid, health_device_id)
   values (auth.uid(), 'healthkit', 'running', now(), now(), 'UTC', '00000000-0000-0000-0000-00000000f001', '00000000-0000-0000-0000-00000000d001')$$,
   '23505', null, 'the same Health workout cannot import twice');
+set local role authenticated;
 select throws_ok($$insert into workout_exercises (workout_id, exercise_id, position)
   values ('00000000-0000-0000-0000-00000000a502', (select id from exercises where name = 'Deadlift'), 0)$$,
   '23503', null, 'imported summaries cannot have exercises');

@@ -3,6 +3,7 @@ import { dateFromKey, formatSleep, formatWeight, type WeightUnit } from './healt
 import type { SharedMetric } from './groups';
 import { roundNutrient } from './food/nutrition';
 import { weekLabel } from './workout-history';
+import { formatWater, type WaterUnit } from './water/units';
 
 // recorded: has a value (0 is a value). no_data: shared, but nothing synced. not_shared: no value and no hint
 // whether data exists.
@@ -22,7 +23,8 @@ export type FoodSummary =
   | { state: 'no_data' }
   | { state: 'recorded'; date: string; energy: Total; protein: Total; carbs: Total; fat: Total };
 
-export type MemberSummary = { userId: string; name: string; sleep: Summary; weight: Summary; workouts: WorkoutSummary; food: FoodSummary };
+// Water is a daily total: the latest day with entries. A day without entries is no data, never 0 mL.
+export type MemberSummary = { userId: string; name: string; sleep: Summary; weight: Summary; workouts: WorkoutSummary; food: FoodSummary; water: Summary };
 
 type Slept = { user_id: string; date: string; minutes: number };
 type Weighed = { user_id: string; measured_on: string; kg: number };
@@ -31,6 +33,7 @@ type Ate = {
   energy_kcal: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null;
   energy_kcal_incomplete: boolean; protein_g_incomplete: boolean; carbs_g_incomplete: boolean; fat_g_incomplete: boolean;
 };
+type Drank = { user_id: string; local_date: string; total_ml: number };
 type Worked = { user_id: string; week_start: string; workout_count: number; total_duration_s: number };
 
 function pick(shared: boolean, found: { value: number; date: string } | undefined): Summary {
@@ -66,6 +69,7 @@ export function buildMemberSummaries(
   weights: Weighed[],
   workouts: Worked[] = [],
   food: Ate[] = [],
+  water: Drank[] = [],
 ): MemberSummary[] {
   const lastSleep = new Map<string, { value: number; date: string }>();
   for (const r of sleep) {
@@ -85,6 +89,11 @@ export function buildMemberSummaries(
     const prev = lastFood.get(r.user_id);
     if (!prev || r.local_date > prev.local_date) lastFood.set(r.user_id, r);
   }
+  const lastWater = new Map<string, { value: number; date: string }>();
+  for (const r of water) {
+    const prev = lastWater.get(r.user_id);
+    if (!prev || r.local_date > prev.date) lastWater.set(r.user_id, { value: Number(r.total_ml), date: r.local_date });
+  }
   return members.map((m) => ({
     userId: m.userId,
     name: m.name,
@@ -92,6 +101,7 @@ export function buildMemberSummaries(
     weight: pick(shares[m.userId]?.includes('weight') ?? false, weight.get(m.userId)),
     workouts: pickWorkouts(shares[m.userId]?.includes('workouts') ?? false, lastWeek.get(m.userId)),
     food: pickFood(shares[m.userId]?.includes('food') ?? false, lastFood.get(m.userId)),
+    water: pick(shares[m.userId]?.includes('water') ?? false, lastWater.get(m.userId)),
   }));
 }
 
@@ -126,4 +136,11 @@ export function foodText(s: FoodSummary, now: Date = new Date()) {
     part('carbs ', 'carbs_g', 'g', s.carbs), part('fat ', 'fat_g', 'g', s.fat),
   ].filter((p): p is string => p !== null);
   return `${parts.length ? parts.join(', ') : 'Logged, amounts unknown'}, ${readingDateLabel(dateFromKey(s.date), now).toLowerCase()}`;
+}
+
+// "1.8 L, today". "No water logged" is never "0 mL".
+export function waterText(s: Summary, unit: WaterUnit, now: Date = new Date()) {
+  if (s.state === 'not_shared') return 'Not shared';
+  if (s.state === 'no_data') return 'No water logged this week';
+  return `${formatWater(s.value, unit)}, ${readingDateLabel(dateFromKey(s.date), now).toLowerCase()}`;
 }

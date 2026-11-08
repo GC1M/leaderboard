@@ -75,11 +75,13 @@ select pg_temp.as_user('00000000-0000-0000-0000-0000000000a8');
 create temp table g as select id, invite_code from create_group('Imports');
 grant select on g to authenticated;
 insert into metric_shares (group_id, user_id, metric) values ((select id from g), auth.uid(), 'workouts');
+reset role; -- Health rows arrive through the import RPCs, so seed them as the database owner
 insert into workouts (user_id, source, activity_type, started_at, ended_at, timezone, duration_s, health_uuid, health_device_id) values
   (auth.uid(), 'healthkit', 'Traditional Strength Training', '2026-10-20T08:01:00Z', '2026-10-20T09:00:00Z', 'UTC', 3540,
    '00000000-0000-0000-0000-00000000f008', '00000000-0000-0000-0000-00000000d008'),
   (auth.uid(), 'healthkit', 'Walking', '2026-10-20T18:00:00Z', '2026-10-20T18:30:00Z', 'UTC', 1800,
    '00000000-0000-0000-0000-00000000f009', '00000000-0000-0000-0000-00000000d008');
+set local role authenticated;
 select results_eq($$select workout_count, total_duration_s from group_workouts((select id from g), '2026-10-19', '2026-10-25')$$,
   $$values (4, (4200 + 1800 + 3600 + 1800)::numeric)$$,
   'the overlapping Health copy is not counted; the separate Health walk is');
