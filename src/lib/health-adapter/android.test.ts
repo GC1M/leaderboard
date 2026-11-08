@@ -49,6 +49,15 @@ describe('Android adapter over Health Connect', () => {
     expect(await a.getPermission('steps', 'write')).toBe('unavailable');
     expect(await a.getPermission('steps', 'history')).toBe('unknown');
   });
+  it('asks for write access per type, separately from reads, and never for steps', async () => {
+    const a = createAndroidHealthAdapter();
+    expect(await a.getPermission('weight', 'write')).toBe('not-asked');
+    await a.requestPermissions('write', ['weight', 'steps']);
+    expect(mockHc.requestPermission).toHaveBeenLastCalledWith([{ accessType: 'write', recordType: 'Weight' }]);
+    expect(await a.getPermission('weight', 'write')).toBe('granted');
+    expect(await a.getPermission('weight', 'read')).toBe('not-asked');
+    expect(await a.getPermission('steps', 'write')).toBe('unavailable');
+  });
   it('maps SDK status to the shared availability results', async () => {
     sdk = 1;
     expect(await createAndroidHealthAdapter().getAvailability()).toEqual({ status: 'unsupported', reason: 'os-version' });

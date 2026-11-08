@@ -1,6 +1,6 @@
 import { localDateKey, startOfLocalDay } from '../health/dates';
 import {
-  getHealthConnectAvailability, loadHealthConnect, mapExercise, OWN_PACKAGE, readSince, RECORD_TYPES, sleepSamples,
+  getHealthConnectAvailability, loadHealthConnect, mapExercise, OWN_PACKAGE, readSince, RECORD_TYPES, refreshHealthConnectWriteAccess, sleepSamples, WRITE_TYPES,
   type HealthConnectAvailability, type HealthRecord as Rec,
 } from '../health/health-connect';
 import type { HealthMetric } from '../health/healthkit';
@@ -12,8 +12,8 @@ import {
 } from './types';
 
 // Thin wrapper over src/lib/health/health-connect.ts, which owns all Health Connect behavior. Like the iOS wrapper, the
-// journal-based change feed (changes.ts) and the export queue writers are not routed through the adapter, so readChanges,
-// write and remove answer from the matrix ('not-implemented').
+// journal-based change feed (changes.ts) and the export queue writers (health-connect-export.ts) are not routed through the
+// adapter, so readChanges, write and remove answer from the matrix ('not-implemented'). Write permissions are real.
 const metricOf = (type: HealthDataType): HealthMetric | null => (type in RECORD_TYPES ? (type as HealthMetric) : null);
 const NOT_WIRED = { status: 'unsupported', reason: 'not-implemented' } as const;
 // SDK_UNAVAILABLE in practice means Android older than 9.
@@ -37,7 +37,9 @@ async function permission(type: HealthDataType, access: AccessKind): Promise<Per
   if (!metric || !hc || (await availability()).status !== 'available') return 'unavailable';
   if (access === 'read') return (await hc.getGrantedPermissions()).some((p) => p.accessType === 'read' && p.recordType === RECORD_TYPES[metric]) ? 'granted' : 'not-asked';
   if (access === 'history') return 'unknown'; // requested with reads, but the native module does not report this grant
-  return 'unavailable'; // no writes or background reads in this build
+  const write = access === 'write' && metric !== 'steps' ? WRITE_TYPES[metric] : null; // steps are never written
+  if (write) return (await hc.getGrantedPermissions()).some((p) => p.accessType === 'write' && p.recordType === write) ? 'granted' : 'not-asked';
+  return 'unavailable'; // no background reads in this build
 }
 
 async function readable<T>(type: HealthDataType, run: () => Promise<{ data: T; truncatedFrom?: string }>): Promise<ReadResult<T>> {
@@ -98,6 +100,8 @@ export function createAndroidHealthAdapter(): HealthAdapter {
       if (hc && metrics.length && (await availability()).status === 'available') {
         if (access === 'read') await hc.requestPermission(metrics.map((m) => ({ accessType: 'read', recordType: RECORD_TYPES[m] })));
         if (access === 'history') await hc.requestPermission([{ accessType: 'read', recordType: 'ReadHealthDataHistory' }]);
+        const writes = access === 'write' ? metrics.flatMap((m) => (m === 'steps' ? [] : [WRITE_TYPES[m]])) : [];
+        if (writes.length) { await hc.requestPermission(writes.map((recordType) => ({ accessType: 'write', recordType }))); await refreshHealthConnectWriteAccess(); }
       }
       const out: PermissionSnapshot = {};
       for (const t of types) out[t] = await permission(t, access);

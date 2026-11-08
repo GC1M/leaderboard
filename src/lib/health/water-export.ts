@@ -2,6 +2,8 @@ import { supabase } from '@/lib/supabase';
 
 import { localDateKey, startOfLocalDay } from './dates';
 import { exportMetadata } from './export-metadata';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
+
 import { registerExportWriter, type ExportEntry, type ExportWriter } from './export-queue';
 import { loadHealthKit, removeExportedSample } from './healthkit';
 
@@ -52,7 +54,7 @@ export async function settleWaterExport(exp: WaterExportControls, removeFromHeal
       await exp.enqueue(WATER_KIND, e.recordId, 'delete', null, waterDeleteVersion(exp.getEntries(), e.recordId)!);
     }
     // A delete still queued did not finish: say so instead of claiming the water is gone from Health.
-    if (exp.getEntries().some((e) => e.kind === WATER_KIND && e.op === 'delete')) throw new Error("Couldn't remove some water from Apple Health. Allow water in Health and try again, or keep it in Health.");
+    if (exp.getEntries().some((e) => e.kind === WATER_KIND && e.op === 'delete')) throw new Error(`Couldn't remove some water from ${healthProviderName()}. Allow water in Health and try again, or keep it in Health.`);
   } finally {
     bumpWaterSyncGeneration();
   }
@@ -61,7 +63,7 @@ export async function settleWaterExport(exp: WaterExportControls, removeFromHeal
 // Synced manual entries of the last EXPORT_DAYS days: an entry still waiting to sync has no id and is never in it.
 export async function fetchRecentWaterRows(now = new Date()): Promise<WaterRow[]> {
   const { data, error } = await supabase.from('water_entries').select('id,updated_at,consumed_at,ml').eq('source', 'manual').gte('local_date', localDateKey(startOfLocalDay(now, EXPORT_DAYS - 1)));
-  if (error) throw new Error("Couldn't load your water to save to Apple Health.");
+  if (error) throw new Error(`Couldn't load your water to save to ${healthProviderName()}.`);
   return data as WaterRow[];
 }
 
@@ -87,7 +89,7 @@ export async function deletedWaterIds(rows: readonly { id: string }[], known: re
   for (let i = 0; i < ids.length; i += 100) {
     const chunk = ids.slice(i, i + 100);
     const { data, error } = await supabase.from('water_entries').select('id').in('id', chunk);
-    if (error) throw new Error("Couldn't check your water against Apple Health.");
+    if (error) throw new Error(`Couldn't check your water against ${healthProviderName()}.`);
     const found = new Set(data.map((r) => r.id));
     gone.push(...chunk.filter((id) => !found.has(id)));
   }

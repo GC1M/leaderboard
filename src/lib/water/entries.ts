@@ -1,6 +1,7 @@
 // Water intake (#55, #56, #57). Manual entries are saved on this device first and synced through the shared pending
 // queue (so logging works offline); imported Apple Health samples arrive through the Health sync. A day with no entries
 // has no total: never show it as 0 mL.
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import * as Crypto from 'expo-crypto';
 
 import type { Tables } from '@/lib/database.types';
@@ -219,4 +220,4 @@ export async function deleteWaterHistory(uid: string): Promise<void> {
   }
 }
 
-export const sourceLabel = (e: WaterEntry) => (e.source === 'manual' ? 'Added here' : `From Apple Health${e.sourceName ? ` · ${e.sourceName}` : ''}`);
+export const sourceLabel = (e: WaterEntry) => (e.source === 'manual' ? 'Added here' : `From ${healthProviderName()}${e.sourceName ? ` · ${e.sourceName}` : ''}`);

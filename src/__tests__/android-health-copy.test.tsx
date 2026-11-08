@@ -52,7 +52,9 @@ test('the privacy policy on Android never mentions Apple Health or the iPhone', 
   const { text } = await render('@/app/(tabs)/profile/privacy');
   expect(text).toContain('What Leaderboard reads from Health Connect');
   expect(text).toContain('about 30 days');
-  expect(text).not.toMatch(/Apple Health|iPhone|What Leaderboard saves/);
+  expect(text).toContain('What Leaderboard saves to Health Connect');
+  expect(text).toContain('Steps are not saved to Health Connect.');
+  expect(text).not.toMatch(/Apple Health|iPhone|distance or energy only if/);
 });
 
 test('sync status explains a truncated Health Connect import', () => {

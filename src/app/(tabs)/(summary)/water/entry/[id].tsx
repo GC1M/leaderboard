@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 
 import { DateField, NumberField } from '@/components/inputs';
 import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
@@ -65,7 +66,7 @@ export default function WaterEntryDetail() {
     return (
       <Screen title="Water" back>
         {details}
-        <Text style={[styles.body, { color: c.inkSoft }]}>This water came from Apple Health. To change or delete it, use the Health app or the app that recorded it.</Text>
+        <Text style={[styles.body, { color: c.inkSoft }]}>{`This water came from ${healthProviderName()}. To change or delete it, use ${Platform.OS === 'android' ? 'Health Connect' : 'the Health app'} or the app that recorded it.`}</Text>
       </Screen>
     );
   }

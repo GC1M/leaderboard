@@ -3,7 +3,7 @@ import { Linking, Platform } from 'react-native';
 
 import type { ChangePage, JournalState, StoredSample } from './changes';
 import { startOfLocalDay } from './dates';
-import type { HealthAccess, HealthMetric } from './healthkit';
+import type { HealthAccess, HealthMetric, HealthWriteAccess } from './healthkit';
 import type { SleepSample } from './sleep';
 import type { WaterChange } from './water';
 import type { WeightSample } from './weight';
@@ -36,8 +36,13 @@ const EXERCISE_AS_HK: Record<number, number> = {
   73: 46, 74: 46, 75: 47, 76: 48, 78: 51, 79: 52, 80: 54, 81: 50, 82: 70, 83: 57,
 };
 
+// What the export queue writes (#61). Steps are never written: aggregation would count them in our own imported totals.
+export const WRITE_TYPES = { weight: 'Weight', sleep: 'SleepSession', workouts: 'ExerciseSession', nutrition: 'Nutrition', water: 'Hydration' } as const satisfies Record<string, RecordType>;
+export type HealthConnectWriteType = (typeof WRITE_TYPES)[keyof typeof WRITE_TYPES];
+
 let cached: HealthConnect | null | undefined;
 let ready: Promise<boolean> | undefined;
+let writeGrants = new Set<string>();
 
 // The native module only exists in an Android dev/production build; its JS entry throws on iOS and web as soon as any export is touched.
 export function loadHealthConnect(): HealthConnect | null {
@@ -59,6 +64,7 @@ export const isHealthConnectLoaded = () => loadHealthConnect() !== null;
 export function resetHealthConnectCache() {
   cached = undefined;
   ready = undefined;
+  writeGrants = new Set();
 }
 
 // 'provider-update-required' covers both "not installed" and "too old": Health Connect does not say which, and Google Play fixes both.
@@ -96,6 +102,46 @@ export async function requestHealthConnectAccess(): Promise<void> {
     { accessType: 'read', recordType: 'ReadHealthDataHistory' },
   ]);
 }
+
+// The export queue and the save switches ask for write access synchronously (HealthKit can answer that way), so write
+// grants are cached: refreshed before the queue runs, after every request and after a failed write.
+export async function refreshHealthConnectWriteAccess(): Promise<void> {
+  const hc = await client();
+  writeGrants = hc ? new Set([...(await granted(hc))].filter((k) => k.startsWith('write:')).map((k) => k.slice(6))) : new Set();
+}
+export const getHealthConnectWriteAccess = (type: HealthConnectWriteType): HealthWriteAccess => !loadHealthConnect() ? 'unavailable' : writeGrants.has(type) ? 'granted' : 'not-asked';
+
+// One kind of access per request: write only, for the types the feature the user just turned on needs.
+export async function requestHealthConnectWriteAccess(types: readonly HealthConnectWriteType[]): Promise<void> {
+  const hc = await client();
+  if (hc && types.length) await hc.requestPermission(types.map((recordType) => ({ accessType: 'write' as const, recordType })));
+  await refreshHealthConnectWriteAccess();
+}
+
+// Writes are upserts keyed by our clientRecordId: Health Connect keeps the record with the highest clientRecordVersion,
+// so a retry with the same version changes nothing and an edit (higher version) replaces it. A failure that turns out to
+// be a missing grant is tagged so the queue shows it as a permission problem.
+async function guarded<T>(type: HealthConnectWriteType, run: (hc: HealthConnect) => Promise<T>): Promise<T> {
+  const hc = await client();
+  if (!hc) throw new Error(await healthConnectUnavailableMessage());
+  try {
+    return await run(hc);
+  } catch (e) {
+    await refreshHealthConnectWriteAccess().catch(() => {});
+    throw writeGrants.has(type) ? e : Object.assign(new Error('Health Connect did not allow saving this.'), { reason: 'permission' });
+  }
+}
+type HealthConnectRecord = import('react-native-health-connect').HealthConnectRecord;
+export type WriteRecord = HealthConnectRecord extends infer R ? R extends HealthConnectRecord ? Omit<R, 'metadata'> : never : never;
+export const insertHealthConnectRecord = (type: HealthConnectWriteType, record: WriteRecord, clientRecordId: string, version: number) =>
+  guarded(type, async (hc) => (await hc.insertRecords([{ ...record, metadata: { clientRecordId, clientRecordVersion: version, recordingMethod: 3 } } as HealthConnectRecord]))[0] ?? null);
+// Health Connect only deletes records the calling app wrote; the client record id narrows it to this one export.
+export const deleteHealthConnectRecord = (type: HealthConnectWriteType, clientRecordId: string) => guarded(type, (hc) => hc.deleteRecordsByUuids(type, [], [clientRecordId]));
+
+// ExerciseType for an activity, through the HKWorkoutActivityType code the iOS export uses (activityCode); the first
+// listed Health Connect type wins (running, not treadmill). Unknown activities are OTHER_WORKOUT (0).
+const HK_AS_EXERCISE: Record<number, number> = Object.fromEntries(Object.entries(EXERCISE_AS_HK).reverse().map(([hc, hk]) => [hk, Number(hc)]));
+export const exerciseType = (hkCode: number) => HK_AS_EXERCISE[hkCode] ?? 0;
 
 export const openHealthConnectSettings = () => loadHealthConnect()?.openHealthConnectSettings();
 export const openHealthConnectInstall = () => Linking.openURL(`market://details?id=${PROVIDER_PACKAGE}`);

@@ -1,6 +1,6 @@
 # Shared health adapter and Android capability matrix (#59)
 
-Design for keeping Apple HealthKit code isolated and planning Android (Health Connect) equivalents. Code lives in `src/lib/health-adapter/`. Android reads (steps, sleep, weight, workouts) shipped in #60: see "Android: Health Connect reads" in `docs/health-sync.md`. Android writes are still a plan.
+Design for keeping Apple HealthKit code isolated and planning Android (Health Connect) equivalents. Code lives in `src/lib/health-adapter/`. Android reads (steps, sleep, weight, workouts) shipped in #60: see "Android: Health Connect reads" in `docs/health-sync.md`. Android writes of app-created entries shipped in #61 (weight, sleep, workouts, food; never steps): see "Android: Health Connect writes" in `docs/health-sync.md`.
 
 ## What was added
 
@@ -24,11 +24,11 @@ Design for keeping Apple HealthKit code isolated and planning Android (Health Co
 
 | Type | iOS read | iOS write | Android read | Android write |
 | --- | --- | --- | --- | --- |
-| Steps | App: yes | Platform yes (U vs Apple docs); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_STEPS`); App: yes (#60) | Platform yes (`WRITE_STEPS`); App: no |
-| Sleep | App: yes | Platform yes (U); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_SLEEP`, one session record with optional stages); App: yes (#60) | Platform yes (`WRITE_SLEEP`); App: no |
-| Weight | App: yes | Platform yes (write permission path exercised in `healthkit.test.ts`); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_WEIGHT`); App: yes (#60) | Platform yes (`WRITE_WEIGHT`); App: no |
-| Workouts | Platform yes (U); App: imported (#80), not wired through the adapter | Platform yes (U); App: exported (#35), not wired through the adapter | Platform yes (`READ_EXERCISE`, routes need `READ_EXERCISE_ROUTE`); App: yes, sessions without routes, distance or energy (#60) | Platform yes (`WRITE_EXERCISE`, `WRITE_EXERCISE_ROUTE`); App: no |
-| Nutrition | Platform yes (U); App: no | Platform yes (U); App: no | Platform yes (`READ_NUTRITION`); App: no | Platform yes (`WRITE_NUTRITION`); App: no |
+| Steps | App: yes | Platform yes (U vs Apple docs); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_STEPS`); App: yes (#60) | Platform yes (`WRITE_STEPS`); App: no, on purpose (aggregation would count our own steps) |
+| Sleep | App: yes | Platform yes (U); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_SLEEP`, one session record with optional stages); App: yes (#60) | Platform yes (`WRITE_SLEEP`); App: manual sleep, by the export queue (#61) |
+| Weight | App: yes | Platform yes (write permission path exercised in `healthkit.test.ts`); App: exported by the export queue, not wired through the adapter | Platform yes (`READ_WEIGHT`); App: yes (#60) | Platform yes (`WRITE_WEIGHT`); App: manual weight, by the export queue (#61) |
+| Workouts | Platform yes (U); App: imported (#80), not wired through the adapter | Platform yes (U); App: exported (#35), not wired through the adapter | Platform yes (`READ_EXERCISE`, routes need `READ_EXERCISE_ROUTE`); App: yes, sessions without routes, distance or energy (#60) | Platform yes (`WRITE_EXERCISE`, `WRITE_EXERCISE_ROUTE`); App: app-created workouts without routes, distance or energy, by the export queue (#61) |
+| Nutrition | Platform yes (U); App: no | Platform yes (U); App: no | Platform yes (`READ_NUTRITION`); App: no | Platform yes (`WRITE_NUTRITION`); App: food entries, by the export queue (#61) |
 | Water | Platform yes (U); App: no | Platform yes (U); App: no | Platform yes (`READ_HYDRATION`, a separate record type from nutrition); App: no | Platform yes (`WRITE_HYDRATION`); App: no |
 
 | Limit | iOS (as the app uses it) | Android Health Connect |

@@ -18,8 +18,9 @@ Keep this table equal to `android.permissions` in `app.config.ts`. Google reject
 | `android.permission.health.WRITE_SLEEP` | Sleep sessions | Saves manually entered sleep, only after the user turns that on. | Sleep entry |
 | `android.permission.health.WRITE_EXERCISE` | Exercise sessions | Saves workouts logged in the app, only after the user turns that on. | Workout logging |
 | `android.permission.health.WRITE_NUTRITION` | Nutrition | Saves food logged in the app, only after the user turns that on. | Food diary |
+| `android.permission.health.WRITE_HYDRATION` | Hydration | Saves water logged in the app, only after the user turns that on. | Water |
 
-Not requested: background reads (`READ_HEALTH_DATA_IN_BACKGROUND`; sync runs only while the app is open), exercise routes, hydration writes (water logged in the app is not saved to Health Connect yet), steps writes (left out on purpose so Health Connect's step totals never count the app's own entries).
+Not requested: background reads (`READ_HEALTH_DATA_IN_BACKGROUND`; sync runs only while the app is open), exercise routes, steps writes (left out on purpose so Health Connect's step totals never count the app's own entries).
 
 Final list check before submitting:
 
