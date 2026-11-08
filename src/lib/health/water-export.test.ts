@@ -176,6 +176,11 @@ describe('settling water in Health (keep or remove)', () => {
     expect(c.enqueue.mock.calls.map((x) => [x[1], x[2]])).toEqual([['sent', 'delete']]);
     expect(c.getEntries().map((e) => e.recordId)).toEqual(['f']);
   });
+  it('remove that fails keeps a never-attempted save as a delete, so a sync while the switch is still on cannot export it (#155)', async () => {
+    const c = controls([entry('sent', 1), entry('waiting', 1, { status: 'pending', payload: { ml: 1 } })], 'wait');
+    await expect(settleWaterExport(c, true)).rejects.toThrow(/Couldn't remove some water/);
+    expect(c.getEntries().map((e) => [e.recordId, e.op])).toEqual([['sent', 'delete'], ['waiting', 'delete']]);
+  });
   it('remove says so when a delete has not finished, and bumps the sync generation before and after', async () => {
     const before = waterSyncGeneration();
     await expect(settleWaterExport(controls([entry('sent', 1)], 'wait'), true)).rejects.toThrow(/Couldn't remove some water/);

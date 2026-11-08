@@ -7,6 +7,7 @@ import { Button, ErrorText, Skeleton, styles as ui, useLargeText } from '@/compo
 import { LeaderboardRowView } from '@/components/leaderboard/LeaderboardRowView';
 import { MemberSummaries } from '@/components/leaderboard/MemberSummaries';
 import { useAuth } from '@/lib/auth';
+import { flushLocalLogs } from '@/lib/flush-logs';
 import { buildMemberSummaries, type MemberSummary } from '@/lib/group-summaries';
 import { getGroupFood, getGroupShares, getGroupWater, getGroupSleep, getGroupWeights, getGroupWorkouts, isNotMember, isValidGroupId, listMembers } from '@/lib/groups';
 import { useWaterUnit } from '@/lib/water/units';
@@ -58,7 +59,7 @@ export default function GroupDetail() {
 
   const load = useCallback(
     () =>
-      Promise.resolve().then(() => {
+      Promise.resolve(me && flushLocalLogs(me)).then(() => {
         if (!isValidGroupId(id)) throw new Error('not a member of this group');
         return Promise.all([supabase.from('groups').select('name').eq('id', id).maybeSingle(), getLeaderboard(id, METRIC, period)]);
       })
@@ -95,7 +96,7 @@ export default function GroupDetail() {
           }
           setError("Couldn't load the leaderboard. Pull down to try again.");
         }),
-    [id, period, router],
+    [id, period, router, me],
   );
 
   // Also reloads when coming back from group info, which can rename the group or remove members.

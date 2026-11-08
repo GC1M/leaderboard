@@ -6,7 +6,7 @@ import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import { writeTypesFor } from '@/lib/health/export-queue';
-import { allowedFoodMask, deletedFoodIds, fetchRecentFoodRows, FOOD_KIND, exportedFood, foodSyncGeneration, foodDeleteVersion, pendingFoodSaves, settleFoodExport } from '@/lib/health/food-export';
+import { allowedFoodMask, bumpFoodSyncGeneration, deletedFoodIds, fetchRecentFoodRows, FOOD_KIND, exportedFood, foodSyncGeneration, pendingFoodSaves, removeFoodExport, settleFoodExport } from '@/lib/health/food-export';
 import { getHealthWriteAccess, isHealthAvailable } from '@/lib/health/healthkit';
 import { useHealthExport } from '@/lib/health/sync';
 import { secureStorage } from '@/lib/secure-storage';
@@ -28,9 +28,12 @@ export function useFoodExport() {
   const [on, setOn] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const latest = useRef({ on, ready: exp.ready, entries: exp.entries, enqueue: exp.enqueue });
-  useEffect(() => { latest.current = { on, ready: exp.ready, entries: exp.entries, enqueue: exp.enqueue }; });
+  const fresh = () => ({ on, ready: exp.ready, entries: exp.entries, getEntries: exp.getEntries, enqueue: exp.enqueue, forget: exp.forget });
+  const latest = useRef(fresh());
+  useEffect(() => { latest.current = fresh(); });
   const running = useRef<Promise<void> | null>(null);
+  // Set from the moment the user turns the option off until it is on again: `on` only changes after the discard.
+  const stopping = useRef(false);
   useEffect(() => {
     let live = true;
     secureStorage.getItem(key).then((v) => live && setOn(v === '1'), () => {});
@@ -39,15 +42,21 @@ export function useFoodExport() {
   const sync = useCallback(() => {
     running.current ??= (async () => {
       // Before the queue has loaded its saved entries every row would look new and reset each entry's attempt version.
-      if (!latest.current.on || !latest.current.ready) return;
+      if (stopping.current || !latest.current.on || !latest.current.ready) return;
       // Food deleted or settled meanwhile (see settleFoodExport): what was read is stale, so queue nothing from it.
       const gen = foodSyncGeneration();
       const rows = await fetchRecentFoodRows();
       const { entries, enqueue } = latest.current;
       const gone = await deletedFoodIds(rows, entries);
-      if (gen !== foodSyncGeneration()) return;
-      for (const s of pendingFoodSaves(rows, entries, allowedFoodMask())) await enqueue(FOOD_KIND, s.id, 'save', s.payload, s.version);
-      for (const id of gone) await enqueue(FOOD_KIND, id, 'delete', null, foodDeleteVersion(entries, id)!);
+      // Checked before and after every enqueue: each one waits for its Health write, and a settle, history deletion
+      // or switch-off can start during that wait. A save queued after one started is taken back out of Health.
+      const stale = () => stopping.current || gen !== foodSyncGeneration();
+      for (const s of pendingFoodSaves(rows, entries, allowedFoodMask())) {
+        if (stale()) return;
+        await enqueue(FOOD_KIND, s.id, 'save', s.payload, s.version);
+        if (stale()) return void (await removeFoodExport(latest.current, s.id));
+      }
+      for (const id of gone) { if (stale()) return; await removeFoodExport(latest.current, id); }
     })().catch(() => {}).finally(() => { running.current = null; }); // a failure retries on the next diary load
     return running.current;
   }, []);
@@ -55,7 +64,8 @@ export function useFoodExport() {
   // Turning the switch off with food already in Health: the user chooses whether it stays (see settleFoodExport).
   const turnOff = (fromHealth: boolean) => {
     setBusy(true);
-    settleFoodExport(exp, fromHealth).then(() => apply(false), (e: Error) => setMessage(e.message)).finally(() => setBusy(false));
+    stopping.current = true;
+    settleFoodExport(exp, fromHealth).then(() => apply(false), (e: Error) => { stopping.current = false; setMessage(e.message); }).finally(() => setBusy(false));
   };
   const set = async (next: boolean) => {
     const n = exportedFood(exp.getEntries()).length;
@@ -73,9 +83,12 @@ export function useFoodExport() {
     setBusy(true);
     try {
       if (next) {
+        stopping.current = false;
         try { await exp.allowWrite(writeTypesFor(FOOD_KIND)); } catch { /* the access check below reports it */ }
         if (!writeTypesFor(FOOD_KIND).some((t) => getHealthWriteAccess(t) === 'granted')) return setMessage(denied());
       } else {
+        stopping.current = true;
+        bumpFoodSyncGeneration(); // a sync in flight stops queuing saves
         await exp.discard(FOOD_KIND);
       }
       setOn(next);
@@ -88,8 +101,7 @@ export function useFoodExport() {
     eligible: isHealthAvailable(), on, message, busy, set, sync,
     // After the server deleted an entry: one this device exported leaves Health too, whatever the clock says.
     deleted: useCallback(async (id: string) => {
-      const version = foodDeleteVersion(latest.current.entries, id);
-      if (version !== null) await latest.current.enqueue(FOOD_KIND, id, 'delete', null, version).catch(() => {});
+      await removeFoodExport(latest.current, id).catch(() => {});
     }, []),
   };
 }

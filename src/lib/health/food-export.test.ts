@@ -1,6 +1,6 @@
 import { isOwnExport } from './export-metadata';
 import { createExportQueue, exportWriters, type ExportEntry } from './export-queue';
-import { deletedFoodIds, EXPORT_DAYS, exportedFood, fetchRecentFoodRows, FOOD_KIND, FOOD_NUTRIENTS, foodDeleteVersion, foodPayload, foodSyncGeneration, foodVersion, pendingFoodSaves, settleFoodExport, type FoodRow } from './food-export';
+import { deletedFoodIds, EXPORT_DAYS, exportedFood, fetchRecentFoodRows, FOOD_KIND, FOOD_NUTRIENTS, foodDeleteVersion, foodPayload, foodSyncGeneration, foodVersion, pendingFoodSaves, removeFoodExport, settleFoodExport, type FoodRow } from './food-export';
 import { getHealthWriteAccess, resetHealthKitCache } from './healthkit';
 
 const mockSelect = jest.fn();
@@ -456,8 +456,17 @@ describe('settling food in Health (keep or remove)', () => {
       forget: jest.fn(async (kind: string, match: (e: ExportEntry) => boolean = () => true) => { entries = entries.filter((e) => !(e.kind === kind && match(e))); }),
     };
   };
-  const all = [mk('sent', 'success'), mk('waiting', 'pending'), mk('failed', 'failed', { reason: 'permission' }), mk('del', 'pending', { op: 'delete', payload: null }), { ...mk('w', 'success'), kind: 'workout' }];
+  const all = [mk('sent', 'success'), mk('waiting', 'pending'), mk('failed', 'failed', { reason: 'permission', attemptVersion: 1 }), mk('del', 'pending', { op: 'delete', payload: null }), { ...mk('w', 'success'), kind: 'workout' }];
 
+  it('does not count a save that succeeded with no known nutrient, since nothing was written (#155)', () => {
+    expect(exportedFood([mk('empty', 'success', { writtenTypes: 0 }), mk('old', 'success')]).map((e) => e.recordId)).toEqual(['old']);
+  });
+  it('removing a save never attempted forgets it instead of queueing a delete that waits on access (#155)', async () => {
+    const c = controls([mk('new', 'pending')], 'wait');
+    await removeFoodExport(c, 'new');
+    expect(c.enqueue).not.toHaveBeenCalled();
+    expect(c.getEntries()).toEqual([]);
+  });
   it('counts what reached Health, including a save that may have been written', () => {
     expect(exportedFood([...all, mk('half', 'pending', { writtenTypes: 3 })]).map((e) => e.recordId)).toEqual(['sent', 'half']);
   });
@@ -476,8 +485,15 @@ describe('settling food in Health (keep or remove)', () => {
   it('remove queues a delete for every food save, which replaces unsaved nutrients, and succeeds when they run', async () => {
     const c = controls(all.filter((e) => e.recordId !== 'del'));
     await settleFoodExport(c, true);
-    expect(c.enqueue.mock.calls.map((x) => [x[1], x[2], x[3]]).sort()).toEqual([['failed', 'delete', null], ['sent', 'delete', null], ['waiting', 'delete', null]]);
+    expect(c.enqueue.mock.calls.map((x) => [x[1], x[2], x[3]]).sort()).toEqual([['failed', 'delete', null], ['sent', 'delete', null]]);
+    // 'waiting' was never attempted: nothing is in Health, so it is forgotten rather than left waiting on write access.
+    expect(c.forget).toHaveBeenCalledWith(FOOD_KIND, expect.any(Function));
     expect(JSON.stringify(c.getEntries())).not.toContain('Secret');
+  });
+  it('remove that fails keeps a never-attempted save as a delete, so a sync while the switch is still on cannot export it (#155)', async () => {
+    const c = controls([mk('sent', 'success'), mk('new', 'pending')], 'fail');
+    await expect(settleFoodExport(c, true)).rejects.toThrow(/Couldn't remove some food/);
+    expect(c.getEntries().map((e) => [e.recordId, e.op])).toEqual([['sent', 'delete'], ['new', 'delete']]);
   });
   it('remove says so when a Health delete could not run, instead of claiming success', async () => {
     await expect(settleFoodExport(controls([mk('sent', 'success')], 'fail'), true)).rejects.toThrow(/Couldn't remove some food/);

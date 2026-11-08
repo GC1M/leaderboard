@@ -15,6 +15,10 @@ export type ExportEntry = {
   writtenTypes?: number; // bit mask of the sample types a writer with `intent` has written or may have written
   attemptVersion?: number; // last sync version a writer with attemptVersions used, saved before the write so it only grows
 };
+
+// A save never attempted has nothing in Health to delete: forget it instead of queueing a delete that could wait for
+// write access forever. Only for writers with attemptVersions, which stamp attemptVersion before any write.
+export const neverWritten = (e: ExportEntry) => e.op === 'save' && e.status !== 'success' && e.attemptVersion === undefined;
 export interface ExportStore {
   list(): Promise<ExportEntry[]>;
   put(entry: ExportEntry): Promise<void>;

@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 
 import { reconcileHealth, type HealthJournal, type JournalState } from './changes';
 import { createExportQueue, exportWriters, writeTypesFor, type ExportEntry } from './export-queue';
-import { FOOD_KIND, foodPayload } from './food-export';
+import { exportedFood, FOOD_KIND, foodPayload } from './food-export';
 import { OWN_PACKAGE, refreshHealthConnectWriteAccess, resetHealthConnectCache } from './health-connect';
 import { registerHealthConnectWriters } from './health-connect-export';
 import { getHealthWriteAccess } from './healthkit';
@@ -139,6 +139,18 @@ test('workouts and food map to Health Connect records; unknown nutrients stay ab
   expect(food.dietaryFiber).toBeUndefined();
   expect(food.metadata.clientRecordVersion).toBeGreaterThanOrEqual(7); // the queue's attempt version, above every earlier attempt
   expect(entry(q, FOOD_KIND)?.writtenTypes).toBe(255); // one permission covers every nutrient
+});
+
+test('a food entry with no known nutrient writes nothing and is not counted as saved to Health (#155)', async () => {
+  grants.add('write:Nutrition');
+  await refreshHealthConnectWriteAccess();
+  const q = makeQueue();
+  await q.initialize();
+  const none = { energy_kcal: null, protein_g: null, carbs_g: null, fat_g: null, fiber_g: null, sugars_g: null, sat_fat_g: null, sodium_mg: null };
+  await q.enqueue(FOOD_KIND, 'f0', 'save', foodPayload({ name: 'Mystery', consumedAt: at, nutrients: none }), 7);
+  expect(records.find((r) => r.recordType === 'Nutrition')).toBeUndefined();
+  expect(entry(q, FOOD_KIND)).toMatchObject({ status: 'success', writtenTypes: 0 });
+  expect(exportedFood(q.getSnapshot().entries)).toEqual([]);
 });
 
 test('water saves as a Hydration record in mL, asks for the Hydration write grant, and an edit replaces it', async () => {

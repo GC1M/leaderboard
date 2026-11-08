@@ -41,7 +41,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockReady = false;
   mockStore.set('health-export-u1-food', '1');
-  mockEntries = [saved('e1'), { ...saved('e2'), status: 'pending', payload: { name: 'Secret' } }];
+  mockEntries = [saved('e1'), { ...saved('e2'), status: 'pending', payload: { name: 'Secret' }, attemptVersion: 4 }];
 });
 
 test('turning the switch off with food in Health asks, and Cancel changes nothing', async () => {

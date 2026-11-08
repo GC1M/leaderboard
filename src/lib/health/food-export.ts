@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 
 import { localDateKey, startOfLocalDay } from './dates';
 import { APP_RECORD_KEY, exportMetadata } from './export-metadata';
-import { registerExportWriter, type ExportEntry, type ExportWriter } from './export-queue';
+import { neverWritten, registerExportWriter, type ExportEntry, type ExportWriter } from './export-queue';
 import { getHealthWriteAccess, loadHealthKit, removeExportedSample } from './healthkit';
 
 // Food entries logged in this app that the user chose to also save to Apple Health (#48). recordId is the
@@ -78,13 +78,27 @@ export type FoodExportControls = {
   enqueue(kind: string, recordId: string, op: 'save' | 'delete', payload: unknown, version?: number): Promise<unknown>;
   forget(kind: string, match?: (e: ExportEntry) => boolean): Promise<unknown>;
 };
-export const exportedFood = (entries: readonly ExportEntry[]) => entries.filter((e) => e.kind === FOOD_KIND && e.op === 'save' && (e.status === 'success' || !!e.writtenTypes));
+// A save that succeeded with nothing to write (no known nutrient) has writtenTypes 0 and is not in Health.
+export const exportedFood = (entries: readonly ExportEntry[]) => entries.filter((e) => e.kind === FOOD_KIND && e.op === 'save' && (e.status === 'success' ? e.writtenTypes !== 0 : !!e.writtenTypes));
 
 // Bumped when food is being settled or deleted. A diary sync that read the rows before such a change must not queue
 // anything from them, so it compares the number it saw at the start with the current one.
 let syncGeneration = 0;
 export const foodSyncGeneration = () => syncGeneration;
 export const bumpFoodSyncGeneration = () => { syncGeneration++; };
+
+// Takes one entry out of Health: queues a delete for a save that reached Health (or may have), and forgets one that
+// was never attempted, since there is nothing to delete and the delete would only wait on write access.
+export async function removeFoodExport(exp: FoodExportControls, id: string): Promise<void> {
+  const prev = exp.getEntries().find((e) => e.kind === FOOD_KIND && e.recordId === id);
+  if (!prev) return;
+  if (neverWritten(prev)) {
+    // forget waits for a write in flight, which may write this entry before stamping it, so it re-checks then.
+    await exp.forget(FOOD_KIND, (e) => e.recordId === id && neverWritten(e));
+    if (!exp.getEntries().some((e) => e.kind === FOOD_KIND && e.recordId === id)) return;
+  }
+  await exp.enqueue(FOOD_KIND, id, 'delete', null, foodDeleteVersion(exp.getEntries(), id)!);
+}
 
 export async function settleFoodExport(exp: FoodExportControls, removeFromHealth: boolean): Promise<void> {
   bumpFoodSyncGeneration();
@@ -97,8 +111,16 @@ export async function settleFoodExport(exp: FoodExportControls, removeFromHealth
 
 async function settle(exp: FoodExportControls, removeFromHealth: boolean): Promise<void> {
   if (!removeFromHealth) return void (await exp.forget(FOOD_KIND, (e) => e.op === 'save'));
-  for (const e of exp.getEntries().filter((x) => x.kind === FOOD_KIND && x.op === 'save')) {
-    await exp.enqueue(FOOD_KIND, e.recordId, 'delete', null, foodDeleteVersion(exp.getEntries(), e.recordId)!);
+  // Saves that reached Health (or may have) first. One never attempted is forgotten only once every delete finished:
+  // while the switch stays on after a failure, a forgotten row would look new to the next sync and be exported again.
+  const unsent = exp.getEntries().filter((x) => x.kind === FOOD_KIND && neverWritten(x)).map((x) => x.recordId);
+  for (const e of exp.getEntries().filter((x) => x.kind === FOOD_KIND && x.op === 'save' && !unsent.includes(x.recordId))) {
+    await removeFoodExport(exp, e.recordId);
+  }
+  const failed = exp.getEntries().some((e) => e.kind === FOOD_KIND && e.op === 'delete');
+  for (const id of unsent) {
+    if (!failed) await removeFoodExport(exp, id);
+    else if (exp.getEntries().some((e) => e.kind === FOOD_KIND && e.recordId === id && e.op === 'save')) await exp.enqueue(FOOD_KIND, id, 'delete', null, foodDeleteVersion(exp.getEntries(), id)!);
   }
   // Any delete still queued (pending or failed) did not finish: say so instead of claiming the food is gone from Health.
   if (exp.getEntries().some((e) => e.kind === FOOD_KIND && e.op === 'delete')) throw new Error(`Couldn't remove some food from ${healthProviderName()}. Allow nutrition in Health and try again, or keep it in Health.`);
