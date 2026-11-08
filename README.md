@@ -79,7 +79,7 @@ See `docs/health-sync.md` for how import and reconciliation work.
 
 ### Build and run on a device
 
-There is no `eas.json` in this repo yet, so there is no EAS build config. Use a local build:
+`eas.json` has build profiles, but they are only set up for Android so far (see [Android builds and releases](docs/android-release.md)). For iOS, use a local build:
 
 ```bash
 npx expo run:ios --device
