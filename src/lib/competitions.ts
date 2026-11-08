@@ -48,3 +48,20 @@ export const getCompetitionParticipants = (id: string) => checked(supabase.from(
 export function contributionReason(reason: string): string {
   return ({ eligible: 'Included', after_finalization: 'Changed after finalization; frozen result unchanged', outside_period: 'Session crosses a competition boundary', duplicate_import_summary: 'Detailed imported session counted instead', competition_cancelled: 'Competition cancelled', not_enrolled: 'Not enrolled' } as Record<string, string>)[reason] ?? eligibilityLabel(reason);
 }
+const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
+// One line on how far you are from the next place up, or how far ahead you lead. Null when you have no ranked score.
+export function competitionGap(rows: Pick<CompetitionStanding, 'user_id' | 'display_name' | 'score' | 'rank'>[], uid: string, metric: string): string | null {
+  const me = rows.find((r) => r.user_id === uid);
+  if (!me || me.score === null || me.rank === null) return null;
+  const others = rows.filter((r) => r.user_id !== uid && r.score !== null && r.rank !== null);
+  const amount = (n: number) => standingValue({ score: n, eligibility: 'eligible' }, metric);
+  const ahead = others.filter((r) => r.score! > me.score!);
+  if (!ahead.length) {
+    if (others.some((r) => r.score === me.score)) return `Tied for ${ordinal(me.rank)}`;
+    const next = Math.max(...others.map((r) => r.score!));
+    return others.length ? `You lead by ${amount(me.score - next)}` : 'You are in 1st';
+  }
+  const nearest = Math.min(...ahead.map((r) => r.score!));
+  const target = ahead.filter((r) => r.score === nearest);
+  return `${amount(nearest - me.score)} behind ${target.length === 1 ? target[0].display_name : `${ordinal(target[0].rank!)} place`}${target.length === 1 ? ` for ${ordinal(target[0].rank!)}` : ''}`;
+}

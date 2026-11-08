@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useLargeText } from '@/components/ui';
@@ -11,15 +12,19 @@ type Props = {
   isYou: boolean;
   leader: number;
   source?: { text: string; manual: boolean };
+  // Overrides the formatted value, for callers with their own units or empty-state wording.
+  valueText?: string;
+  // Extra captions shown inside the row, under the lane.
+  children?: ReactNode;
 };
 
 // Race-board row: heavy rank numeral, name, score, and a lane bar filled relative to the leader.
-export function LeaderboardRowView({ row, rankLabel, metric, isYou, leader, source }: Props) {
+export function LeaderboardRowView({ row, rankLabel, metric, isYou, leader, source, valueText: override, children }: Props) {
   const c = useTheme();
   // Names wrap at accessibility sizes instead of truncating to a few letters.
   const large = useLargeText();
   const noData = hasNoData(row);
-  const valueText = row.value === null ? (row.state === 'not_shared' ? 'Not shared' : 'No data') : formatValue(metric, row.value);
+  const valueText = override ?? (row.value === null ? (row.state === 'not_shared' ? 'Not shared' : 'No data') : formatValue(metric, row.value));
   const fill = row.value === null || leader <= 0 ? 0 : Math.min(1, row.value / leader);
   const rankColor = noData ? c.inkSoft : (c.medal[row.rank - 1] ?? c.ink);
   return (
@@ -48,6 +53,7 @@ export function LeaderboardRowView({ row, rankLabel, metric, isYou, leader, sour
       <View style={[styles.lane, { backgroundColor: c.lane }]}>
         <View style={[styles.lane, { width: `${fill * 100}%`, backgroundColor: isYou ? c.accent : c.border }]} />
       </View>
+      {children}
     </View>
   );
 }
