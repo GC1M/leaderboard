@@ -29,6 +29,10 @@ export const waterDeleteVersion = (known: readonly ExportEntry[], id: string, no
   return prev ? Math.max(now, prev.version + 1) : null;
 };
 
+// A save never attempted has nothing in Health to delete: forget it instead of queueing a delete that could wait for
+// write access forever.
+export const neverWritten = (e: ExportEntry) => e.op === 'save' && e.status !== 'success' && e.attemptVersion === undefined;
+
 // Saves that reached Health, or may have (an attempt was made).
 export const exportedWater = (entries: readonly ExportEntry[]) => entries.filter((e) => e.kind === WATER_KIND && e.op === 'save' && (e.status === 'success' || e.attemptVersion !== undefined));
 
@@ -46,12 +50,25 @@ export type WaterExportControls = {
   forget(kind: string, match?: (e: ExportEntry) => boolean): Promise<unknown>;
 };
 
+// Takes one entry out of Health: queues a delete for a save that reached Health (or may have), and forgets one that
+// was never attempted, since there is nothing to delete and the delete would only wait on write access.
+export async function removeWaterExport(exp: WaterExportControls, id: string): Promise<void> {
+  const prev = exp.getEntries().find((e) => e.kind === WATER_KIND && e.recordId === id);
+  if (!prev) return;
+  if (neverWritten(prev)) {
+    // forget waits for a write in flight, which may write this entry before stamping it, so it re-checks then.
+    await exp.forget(WATER_KIND, (e) => e.recordId === id && neverWritten(e));
+    if (!exp.getEntries().some((e) => e.kind === WATER_KIND && e.recordId === id)) return;
+  }
+  await exp.enqueue(WATER_KIND, id, 'delete', null, waterDeleteVersion(exp.getEntries(), id)!);
+}
+
 export async function settleWaterExport(exp: WaterExportControls, removeFromHealth: boolean): Promise<void> {
   bumpWaterSyncGeneration();
   try {
     if (!removeFromHealth) return void (await exp.forget(WATER_KIND, (e) => e.op === 'save'));
     for (const e of exp.getEntries().filter((x) => x.kind === WATER_KIND && x.op === 'save')) {
-      await exp.enqueue(WATER_KIND, e.recordId, 'delete', null, waterDeleteVersion(exp.getEntries(), e.recordId)!);
+      await removeWaterExport(exp, e.recordId);
     }
     // A delete still queued did not finish: say so instead of claiming the water is gone from Health.
     if (exp.getEntries().some((e) => e.kind === WATER_KIND && e.op === 'delete')) throw new Error(`Couldn't remove some water from ${healthProviderName()}. Allow water in Health and try again, or keep it in Health.`);

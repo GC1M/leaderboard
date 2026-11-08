@@ -12,7 +12,7 @@ type Day = { date: string; value: number };
 // 7/30/90-day bars for a daily metric (steps, sleep minutes). `fetch` must be stable (module function or useCallback).
 // A new `refresh` value refetches the current range, e.g. after the screen's own reload.
 // Days without a row draw a dashed outline, never a zero bar; the summary averages recorded days only.
-// `target` (a user-set goal) draws a dashed line at that value.
+// `target` (a user-set goal) draws a line at that value (solid on iOS: a dashed border needs all four sides).
 export function BarHistory({ fetch, fmt, noun, refresh, hasAny, emptyAction, target }: { target?: number | null; hasAny?: () => Promise<boolean>; emptyAction?: { label: string; onPress: () => void }; fetch: (days: number) => Promise<Day[]>; fmt: (v: number) => string; noun: string; refresh?: unknown }) {
   const c = useTheme();
   const [days, setDays] = useState<Range>(7);
@@ -94,6 +94,6 @@ const styles = StyleSheet.create({
   chart: { flexDirection: 'row', height: 140 },
   track: { flex: 1, justifyContent: 'flex-end' },
   gap: { height: 8, borderWidth: 1, borderStyle: 'dashed' },
-  target: { position: 'absolute', left: 0, right: 0, borderTopWidth: 1, borderStyle: 'dashed' },
+  target: { position: 'absolute', left: 0, right: 0, borderTopWidth: 1 },
   axis: { flexDirection: 'row', justifyContent: 'space-between' },
 });

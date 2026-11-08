@@ -209,6 +209,10 @@ Run on a signed physical-device build with Apple Health, after the Phase 1, 2 an
 - [ ] Sign out and sign in as another account: no water, pending entries or target from the first account show
 - [ ] Profile, Delete Water History: entries and target are gone, sharing choices stay, the group shows no water. Keep in Health and Remove from Health do what they say
 - [ ] Delete Account: water is gone, and the Remove from Health choice removes the water this app saved
+- [ ] Deny water write, log water, then delete it: no Retry is left for it, and Delete Water History with Remove from Health succeeds
+- [ ] Turn "Save water to Apple Health" off while a backlog is saving: nothing more is written to Health after that
+- [ ] With more than 500 water entries saved to Health from this app, connect water import: water from another app still imports
+- [ ] In Health, the water this app saved keeps its app record id (Water does not import it back), and an edit replaces the sample rather than adding one
 
 ## Competition rules (version 1, issue #43)
 

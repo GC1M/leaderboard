@@ -5,7 +5,7 @@ import { healthProviderName } from '@/lib/health-adapter/capabilities';
 import * as Crypto from 'expo-crypto';
 
 import type { Tables } from '@/lib/database.types';
-import { localDateKey } from '@/lib/health/dates';
+import { dateInZone } from '@/lib/health/dates';
 import { bumpWaterSyncGeneration } from '@/lib/health/water-export';
 import { createPendingQueue, type PendingOp } from '@/lib/pending-queue';
 import { supabase } from '@/lib/supabase';
@@ -40,8 +40,8 @@ export function entryFromRow(r: Row, pending: WaterEntry['pending'] = null, sync
     ml: Number(r.ml),
     consumedAt: r.consumed_at as string,
     timezone: r.timezone as string,
-    // The server sets local_date from the entry's zone; an entry it has not seen is in this device's.
-    localDate: r.local_date ?? localDateKey(new Date(r.consumed_at as string)),
+    // The server sets local_date from the entry's own zone; an entry it has not seen yet gets the same day here.
+    localDate: r.local_date ?? dateInZone(new Date(r.consumed_at as string), r.timezone),
     pending,
     syncError,
     updatedAt: r.updated_at ?? null,
@@ -55,7 +55,8 @@ export function mergePending(allRows: Row[], ops: PendingOp[]): WaterEntry[] {
   const out = rows.map((r) => {
     const op = ops.find((o) => o.kind === 'edit' && o.id === r.id);
     if (op?.kind !== 'edit') return entryFromRow(r);
-    const moved = typeof op.patch.consumed_at === 'string' ? { local_date: localDateKey(new Date(op.patch.consumed_at)) } : {};
+    const zone = (op.patch.timezone as string | undefined) ?? r.timezone;
+    const moved = typeof op.patch.consumed_at === 'string' ? { local_date: dateInZone(new Date(op.patch.consumed_at), zone) } : {};
     return entryFromRow({ ...r, ...op.patch, ...moved }, 'edit', op.error ?? null);
   });
   const have = new Set(rows.map((r) => r.client_id));
@@ -154,7 +155,7 @@ export async function loadWaterDay(uid: string, date: string): Promise<{ entries
   const { data, error } = await supabase.from('water_entries').select('*').eq('local_date', date).order('consumed_at');
   let rows: Row[] = error ? [] : (data ?? []);
   const have = new Set(rows.map((r) => r.id));
-  const moved = ops.flatMap((o) => (o.kind === 'edit' && typeof o.patch.consumed_at === 'string' && localDateKey(new Date(o.patch.consumed_at)) === date && !have.has(o.id) ? [o.id] : []));
+  const moved = ops.flatMap((o) => (o.kind === 'edit' && typeof o.patch.consumed_at === 'string' && dateInZone(new Date(o.patch.consumed_at), o.patch.timezone as string | undefined) === date && !have.has(o.id) ? [o.id] : []));
   if (!error && moved.length) rows = [...rows, ...((await supabase.from('water_entries').select('*').in('id', moved)).data ?? [])];
   return {
     entries: mergePending(rows, ops).filter((e) => e.localDate === date),

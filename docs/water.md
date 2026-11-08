@@ -8,6 +8,7 @@ Server: `supabase/migrations/20261110000000_water.sql`. App: `src/lib/water/` (d
 - `water_targets`: an optional personal daily target. No row means no target. The app never suggests a number.
 - Manual entries are saved on the iPhone first (`waterQueue`, per account) and synced, so logging works offline. Pending and failed entries show as Not synced with Retry Sync; an unsynced edit can be discarded.
 - Imported entries are read-only in the app. They change or go away only when they change in Health.
+- A Health sample is skipped if it is below 0 mL or above 20 L. A sample zone the server does not accept falls back to the profile zone, then UTC. Water this app saved to Health is left out of the import query itself.
 
 ## Units
 
@@ -27,7 +28,7 @@ Per group, off by default, through the Water switch in Group Info. A group sees 
 
 ## Deletion
 
-- Delete Water History (Profile): every water entry (manual and imported), the target, the export mapping and the changes waiting on this iPhone. The user chooses whether water this app saved to Health is removed too. Water other apps saved to Health is never touched. Imports then skip water drunk before the deletion (table `water_history_cutoffs`), so a recheck or another device cannot bring it back; water drunk later still imports.
+- Delete Water History (Profile): every water entry (manual and imported), the target, the export mapping and the changes waiting on this iPhone. The user chooses whether water this app saved to Health is removed too; the choice applies to this iPhone, and another device keeps its own record of what it saved. Water other apps saved to Health is never touched. Imports then skip water drunk before the deletion, and the deleted Health samples dated after it (table `water_history_cutoffs`, which never moves back on a later deletion), so a recheck or another device cannot bring it back; water drunk later still imports.
 - Delete Imported Health Data: imported water goes, manual water stays.
 - Delete Account: everything cascades on the server; this iPhone's water queue and export state are cleared. The same Keep or Remove from Health choice is offered.
 - Sign-out and account switch: the queue and export state are keyed by account, so nothing carries across.

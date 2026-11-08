@@ -1,4 +1,4 @@
-import { isOwnExport } from './export-metadata';
+import { EXCLUDE_OWN_EXPORTS, isOwnExport } from './export-metadata';
 import { HEALTH_TYPES, loadHealthKit } from './healthkit';
 import type { ChangePage, JournalState, StoredSample } from './changes';
 
@@ -21,7 +21,7 @@ export function mapWater(s: HealthWater, timezone: string): WaterChange | null {
   };
 }
 
-// Same contract as workoutPage: our own exports are skipped here, never in the anchored query.
+// Our own exports are also skipped here, in case one gets past the query's predicate.
 export function waterPage(
   samples: readonly HealthWater[], deleted: readonly string[], anchor: string, hasMore: boolean, timezone: string,
 ): ChangePage {
@@ -36,7 +36,11 @@ export async function queryWaterChanges(state: JournalState, limit: number): Pro
   const hk = loadHealthKit();
   if (!hk) throw new Error('Apple Health requires a native iPhone build.');
   const page = await hk.queryQuantitySamplesWithAnchor(HEALTH_TYPES.water, {
-    limit, anchor: state.anchor, unit: 'mL', filter: { date: { startDate: new Date(state.from) } },
+    // Unlike workouts, water excludes our own exports in the query itself: a full first page of them would otherwise
+    // look empty, so the anchor would never advance and other apps' water would never import. This narrows the
+    // predicate for anchors made by development builds before it existed; it only drops samples the import skips
+    // anyway, so no wanted change is lost. Deletions of other apps' water must still arrive (README device check).
+    limit, anchor: state.anchor, unit: 'mL', filter: { date: { startDate: new Date(state.from) }, ...EXCLUDE_OWN_EXPORTS },
   });
   // Same value as deviceTimezone(); importing it would load the Supabase client into the Health query module.
   return waterPage(page.samples as unknown as HealthWater[], page.deletedSamples.map((s) => s.uuid), page.newAnchor,

@@ -5,6 +5,15 @@ export function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// Calendar date (YYYY-MM-DD) of an instant in an IANA zone, the way the server files an entry's local_date.
+// Falls back to this device's date when the zone is missing or unknown.
+export function dateInZone(d: Date, zone: string | null | undefined): string {
+  try {
+    if (zone) return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+  } catch { /* unknown zone */ }
+  return localDateKey(d);
+}
+
 // Local midnight of the day `daysAgo` days before `now`. Calendar arithmetic (not 24h * n ms) so DST days of 23/25 hours are right.
 export function startOfLocalDay(now: Date, daysAgo = 0): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo);

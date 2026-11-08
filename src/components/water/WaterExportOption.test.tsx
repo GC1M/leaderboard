@@ -5,7 +5,8 @@ import { useWaterExport, WaterExportOption } from './WaterExportOption';
 
 const mockAlert = jest.fn();
 const mockEnqueue = jest.fn();
-const mockForget = jest.fn();
+// Drops what it matches, like the real queue.
+const mockForget = jest.fn(async (kind: string, match: (e: any) => boolean = () => true) => { mockEntries = mockEntries.filter((e: any) => !(e.kind === kind && match(e))); });
 const mockDiscard = jest.fn();
 const mockAllow = jest.fn();
 let mockEntries: unknown[] = [];
@@ -76,11 +77,12 @@ test('turning off with water in Health asks Keep or Remove; Keep forgets the sav
   act(() => r.unmount());
 });
 
-test('Remove queues a Health delete for each water save', async () => {
+test('Remove queues a Health delete for each water save that reached Health, and forgets one never attempted', async () => {
   const r = await mount();
   await flip(r, false);
   await act(async () => mockAlert.mock.calls[0][2][1].onPress());
-  expect(mockEnqueue.mock.calls.map((c) => [c[0], c[1], c[2]])).toEqual([['water', 'e1', 'delete'], ['water', 'e2', 'delete']]);
+  expect(mockEnqueue.mock.calls.map((c) => [c[0], c[1], c[2]])).toEqual([['water', 'e1', 'delete']]);
+  expect(mockForget).toHaveBeenCalledWith('water', expect.any(Function));
   act(() => r.unmount());
 });
 

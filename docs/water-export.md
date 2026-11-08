@@ -13,7 +13,7 @@ Rules:
 
 ## Permissions
 
-Turning the switch on asks Health for write access to water only (`toShare`, never read). If it is not allowed the switch stays off and says how to allow it. If it is revoked later, queued entries fail with reason `permission` and stay on the phone; the option says they are kept and waiting, and Retry shows the Health sheet again.
+Turning the switch on asks Health for write access to water only (`toShare`, never read). If it is not allowed the switch stays off and says how to allow it. If it is revoked later, queued entries fail with reason `permission` and stay on the phone; the option says they are kept and waiting, and Retry runs the queue again (iOS does not show the Health sheet again for a type it already asked about, so the user allows water in Settings, Health, first).
 
 ## Sync, edits and deletes
 

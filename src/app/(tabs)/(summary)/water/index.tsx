@@ -41,11 +41,14 @@ export default function Water() {
   const [targetError, setTargetError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const choice = useWaterExport();
   const { sync } = choice;
   const load = useCallback(async () => {
     await waterQueue.flushPending(uid).catch(() => 0);
+    const dropped = waterQueue.takeNotices(uid);
+    if (dropped.length) setNotice(dropped.join(' '));
     const r = await loadWaterDay(uid, date);
     setEntries(r.entries);
     setError(r.error);
@@ -112,6 +115,7 @@ export default function Water() {
       </View>
       <DateField label="Day" mode="date" value={dateFromKey(date)} onChange={(d) => { setAt(null); setDate(localDateKey(d)); }} />
       <ErrorText>{error}</ErrorText>
+      {notice && <Text accessibilityLiveRegion="polite" style={[styles.caption, { color: c.inkSoft }]}>{notice}</Text>}
       {waiting.count > 0 && (
         <View style={{ gap: 4 }}>
           <Text accessibilityLiveRegion="polite" style={[styles.body, { color: c.danger }]}>
@@ -159,7 +163,7 @@ export default function Water() {
       )}
 
       <Text accessibilityRole="header" style={[styles.heading, { color: c.ink }]}>Add water</Text>
-      <Segmented label="Water unit" options={UNITS} value={unit} onChange={(u) => { setUnit(u); setAmount(''); setFormError(null); }} />
+      <Segmented label="Water unit" options={UNITS} value={unit} onChange={(u) => { setUnit(u); setAmount(''); setFormError(null); setTargetText(null); setTargetError(null); }} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {QUICK_ADD[unit].map((v) => {
           const label = formatWater(entryMl(v, unit)!, unit);
@@ -176,7 +180,12 @@ export default function Water() {
         ) : (
           <View style={{ padding: 16, gap: 12 }}>
             <NumberField label={`Daily target (${unit === 'ml' ? 'mL' : 'fl oz'})`} value={targetText} onChangeText={setTargetText} error={targetError} />
-            <Button label="Save Target" disabled={decimalValue(targetText) === null} onPress={() => { const v = decimalValue(targetText); if (v !== null) void saveTarget(Math.round(mlFromUnit(v, unit) * 10) / 10); }} />
+            <Button label="Save Target" disabled={decimalValue(targetText) === null} onPress={() => {
+              // Unchanged prefilled text saves nothing, so a rounded fl oz value never drifts the stored mL.
+              if (target !== null && targetText === amountText(target, unit)) return setTargetText(null);
+              const v = decimalValue(targetText);
+              if (v !== null) void saveTarget(Math.round(mlFromUnit(v, unit) * 10) / 10);
+            }} />
             {target !== null && <Button plain danger label="Clear Target" onPress={() => void saveTarget(null)} />}
             <Button plain label="Cancel" onPress={() => { setTargetText(null); setTargetError(null); }} />
           </View>

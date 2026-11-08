@@ -1,5 +1,5 @@
 import { deriveChanges, reconcileHealth, type HealthChanges, type HealthJournal, type JournalState } from './changes';
-import { APP_RECORD_KEY } from './export-metadata';
+import { APP_RECORD_KEY, EXCLUDE_OWN_EXPORTS } from './export-metadata';
 import { loadHealthKit } from './healthkit';
 import { HEALTH_METRICS, createHealthCoordinator, initialHealthState, type CoordinatorDependencies } from './coordinator';
 import { uploadHealthChanges } from './upload';
@@ -50,12 +50,12 @@ test('our own exports are never imported back, and their deletions never tombsto
   expect((await deriveChanges('water', [], [], page([], ['own']))).removeWater).toEqual([]);
 });
 
-test('queries water in mL from the fixed lower bound and uses the device zone', async () => {
+test('queries water in mL from the fixed lower bound, without our own exports, and uses the device zone', async () => {
   jest.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({ timeZone: 'America/Chicago' } as Intl.ResolvedDateTimeFormatOptions);
   const query = jest.fn(async () => ({ samples: [hw('a')], deletedSamples: [{ uuid: 'gone' }], newAnchor: 'n2' }));
   (loadHealthKit as jest.Mock).mockReturnValue({ queryQuantitySamplesWithAnchor: query });
   const p = await queryWaterChanges({ from: '2026-08-01T05:00:00.000Z', anchor: 'n1', samples: [] }, 2);
-  expect(query).toHaveBeenCalledWith('HKQuantityTypeIdentifierDietaryWater', { limit: 2, anchor: 'n1', unit: 'mL', filter: { date: { startDate: new Date('2026-08-01T05:00:00.000Z') } } });
+  expect(query).toHaveBeenCalledWith('HKQuantityTypeIdentifierDietaryWater', { limit: 2, anchor: 'n1', unit: 'mL', filter: { date: { startDate: new Date('2026-08-01T05:00:00.000Z') }, ...EXCLUDE_OWN_EXPORTS } });
   expect(p).toMatchObject({ deleted: ['gone'], anchor: 'n2', hasMore: true });
   expect(p.water?.[0].timezone).toBe('America/Chicago');
 });
