@@ -18,7 +18,9 @@ select throws_ok($$select * from competition_live_scores('00000000-0000-0000-000
 select throws_ok($$insert into competition_results(competition_id,user_id,score,eligibility,manual_entries,health_entries,excluded_entries) values('00000000-0000-0000-0000-000000004001',auth.uid(),999999,'eligible',0,1,0)$$,'42501',null,'client cannot submit arbitrary scores');
 select lives_ok($$select finalize_competition('00000000-0000-0000-0000-000000004001')$$,'finalization freezes a server snapshot');
 select lives_ok($$select finalize_competition('00000000-0000-0000-0000-000000004001')$$,'repeated finalization is idempotent');
+reset role; -- checks on Health rows, which only the import RPCs write, run as the database owner
 update daily_metrics set value=777 where user_id=auth.uid() and date=current_date-4;
+set local role authenticated;
 select is((select score from competition_standings('00000000-0000-0000-0000-000000004001') where user_id=auth.uid()),100::numeric,'post-finalization edits cannot change the snapshot');
 delete from metric_shares where user_id=auth.uid() and metric='steps';
 select is((select score from competition_standings('00000000-0000-0000-0000-000000004001') where user_id=auth.uid()),null,'revocation still hides a frozen score');

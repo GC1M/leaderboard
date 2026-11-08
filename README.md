@@ -192,7 +192,8 @@ These are the defaults the server enforces (`supabase/migrations/20261107*_compe
 - Missing data is unranked, recorded zeroes count, and ties share a rank.
 - Leaving the competition, leaving the group, turning off sharing or deleting the account removes the score from live and final standings.
 - Results stay provisional until a participant, the creator or the group owner finalizes them, at least 24 hours after the end. Finalizing freezes a server snapshot; later edits do not change it.
-- The creator or group owner can remove a participant or cancel, with a reason that is kept in the audit log.
+- The creator or group owner can cancel before the end, or remove a participant until results are finalized, with a reason that is kept in the audit log.
+- Health-labelled steps, sleep, weight and workouts reach the server only through the Health import functions; direct writes must be manual. This stops a client from relabelling manual entries as Health, but the import still trusts the values the phone read. Step days over 100,000 are flagged for review in the participant's contributions.
 
 ## Competition checklist (issue #43)
 

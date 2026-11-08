@@ -29,7 +29,9 @@ select is((select count(*)::int from competition_standings('00000000-0000-0000-0
 select is((select rank from competition_standings('00000000-0000-0000-0000-000000004301') where score=0),3::bigint,'recorded zero follows shared first places at rank 3');
 select is((select count(*)::int from my_competition_contributions('00000000-0000-0000-0000-000000004301')),1,'source explanations expose only own in-period readings');
 select is((select score from competition_standings('00000000-0000-0000-0000-000000004302') where user_id=auth.uid()),50::numeric,'manual entries count only when enabled at creation');
+reset role; -- a Health correction arrives through the import functions, so apply it as the database owner
 update daily_metrics set value=150001 where user_id=auth.uid() and date='2026-03-08' and metric='steps';
+set local role authenticated;
 select is((select score from competition_standings('00000000-0000-0000-0000-000000004301') where user_id=auth.uid()),150001::numeric,'review flags never silently alter measurements');
 select is((select flagged from my_competition_contributions('00000000-0000-0000-0000-000000004301')),true,'unusually high readings ask for review');
 select is((select count(*)::int from competition_audit where competition_id='00000000-0000-0000-0000-000000004301' and target_id=auth.uid() and event='contribution_changed'),2,'insert and correction each record generic activity');
