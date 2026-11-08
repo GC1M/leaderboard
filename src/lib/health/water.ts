@@ -37,8 +37,9 @@ export async function queryWaterChanges(state: JournalState, limit: number): Pro
   if (!hk) throw new Error('Apple Health requires a native iPhone build.');
   const page = await hk.queryQuantitySamplesWithAnchor(HEALTH_TYPES.water, {
     // Unlike workouts, water excludes our own exports in the query itself: a full first page of them would otherwise
-    // look empty, so the anchor would never advance and other apps' water would never import. Water had this
-    // predicate from its first release, so it stays fixed for every anchor.
+    // look empty, so the anchor would never advance and other apps' water would never import. This narrows the
+    // predicate for anchors made by development builds before it existed; it only drops samples the import skips
+    // anyway, so no wanted change is lost. Deletions of other apps' water must still arrive (README device check).
     limit, anchor: state.anchor, unit: 'mL', filter: { date: { startDate: new Date(state.from) }, ...EXCLUDE_OWN_EXPORTS },
   });
   // Same value as deviceTimezone(); importing it would load the Supabase client into the Health query module.

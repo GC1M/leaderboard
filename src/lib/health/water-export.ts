@@ -55,7 +55,11 @@ export type WaterExportControls = {
 export async function removeWaterExport(exp: WaterExportControls, id: string): Promise<void> {
   const prev = exp.getEntries().find((e) => e.kind === WATER_KIND && e.recordId === id);
   if (!prev) return;
-  if (neverWritten(prev)) return void (await exp.forget(WATER_KIND, (e) => e.recordId === id));
+  if (neverWritten(prev)) {
+    // forget waits for a write in flight, which may write this entry before stamping it, so it re-checks then.
+    await exp.forget(WATER_KIND, (e) => e.recordId === id && neverWritten(e));
+    if (!exp.getEntries().some((e) => e.kind === WATER_KIND && e.recordId === id)) return;
+  }
   await exp.enqueue(WATER_KIND, id, 'delete', null, waterDeleteVersion(exp.getEntries(), id)!);
 }
 

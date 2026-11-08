@@ -461,14 +461,14 @@ isOneToOne: false
                   ]
                 },"water_history_cutoffs": {
                   Row: {
-                    "deleted_at": string,"user_id": string
+                    "deleted_at": string,"health_uuids": (string)[],"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "deleted_at": string,"user_id": string
+                    "deleted_at": string,"health_uuids"?: (string)[],"user_id": string
                   }
                   Update: {
-                    "deleted_at"?: string,"user_id"?: string
+                    "deleted_at"?: string,"health_uuids"?: (string)[],"user_id"?: string
                   }
                   Relationships: [
                     {

@@ -5,7 +5,8 @@ import { useWaterExport, WaterExportOption } from './WaterExportOption';
 
 const mockAlert = jest.fn();
 const mockEnqueue = jest.fn();
-const mockForget = jest.fn();
+// Drops what it matches, like the real queue.
+const mockForget = jest.fn(async (kind: string, match: (e: any) => boolean = () => true) => { mockEntries = mockEntries.filter((e: any) => !(e.kind === kind && match(e))); });
 const mockDiscard = jest.fn();
 const mockAllow = jest.fn();
 let mockEntries: unknown[] = [];

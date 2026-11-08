@@ -1,6 +1,6 @@
 import { createExportQueue, exportWriters, type ExportEntry } from './export-queue';
 import { getHealthWriteAccess, resetHealthKitCache } from './healthkit';
-import { deletedWaterIds, exportedWater, fetchRecentWaterRows, pendingWaterSaves, settleWaterExport, WATER_KIND, WATER_TYPE, waterDeleteVersion, waterSyncGeneration, waterVersion, type WaterRow } from './water-export';
+import { deletedWaterIds, exportedWater, fetchRecentWaterRows, pendingWaterSaves, removeWaterExport, settleWaterExport, WATER_KIND, WATER_TYPE, waterDeleteVersion, waterSyncGeneration, waterVersion, type WaterRow } from './water-export';
 
 const mockSelect = jest.fn();
 const mockIn = jest.fn();
@@ -181,4 +181,18 @@ describe('settling water in Health (keep or remove)', () => {
     await expect(settleWaterExport(controls([entry('sent', 1)], 'wait'), true)).rejects.toThrow(/Couldn't remove some water/);
     expect(waterSyncGeneration()).toBe(before + 2);
   });
+});
+
+test('removing an entry whose save is written while forget waits for the flight queues a delete instead of dropping it', async () => {
+  let entries: ExportEntry[] = [entry('w1', 1, { status: 'pending', payload: { ml: 1 } })];
+  const enqueue = jest.fn(async (kind: string, recordId: string, op: 'save' | 'delete', payload: unknown, version?: number) => {
+    entries = [...entries.filter((e) => e.recordId !== recordId), { kind, recordId, op, payload, version: version!, status: 'pending', attempts: 0 }];
+  });
+  // forget awaits the write in flight, which stamps and writes w1, then applies its match.
+  const forget = jest.fn(async (kind: string, match: (e: ExportEntry) => boolean = () => true) => {
+    entries = entries.map((e) => ({ ...e, status: 'success', attemptVersion: 2 }));
+    entries = entries.filter((e) => !(e.kind === kind && match(e)));
+  });
+  await removeWaterExport({ getEntries: () => entries, enqueue, forget }, 'w1');
+  expect(enqueue.mock.calls.map((c) => [c[1], c[2]])).toEqual([['w1', 'delete']]);
 });

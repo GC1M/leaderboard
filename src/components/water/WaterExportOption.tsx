@@ -30,6 +30,8 @@ export function useWaterExport() {
   const latest = useRef(fresh());
   useEffect(() => { latest.current = fresh(); });
   const running = useRef<Promise<void> | null>(null);
+  // Set from the moment the user turns the option off until it is on again: `on` only changes after the discard.
+  const stopping = useRef(false);
   useEffect(() => {
     let live = true;
     secureStorage.getItem(key).then((v) => live && setOn(v === '1'), () => {});
@@ -38,16 +40,20 @@ export function useWaterExport() {
   const sync = useCallback(() => {
     running.current ??= (async () => {
       // Before the queue has loaded its saved entries every row would look new.
-      if (!latest.current.on || !latest.current.ready) return;
+      if (stopping.current || !latest.current.on || !latest.current.ready) return;
       // Water deleted or settled meanwhile (see settleWaterExport): what was read is stale, so queue nothing from it.
       const gen = waterSyncGeneration();
       const rows = await fetchRecentWaterRows();
       const { entries, enqueue } = latest.current;
       const gone = await deletedWaterIds(rows, entries);
-      // Checked before every enqueue: each one waits for its Health write, and a settle, history deletion or
-      // switch-off can start during that wait.
-      const stale = () => gen !== waterSyncGeneration();
-      for (const s of pendingWaterSaves(rows, entries)) { if (stale()) return; await enqueue(WATER_KIND, s.id, 'save', s.payload, s.version); }
+      // Checked before and after every enqueue: each one waits for its Health write, and a settle, history deletion
+      // or switch-off can start during that wait. A save queued after one started is taken back out of Health.
+      const stale = () => stopping.current || gen !== waterSyncGeneration();
+      for (const s of pendingWaterSaves(rows, entries)) {
+        if (stale()) return;
+        await enqueue(WATER_KIND, s.id, 'save', s.payload, s.version);
+        if (stale()) return void (await removeWaterExport(latest.current, s.id));
+      }
       for (const id of gone) { if (stale()) return; await removeWaterExport(latest.current, id); }
     })().catch(() => {}).finally(() => { running.current = null; }); // a failure retries on the next load
     return running.current;
@@ -55,7 +61,8 @@ export function useWaterExport() {
   useEffect(() => { if (on && exp.ready) void sync(); }, [on, exp.ready, sync]);
   const turnOff = (fromHealth: boolean) => {
     setBusy(true);
-    settleWaterExport(exp, fromHealth).then(() => apply(false), (e: Error) => setMessage(e.message)).finally(() => setBusy(false));
+    stopping.current = true;
+    settleWaterExport(exp, fromHealth).then(() => apply(false), (e: Error) => { stopping.current = false; setMessage(e.message); }).finally(() => setBusy(false));
   };
   const set = async (next: boolean) => {
     const n = exportedWater(exp.getEntries()).length;
@@ -73,9 +80,11 @@ export function useWaterExport() {
     setBusy(true);
     try {
       if (next) {
+        stopping.current = false;
         try { await exp.allowWrite(writeTypesFor(WATER_KIND)); } catch { /* the access check below reports it */ }
         if (!writeTypesFor(WATER_KIND).some((t) => getHealthWriteAccess(t) === 'granted')) return setMessage(denied());
       } else {
+        stopping.current = true;
         bumpWaterSyncGeneration(); // a sync in flight stops queuing saves
         await exp.discard(WATER_KIND);
       }
