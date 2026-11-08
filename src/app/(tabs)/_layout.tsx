@@ -16,6 +16,10 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Icon sf="dumbbell" md="fitness_center" />
         <NativeTabs.Trigger.Label>Workouts</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="compete">
+        <NativeTabs.Trigger.Icon sf={{ default: 'trophy', selected: 'trophy.fill' }} md="emoji_events" />
+        <NativeTabs.Trigger.Label>Compete</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="groups">
         <NativeTabs.Trigger.Icon sf={{ default: 'person.3', selected: 'person.3.fill' }} md="groups" />
         <NativeTabs.Trigger.Label>Groups</NativeTabs.Trigger.Label>

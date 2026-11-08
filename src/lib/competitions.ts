@@ -93,3 +93,13 @@ export function rivalPace(rows: Pick<CompetitionStanding, 'user_id' | 'display_n
   const rival = ahead.length ? ahead.reduce((a, b) => (b.score! < a.score! ? b : a)) : others.reduce((a, b) => (b.score! > a.score! ? b : a));
   return { name: rival.display_name, perDay: Math.round(rival.score! / daysElapsed) };
 }
+export type GroupCompetition = Competition & { groups: { name: string } | null; joined: boolean };
+// Competitions across all your groups (row security limits them to groups you belong to), newest first.
+export async function getMyCompetitions(uid: string): Promise<GroupCompetition[]> {
+  const [rows, mine] = await Promise.all([
+    checked(supabase.from('competitions').select('*, groups(name)').order('starts_at', { ascending: false })),
+    checked(supabase.from('competition_participants').select('competition_id').eq('user_id', uid).eq('status', 'joined')),
+  ]);
+  const joined = new Set((mine ?? []).map((p) => p.competition_id));
+  return (rows ?? []).map((r) => ({ ...r, joined: joined.has(r.id) }));
+}

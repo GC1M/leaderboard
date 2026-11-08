@@ -55,7 +55,7 @@ export function Screen({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={backLabel}
-          onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace(segments.includes('workouts') ? '/workouts' : segments.includes('groups') ? '/groups' : segments.includes('profile') ? '/profile' : '/')))}
+          onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace(segments.includes('workouts') ? '/workouts' : segments.includes('compete') ? '/compete' : segments.includes('groups') ? '/groups' : segments.includes('profile') ? '/profile' : '/')))}
           style={[styles.back, Platform.OS === 'web' && styles.webWidth]}
         >
           <Icon name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} color={c.accent} size={20} />
