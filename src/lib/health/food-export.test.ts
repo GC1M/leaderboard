@@ -490,6 +490,11 @@ describe('settling food in Health (keep or remove)', () => {
     expect(c.forget).toHaveBeenCalledWith(FOOD_KIND, expect.any(Function));
     expect(JSON.stringify(c.getEntries())).not.toContain('Secret');
   });
+  it('remove that fails keeps a never-attempted save as a delete, so a sync while the switch is still on cannot export it (#155)', async () => {
+    const c = controls([mk('sent', 'success'), mk('new', 'pending')], 'fail');
+    await expect(settleFoodExport(c, true)).rejects.toThrow(/Couldn't remove some food/);
+    expect(c.getEntries().map((e) => [e.recordId, e.op])).toEqual([['sent', 'delete'], ['new', 'delete']]);
+  });
   it('remove says so when a Health delete could not run, instead of claiming success', async () => {
     await expect(settleFoodExport(controls([mk('sent', 'success')], 'fail'), true)).rejects.toThrow(/Couldn't remove some food/);
   });

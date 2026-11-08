@@ -65,8 +65,16 @@ export async function settleWaterExport(exp: WaterExportControls, removeFromHeal
   bumpWaterSyncGeneration();
   try {
     if (!removeFromHealth) return void (await exp.forget(WATER_KIND, (e) => e.op === 'save'));
-    for (const e of exp.getEntries().filter((x) => x.kind === WATER_KIND && x.op === 'save')) {
+    // Saves that reached Health (or may have) first. One never attempted is forgotten only once every delete finished:
+    // while the switch stays on after a failure, a forgotten row would look new to the next sync and be exported again.
+    const unsent = exp.getEntries().filter((x) => x.kind === WATER_KIND && neverWritten(x)).map((x) => x.recordId);
+    for (const e of exp.getEntries().filter((x) => x.kind === WATER_KIND && x.op === 'save' && !unsent.includes(x.recordId))) {
       await removeWaterExport(exp, e.recordId);
+    }
+    const failed = exp.getEntries().some((e) => e.kind === WATER_KIND && e.op === 'delete');
+    for (const id of unsent) {
+      if (!failed) await removeWaterExport(exp, id);
+      else if (exp.getEntries().some((e) => e.kind === WATER_KIND && e.recordId === id && e.op === 'save')) await exp.enqueue(WATER_KIND, id, 'delete', null, waterDeleteVersion(exp.getEntries(), id)!);
     }
     // A delete still queued did not finish: say so instead of claiming the water is gone from Health.
     if (exp.getEntries().some((e) => e.kind === WATER_KIND && e.op === 'delete')) throw new Error(`Couldn't remove some water from ${healthProviderName()}. Allow water in Health and try again, or keep it in Health.`);

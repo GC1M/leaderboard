@@ -111,8 +111,16 @@ export async function settleFoodExport(exp: FoodExportControls, removeFromHealth
 
 async function settle(exp: FoodExportControls, removeFromHealth: boolean): Promise<void> {
   if (!removeFromHealth) return void (await exp.forget(FOOD_KIND, (e) => e.op === 'save'));
-  for (const e of exp.getEntries().filter((x) => x.kind === FOOD_KIND && x.op === 'save')) {
+  // Saves that reached Health (or may have) first. One never attempted is forgotten only once every delete finished:
+  // while the switch stays on after a failure, a forgotten row would look new to the next sync and be exported again.
+  const unsent = exp.getEntries().filter((x) => x.kind === FOOD_KIND && neverWritten(x)).map((x) => x.recordId);
+  for (const e of exp.getEntries().filter((x) => x.kind === FOOD_KIND && x.op === 'save' && !unsent.includes(x.recordId))) {
     await removeFoodExport(exp, e.recordId);
+  }
+  const failed = exp.getEntries().some((e) => e.kind === FOOD_KIND && e.op === 'delete');
+  for (const id of unsent) {
+    if (!failed) await removeFoodExport(exp, id);
+    else if (exp.getEntries().some((e) => e.kind === FOOD_KIND && e.recordId === id && e.op === 'save')) await exp.enqueue(FOOD_KIND, id, 'delete', null, foodDeleteVersion(exp.getEntries(), id)!);
   }
   // Any delete still queued (pending or failed) did not finish: say so instead of claiming the food is gone from Health.
   if (exp.getEntries().some((e) => e.kind === FOOD_KIND && e.op === 'delete')) throw new Error(`Couldn't remove some food from ${healthProviderName()}. Allow nutrition in Health and try again, or keep it in Health.`);
