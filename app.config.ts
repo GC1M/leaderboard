@@ -29,7 +29,7 @@ const config: ExpoConfig = {
     // No versionCode here: eas.json uses appVersionSource "remote", so EAS owns it and bumps it on every production
     // build. Local and CI builds fall back to 1. See docs/android-release.md.
     adaptiveIcon: {
-      backgroundColor: '#2340D8',
+      backgroundColor: '#1E5F63',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
@@ -58,10 +58,10 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#0D1424',
+        backgroundColor: '#EDF0EE',
         image: './assets/images/splash-icon.png',
         imageWidth: 76,
-        dark: { backgroundColor: '#0B1020', image: './assets/images/splash-icon.png' },
+        dark: { backgroundColor: '#12171A', image: './assets/images/splash-icon.png' },
       },
     ],
     'expo-secure-store',
