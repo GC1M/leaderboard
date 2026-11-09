@@ -14,9 +14,11 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
 
+# Jobs run on GitHub's ubuntu runners unless the repository variable CI_RUNNER names another label. Set it to
+# "self-hosted" to use the Mac runner when hosted minutes run out; delete it to switch back.
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +61,7 @@ jobs:
   # Prebuilds android/ from app.config.ts and compiles every native module with Gradle. The only place Android
   # native code (Kotlin modules, config plugins) is compiled; debug variant, arm64 only, so no signing secrets.
   android:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -72,6 +74,9 @@ jobs:
           distribution: temurin
           java-version: 17 # React Native 0.88 compiles with JDK 17
       - uses: gradle/actions/setup-gradle@v4
+      # GitHub's ubuntu image ships the Android SDK; a self-hosted Mac may not.
+      - if: runner.environment == 'self-hosted'
+        uses: android-actions/setup-android@v3
       - run: npm ci
       - run: npx expo prebuild --platform android --no-install
       - name: Gradle assembleDebug
@@ -86,13 +91,15 @@ jobs:
           retention-days: 7
 
   db:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
         with:
           version: 2.122.0
+      - if: runner.environment == 'self-hosted'
+        run: scripts/ci/isolate-local-stack.sh
       - run: supabase start # applies every migration from scratch
       - run: supabase test db
       # src/lib/database.types.ts must be exactly what the migrations generate.
@@ -120,10 +127,13 @@ jobs:
             database.types.diff
           if-no-files-found: ignore
           retention-days: 14
+      # A self-hosted machine keeps containers between jobs; free them for the next job.
+      - if: always() && runner.environment == 'self-hosted'
+        run: supabase stop --no-backup
 
   # npm audit is report-only (findings go to the job summary); the gitleaks scan fails the job.
   supply-chain:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -175,7 +185,7 @@ jobs:
 
   # Drives the real local stack (Postgres, GoTrue, PostgREST, RLS, RPCs) with two users.
   smoke-api:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -187,6 +197,8 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.122.0
+      - if: runner.environment == 'self-hosted'
+        run: scripts/ci/isolate-local-stack.sh
       - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,mailpit
       - name: API smoke test
         run: npm run smoke:api
@@ -194,13 +206,16 @@ jobs:
         if: failure()
         run: |
           docker ps -a --format '{{.Names}}  {{.Status}}'
-          for c in supabase_auth_Leaderboard supabase_rest_Leaderboard supabase_db_Leaderboard; do
+          p=$(sed -n 's/^project_id = "\(.*\)"$/\1/p' supabase/config.toml)
+          for c in supabase_auth_$p supabase_rest_$p supabase_db_$p; do
             echo "::group::$c"; docker logs --tail 80 "$c" 2>&1 || true; echo "::endgroup::"
           done
+      - if: always() && runner.environment == 'self-hosted'
+        run: supabase stop --no-backup
 
   # Exports the web build against the local stack and loads it in headless Chromium.
   smoke-web:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -212,14 +227,17 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.122.0
+      - if: runner.environment == 'self-hosted'
+        run: scripts/ci/isolate-local-stack.sh
       - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector
       - name: Export web build against the local stack
         run: |
           supabase status -o env > "$RUNNER_TEMP/stack.env"
           anon=$(sed -n 's/^ANON_KEY="\(.*\)"$/\1/p' "$RUNNER_TEMP/stack.env")
-          [ -n "$anon" ] || { echo "::error::supabase status did not report ANON_KEY"; exit 1; }
+          api=$(sed -n 's/^API_URL="\(.*\)"$/\1/p' "$RUNNER_TEMP/stack.env")
+          [ -n "$anon" ] && [ -n "$api" ] || { echo "::error::supabase status did not report ANON_KEY and API_URL"; exit 1; }
           echo "::add-mask::$anon"
-          EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 EXPO_PUBLIC_SUPABASE_ANON_KEY="$anon" \
+          EXPO_PUBLIC_SUPABASE_URL="$api" EXPO_PUBLIC_SUPABASE_ANON_KEY="$anon" \
             npx expo export --platform web --output-dir dist
       - run: npx playwright install --with-deps chromium
       - name: Web smoke test
@@ -232,12 +250,14 @@ jobs:
           path: web-smoke-*.png
           if-no-files-found: ignore
           retention-days: 14
+      - if: always() && runner.environment == 'self-hosted'
+        run: supabase stop --no-backup
 
   # One status for branch protection: green only when every job above succeeded (skipped counts as not green).
   ci-ok:
     if: always()
     needs: [check, android, db, supply-chain, smoke-api, smoke-web]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - name: Require every job to have succeeded
