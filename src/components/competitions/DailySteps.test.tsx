@@ -21,7 +21,7 @@ test('ended card never says today and counts the last day as missing', async () 
   expect(text).not.toMatch(/[Tt]oday/);
   expect(text).toContain('1 day with no data');
 });
-test('single-day competition shows the total without a chart', async () => {
+test('single-day competition shows the total without the pace legend', async () => {
   const text = await render({ days: [day('2026-11-01', 1200)], today: '2026-11-01', live: true, pace: { name: 'Maya', perDay: 3000 } });
   expect(text).toContain('1,200'); expect(text).not.toContain('Line:');
 });

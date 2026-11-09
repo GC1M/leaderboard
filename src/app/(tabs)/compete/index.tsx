@@ -14,7 +14,7 @@ export default function Compete() {
   const [tries, setTries] = useState(0); const [refreshing, setRefreshing] = useState(false);
   useFocusEffect(useCallback(() => {
     let live = true;
-    if (!uid) return;
+    if (!uid) { setRefreshing(false); return; }
     void getMyCompetitions(uid).then((r) => { if (live) { setRows(r); setError(null); setRefreshing(false); } }, () => { if (live) { setError('Couldn’t load competitions.'); setRefreshing(false); } });
     return () => { live = false; };
   }, [uid, tries]));

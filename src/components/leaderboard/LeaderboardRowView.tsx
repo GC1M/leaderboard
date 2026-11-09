@@ -44,7 +44,7 @@ export function LeaderboardRowView({ row, rankLabel, metric, isYou, leader, sour
             </Text>
             {isYou && <Text style={[styles.tag, { color: c.accent }]}>You</Text>}
           </View>
-          {source && (source.manual || large) && <Text style={[styles.source, { color: source.manual ? c.manual : c.inkSoft }]}>{source.text}</Text>}
+          {source && <Text style={[styles.source, { color: source.manual ? c.manual : c.inkSoft }]}>{source.text}</Text>}
         </View>
         <Text maxFontSizeMultiplier={1.3} style={[noData ? styles.none : styles.score, { color: noData ? c.inkSoft : c.ink }]}>
           {valueText}

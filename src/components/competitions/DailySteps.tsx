@@ -28,7 +28,7 @@ export function DailyStepsCard({ days, today, live, pace }: { days: DailySteps[]
     missing ? `${missing} ${missing === 1 ? 'day' : 'days'} with no data.` : '',
     excluded ? `${excluded} ${excluded === 1 ? 'day' : 'days'} only had entries this competition excludes.` : '',
     pace ? `${pace.name}'s pace ${pace.perDay.toLocaleString()} a day.` : '',
-    pace && recorded.length ? `Your average ${Math.round(total / recorded.length).toLocaleString()} a day.` : '',
+    recorded.length ? `Your average ${Math.round(total / recorded.length).toLocaleString()} a day.` : '',
   ].filter(Boolean).join(' ');
   return (
     <Card icon={{ ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' }} label="Your steps" color={c.steps} meta="Only you see this">
