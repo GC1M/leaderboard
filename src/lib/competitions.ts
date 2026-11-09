@@ -15,8 +15,23 @@ export const getCompetition = (id: string) => checked(supabase.from('competition
 export const getParticipation = (id: string, uid: string) => checked(supabase.from('competition_participants').select('*').eq('competition_id', id).eq('user_id', uid).maybeSingle());
 export const joinCompetition = (id: string) => checked(supabase.rpc('join_competition', { p_id: id }));
 export const leaveCompetition = (id: string) => checked(supabase.rpc('leave_competition', { p_id: id }));
-export const createCompetition = (input: { groupId: string; name: string; firstDay: string; endDay: string; timezone: string; includeManual: boolean }) => checked(supabase.rpc('create_competition', {
-  p_group_id: input.groupId, p_name: input.name, p_metric: 'steps', p_start_day: input.firstDay, p_end_day: input.endDay, p_timezone: input.timezone, p_include_manual: input.includeManual,
+// The metrics a competition may rank, with the unit of a total. Raw weight, food intake and sleep are never ranked.
+export const METRICS = [
+  { value: 'steps', label: 'Steps', unit: 'steps' },
+  { value: 'workout_minutes', label: 'Workout minutes', unit: 'min' },
+  { value: 'workout_count', label: 'Workouts', unit: 'workouts' },
+  { value: 'water_days_on_target', label: 'Water days', unit: 'days' },
+  { value: 'active_days', label: 'Active days', unit: 'days' },
+] as const;
+export type CompetitionMetric = (typeof METRICS)[number]['value'];
+export const SCORING = [{ value: 'total', label: 'Total' }, { value: 'daily_average', label: 'Daily average' }, { value: 'best_streak', label: 'Best streak' }] as const;
+export type CompetitionScoring = (typeof SCORING)[number]['value'];
+export const metricLabel = (metric: string) => METRICS.find((m) => m.value === metric)?.label ?? metric;
+export const metricUnit = (metric: string) => METRICS.find((m) => m.value === metric)?.unit ?? metric;
+// Steps and active days are filed under the device's local day, so those need the profile timezone to match.
+export const metricNeedsTimezone = (metric: string) => metric === 'steps' || metric === 'active_days';
+export const createCompetition = (input: { groupId: string; name: string; metric: CompetitionMetric; firstDay: string; endDay: string; timezone: string; includeManual: boolean; lateJoins: boolean; scoring: CompetitionScoring }) => checked(supabase.rpc('create_competition', {
+  p_group_id: input.groupId, p_name: input.name, p_metric: input.metric, p_start_day: input.firstDay, p_end_day: input.endDay, p_timezone: input.timezone, p_include_manual: input.includeManual, p_late_joins: input.lateJoins, p_scoring: input.scoring,
 }));
 export function competitionInviteLink(code: string, id: string) {
   if (!isValidCode(code) || !isValidGroupId(id)) throw new Error('Invalid competition invitation.');
@@ -35,9 +50,13 @@ type StandingRow = Database['public']['Functions']['competition_standings']['Ret
 export type CompetitionStanding = Omit<StandingRow, 'score' | 'rank' | 'updated_at'> & { score: number | null; rank: number | null; updated_at: string | null };
 export const getCompetitionStandings = (id: string) => checked(supabase.rpc('competition_standings', { p_id: id }));
 export const finalizeCompetition = (id: string) => checked(supabase.rpc('finalize_competition', { p_id: id }));
-export function standingValue(row: Pick<CompetitionStanding, 'score' | 'eligibility'>, metric: string): string {
+const plural = (n: number, unit: string) => (n === 1 ? unit.replace(/s$/, '') : unit);
+// A score in the competition's own words: "6,500 steps", "1,300 steps/day" for a daily average, "3 days" for a streak.
+export function standingValue(row: Pick<CompetitionStanding, 'score' | 'eligibility'>, metric: string, scoring = 'total'): string {
   if (row.score === null) return eligibilityLabel(row.eligibility);
-  return metric === 'workout_duration' ? `${Math.round(row.score / 60).toLocaleString()} min` : `${Number(row.score).toLocaleString()} ${metric === 'steps' ? 'steps' : 'workouts'}`;
+  const n = Number(row.score); const text = n.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  if (scoring === 'best_streak') return `${text} ${plural(n, 'days')}`;
+  return scoring === 'daily_average' ? `${text} ${metricUnit(metric)}/day` : `${text} ${plural(n, metricUnit(metric))}`;
 }
 export function eligibilityLabel(value: string): string {
   return ({ eligible: 'Eligible', no_data: 'No data', not_sharing: 'Not sharing', timezone_mismatch: 'Timezone does not match', left_group: 'No longer in group', manual_entries_excluded: 'Manual entries excluded' } as Record<string, string>)[value] ?? 'Data unavailable';
@@ -51,11 +70,11 @@ export function contributionReason(reason: string): string {
 }
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 // One line on how far you are from the next place up, or how far ahead you lead. Null when you have no ranked score.
-export function competitionGap(rows: Pick<CompetitionStanding, 'user_id' | 'display_name' | 'score' | 'rank'>[], uid: string, metric: string): string | null {
+export function competitionGap(rows: Pick<CompetitionStanding, 'user_id' | 'display_name' | 'score' | 'rank'>[], uid: string, metric: string, scoring = 'total'): string | null {
   const me = rows.find((r) => r.user_id === uid);
   if (!me || me.score === null || me.rank === null) return null;
   const others = rows.filter((r) => r.user_id !== uid && r.score !== null && r.rank !== null);
-  const amount = (n: number) => standingValue({ score: n, eligibility: 'eligible' }, metric);
+  const amount = (n: number) => standingValue({ score: n, eligibility: 'eligible' }, metric, scoring);
   const ahead = others.filter((r) => r.score! > me.score!);
   if (!ahead.length) {
     if (others.some((r) => r.score === me.score)) return `Tied for ${ordinal(me.rank)}`;

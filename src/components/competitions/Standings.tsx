@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Card, styles, useLargeText } from '@/components/ui';
 import { LeaderboardRowView } from '@/components/leaderboard/LeaderboardRowView';
-import { competitionGap, eligibilityLabel, standingValue, type CompetitionStanding } from '@/lib/competitions';
+import { competitionGap, eligibilityLabel, metricUnit, standingValue, type CompetitionStanding } from '@/lib/competitions';
 import { leaderValue, rankLabels, type LeaderboardRow } from '@/lib/leaderboard';
 import { rounded, serif, useTheme } from '@/theme';
 const entries = (n: number, kind: string) => `${n} ${kind} ${n === 1 ? 'entry' : 'entries'}`;
@@ -9,7 +9,7 @@ const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['
 // Per-row freshness only when it is worth a look.
 const STALE_MS = 6 * 3_600_000;
 
-export function CompetitionStandings({ rows, metric, uid, meta, final, now }: { rows: CompetitionStanding[]; metric: string; uid: string; meta?: string; final?: boolean; now?: Date }) {
+export function CompetitionStandings({ rows, metric, scoring, uid, meta, final, now }: { rows: CompetitionStanding[]; metric: string; scoring?: string; uid: string; meta?: string; final?: boolean; now?: Date }) {
   const c = useTheme();
   const icon = { ios: 'trophy', android: 'emoji_events', web: 'emoji_events' } as const;
   if (!rows.length) return <Card icon={icon} label="Standings" color={c.steps} meta={meta}><Text style={[styles.body, { color: c.inkSoft }]}>No one has joined yet. Share the invite to get people in.</Text></Card>;
@@ -21,9 +21,9 @@ export function CompetitionStandings({ rows, metric, uid, meta, final, now }: { 
   return (
     <Card icon={icon} label={final ? 'Final standings' : 'Standings'} color={c.steps} meta={meta} footer={notes || undefined}>
       {me?.rank ? <Text accessibilityLabel={`You are ${ordinal(me.rank)} of ${rows.length}`} maxFontSizeMultiplier={1.5} style={[s.place, { color: c.ink }]}>{ordinal(me.rank)}<Text style={[s.of, { color: c.inkFaint }]}> of {rows.length}</Text></Text> : null}
-      {rows.every((r) => r.score === null) && <Text style={[styles.body, { color: c.inkSoft }]}>No steps recorded yet.</Text>}
+      {rows.every((r) => r.score === null) && <Text style={[styles.body, { color: c.inkSoft }]}>No {metricUnit(metric)} recorded yet.</Text>}
       <View style={{ marginHorizontal: -12 }}>
-        {rows.map((r, i) => <LeaderboardRowView key={r.user_id} row={board[i]} rankLabel={labels[i]} metric="steps" isYou={r.user_id === uid} leader={rows.length > 1 ? leader : 0} valueText={standingValue(r, metric)}
+        {rows.map((r, i) => <LeaderboardRowView key={r.user_id} row={board[i]} rankLabel={labels[i]} metric="steps" isYou={r.user_id === uid} leader={rows.length > 1 ? leader : 0} valueText={standingValue(r, metric, scoring)}
           source={r.score === null ? undefined : { text: `${entries(r.health_entries, 'Health')}, ${entries(r.manual_entries, 'manual')}`, manual: r.manual_entries > 0 }}>
           {r.excluded_entries > 0 && <Text style={[styles.caption, { color: c.inkSoft }]}>{entries(r.excluded_entries, 'manual')} excluded by this competition&apos;s rules.</Text>}
           {r.score !== null && r.eligibility !== 'eligible' && <Text style={[styles.caption, { color: c.inkSoft }]}>{eligibilityLabel(r.eligibility)}</Text>}
@@ -35,16 +35,16 @@ export function CompetitionStandings({ rows, metric, uid, meta, final, now }: { 
 }
 
 // One sentence on the race around you, then a strip from the person behind you to the person ahead.
-export function GapHighlight({ rows, metric, uid }: { rows: CompetitionStanding[]; metric: string; uid: string }) {
+export function GapHighlight({ rows, metric, scoring, uid }: { rows: CompetitionStanding[]; metric: string; scoring?: string; uid: string }) {
   const c = useTheme();
   const large = useLargeText();
-  const gap = competitionGap(rows, uid, metric);
+  const gap = competitionGap(rows, uid, metric, scoring);
   const me = rows.find((r) => r.user_id === uid);
   if (!gap || !me || me.score === null) return null;
   const others = rows.filter((r) => r.user_id !== uid && r.score !== null);
   const above = others.filter((r) => r.score! > me.score!).sort((a, b) => a.score! - b.score!)[0];
   const below = others.filter((r) => r.score! < me.score!).sort((a, b) => b.score! - a.score!)[0];
-  const amount = (n: number) => standingValue({ score: n, eligibility: 'eligible' }, metric);
+  const amount = (n: number) => standingValue({ score: n, eligibility: 'eligible' }, metric, scoring);
   const behind = below ? `${below.display_name} is ${amount(me.score - below.score!)} behind you.` : null;
   const lo = below?.score ?? me.score; const hi = above?.score ?? me.score;
   const at = (v: number) => `${hi === lo ? 50 : ((v - lo) / (hi - lo)) * 100}%` as const;

@@ -117,14 +117,14 @@ isOneToOne: true
                   ]
                 },"competitions": {
                   Row: {
-                    "cancelled_at": string | null,"created_at": string,"creator_id": string | null,"ends_at": string,"finalized_at": string | null,"group_id": string,"id": string,"include_manual": boolean,"metric": string,"name": string,"scoring_version": number,"starts_at": string,"status": string,"timezone": string
+                    "cancelled_at": string | null,"created_at": string,"creator_id": string | null,"ends_at": string,"finalized_at": string | null,"group_id": string,"id": string,"include_manual": boolean,"late_joins": boolean,"metric": string,"name": string,"scoring": string,"scoring_version": number,"starts_at": string,"status": string,"timezone": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "cancelled_at"?: string | null,"created_at"?: string,"creator_id"?: string | null,"ends_at": string,"finalized_at"?: string | null,"group_id": string,"id"?: string,"include_manual"?: boolean,"metric": string,"name": string,"scoring_version"?: number,"starts_at": string,"status"?: string,"timezone": string
+                    "cancelled_at"?: string | null,"created_at"?: string,"creator_id"?: string | null,"ends_at": string,"finalized_at"?: string | null,"group_id": string,"id"?: string,"include_manual"?: boolean,"late_joins"?: boolean,"metric": string,"name": string,"scoring"?: string,"scoring_version"?: number,"starts_at": string,"status"?: string,"timezone": string
                   }
                   Update: {
-                    "cancelled_at"?: string | null,"created_at"?: string,"creator_id"?: string | null,"ends_at"?: string,"finalized_at"?: string | null,"group_id"?: string,"id"?: string,"include_manual"?: boolean,"metric"?: string,"name"?: string,"scoring_version"?: number,"starts_at"?: string,"status"?: string,"timezone"?: string
+                    "cancelled_at"?: string | null,"created_at"?: string,"creator_id"?: string | null,"ends_at"?: string,"finalized_at"?: string | null,"group_id"?: string,"id"?: string,"include_manual"?: boolean,"late_joins"?: boolean,"metric"?: string,"name"?: string,"scoring"?: string,"scoring_version"?: number,"starts_at"?: string,"status"?: string,"timezone"?: string
                   }
                   Relationships: [
                     {
@@ -688,13 +688,16 @@ isOneToOne: false
               "eligibility": string,"excluded_entries": number,"health_entries": number,"manual_entries": number,"score": number,"updated_at": string,"user_id": string
             }[]
                            },
+"competition_share_metric":
+{ Args: { "p_metric": string }; Returns: string
+                           },
 "competition_standings":
 { Args: { "p_id": string }; Returns: {
               "display_name": string,"eligibility": string,"excluded_entries": number,"health_entries": number,"manual_entries": number,"rank": number,"score": number,"updated_at": string,"user_id": string
             }[]
                            },
 "create_competition":
-{ Args: { "p_end_day": string,"p_group_id": string,"p_include_manual"?: boolean,"p_metric": string,"p_name": string,"p_start_day": string,"p_timezone": string }; Returns: string
+{ Args: { "p_end_day": string,"p_group_id": string,"p_include_manual"?: boolean,"p_late_joins"?: boolean,"p_metric": string,"p_name": string,"p_scoring"?: string,"p_start_day": string,"p_timezone": string }; Returns: string
                            },
 "create_group":
 { Args: { "name": string }; Returns: {
@@ -794,7 +797,7 @@ isOneToOne: false
                            },
 "my_competition_contributions":
 { Args: { "p_id": string }; Returns: {
-              "flagged": boolean,"included": boolean,"measured_on": string,"reason": string,"record_id": string,"source": string,"updated_at": string,"value": number
+              "flagged": boolean,"included": boolean,"measured_on": string,"reason": string,"record_id": string,"source": string,"unit": string,"updated_at": string,"value": number
             }[]
                            },
 "record_health_export":
