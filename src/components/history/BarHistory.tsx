@@ -65,7 +65,7 @@ export function BarHistory({ fetch, fmt, noun, refresh, hasAny, emptyAction, tar
             {values.map((v, i) => (
               <View key={dates[i]} style={styles.track}>
                 {v === null ? (
-                  <View style={[styles.gap, { borderColor: c.border }]} />
+                  <View style={days === 7 ? [styles.gap, { borderColor: c.border }] : { height: '100%', backgroundColor: c.lane, borderRadius: 1 }} />
                 ) : (
                   <View
                     style={{

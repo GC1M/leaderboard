@@ -44,14 +44,14 @@ export function LeaderboardRowView({ row, rankLabel, metric, isYou, leader, sour
             </Text>
             {isYou && <Text style={[styles.tag, { color: c.accent }]}>You</Text>}
           </View>
-          {source && <Text style={[styles.source, { color: source.manual ? c.manual : c.inkSoft }]}>{source.text}</Text>}
+          {source && (source.manual || large) && <Text style={[styles.source, { color: source.manual ? c.manual : c.inkSoft }]}>{source.text}</Text>}
         </View>
         <Text maxFontSizeMultiplier={1.3} style={[noData ? styles.none : styles.score, { color: noData ? c.inkSoft : c.ink }]}>
           {valueText}
         </Text>
       </View>
       <View style={[styles.lane, { backgroundColor: c.lane }]}>
-        <View style={[styles.lane, { width: `${fill * 100}%`, minWidth: fill > 0 ? 4 : 0, backgroundColor: isYou ? c.accent : c.border }]} />
+        <View style={[styles.lane, { width: `${fill * 100}%`, minWidth: row.value === null ? 0 : 4, backgroundColor: isYou ? c.accent : c.border }]} />
       </View>
       {children}
     </View>
@@ -61,13 +61,13 @@ export function LeaderboardRowView({ row, rankLabel, metric, isYou, leader, sour
 const styles = StyleSheet.create({
   row: { minHeight: 64, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  rank: { minWidth: 44, fontSize: 28, lineHeight: 32, fontWeight: '800', fontFamily: rounded, fontVariant: ['tabular-nums'] },
+  rank: { minWidth: 48, fontSize: 28, lineHeight: 32, fontWeight: '800', fontFamily: rounded, fontVariant: ['tabular-nums'] },
   main: { flex: 1 },
   name: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   source: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
   nameText: { flexShrink: 1, fontSize: 16, lineHeight: 24, fontWeight: '600' },
   tag: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
   score: { fontSize: 22, lineHeight: 28, fontWeight: '800', fontFamily: rounded, fontVariant: ['tabular-nums'] },
-  none: { fontSize: 16, lineHeight: 24 },
-  lane: { height: 4, borderRadius: 999 },
+  none: { maxWidth: '50%', textAlign: 'right', fontSize: 16, lineHeight: 24 },
+  lane: { height: 6, borderRadius: 999 },
 });
