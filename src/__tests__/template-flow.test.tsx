@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot } from 'test-renderer';
 import { TemplateEditor } from '@/components/workouts/TemplateEditor';
-import WorkoutDetailScreen from '@/app/(tabs)/workouts/[id]';
+import WorkoutDetailScreen from '@/app/(tabs)/(summary)/workouts/[id]';
 import { ExercisePicker } from '@/components/workouts/ExercisePicker';
 const mockCreate = jest.fn();
 const mockDeleteWorkout = jest.fn();

@@ -20,7 +20,7 @@ test('highlights the current user', async () => {
   expect(out).toContain('"You"');
   expect(out).toContain('12,345');
   expect(out).toContain('"width":"100%"');
-  expect(out).toContain('#E1E9E7');
+  expect(out).toContain('rgba(23,106,110,0.10)');
 });
 
 test('other users are not highlighted; no-data rows say so', async () => {
@@ -28,7 +28,7 @@ test('other users are not highlighted; no-data rows say so', async () => {
     <LeaderboardRowView row={{ userId: 'b', name: 'Bob', value: null, rank: 3, state: 'no_data' }} rankLabel="-" metric="steps" isYou={false} leader={12345} />,
   );
   expect(out).not.toContain('"You"');
-  expect(out).not.toContain('#E1E9E7');
+  expect(out).not.toContain('rgba(23,106,110,0.10)');
   expect(out).toContain('Unranked, Bob, No data');
   expect(out).toContain('"width":"0%"');
 });
@@ -57,6 +57,6 @@ test('medal color for the podium and the source caption', async () => {
     />,
   );
   expect(out).toContain('#8A5F00'); // gold
-  expect(out).toContain('#8A5A00'); // manual color
+  expect(out).toContain('#805300'); // manual color
   expect(out).toContain('Rank 1, Cy, 900, Manual');
 });

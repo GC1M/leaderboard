@@ -131,7 +131,7 @@ try {
     await page.goto(`${base}/weight`);
     await page.getByText('No weight recorded yet.', { exact: true }).waitFor();
     if (await page.getByRole('radiogroup', { name: 'Time range', exact: true }).count()) throw new Error('An empty weight history still shows ranges');
-    for (const name of ['Summary', 'Workouts', 'Groups', 'Profile']) await page.getByRole('tab', { name, exact: true }).waitFor();
+    for (const name of ['Summary', 'Compete', 'Groups', 'Profile']) await page.getByRole('tab', { name, exact: true }).waitFor();
     await page.getByRole('button', { name: 'Add Weight', exact: true }).click();
     await page.getByRole('textbox', { name: 'Weight (kg)', exact: true }).fill('75.');
     if (await page.getByRole('button', { name: 'Save Weight', exact: true }).isDisabled()) throw new Error('Decimal typing left save disabled');
@@ -144,7 +144,8 @@ try {
     await page.getByText('Unsaved changes', { exact: true }).waitFor();
     await page.getByText('Save Draft', { exact: true }).click();
     await page.getByRole('button', { name: 'Resume Weight Draft', exact: true }).waitFor();
-    await page.getByRole('tab', { name: 'Workouts', exact: true }).click();
+    // Workouts lives under the Summary tab now; open it by URL like a deep link.
+    await page.goto(`${base}/workouts`);
     await page.getByText('No workouts yet.', { exact: false }).waitFor();
     if (await page.getByRole('radiogroup', { name: 'Time range', exact: true }).count()) throw new Error('An empty workout history still shows ranges');
     await page.getByRole('button', { name: 'Log Workout', exact: true }).click();
@@ -154,12 +155,10 @@ try {
     if (await page.getByRole('textbox', { name: 'Duration seconds', exact: true }).count()) throw new Error('Duration still shows seconds');
     await page.getByRole('textbox', { name: 'Duration minutes', exact: true }).fill('30');
     await page.getByRole('tab', { name: 'Groups', exact: true }).click();
-    await page.getByRole('tab', { name: 'Workouts', exact: true }).click();
+    await page.getByRole('tab', { name: 'Summary', exact: true }).click();
     if (await page.getByRole('textbox', { name: 'Duration minutes', exact: true }).inputValue() !== '30') throw new Error('Switching tabs lost the workout draft');
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     await page.getByText('Discard Changes', { exact: true }).click();
-    await page.getByRole('button', { name: 'Log Workout', exact: true }).waitFor();
-    await page.getByRole('tab', { name: 'Workouts', exact: true }).click();
     await page.getByRole('button', { name: 'Log Workout', exact: true }).waitFor();
   });
 
@@ -202,7 +201,7 @@ try {
     await page.getByText('Health entries only', { exact: true }).waitFor();
     await page.getByText('0 steps', { exact: true }).waitFor();
     await page.getByText('No data', { exact: true }).waitFor();
-    for (const name of ['Summary', 'Workouts', 'Groups', 'Profile']) await page.getByRole('tab', { name, exact: true }).waitFor();
+    for (const name of ['Summary', 'Compete', 'Groups', 'Profile']) await page.getByRole('tab', { name, exact: true }).waitFor();
     await page.getByRole('button', { name: 'Join Competition', exact: true }).click();
     await page.getByRole('button', { name: 'Leave Competition', exact: true }).waitFor();
     if (optIns !== 1) throw new Error(`Expected one explicit opt-in, got ${optIns}`);
