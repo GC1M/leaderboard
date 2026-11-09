@@ -2,6 +2,7 @@ import { Newsreader_500Medium, Newsreader_600SemiBold, useFonts } from '@expo-go
 import { Stack, useGlobalSearchParams, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { loadAppearance } from '@/lib/appearance';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { isValidCode, isValidGroupId, normalizeCode, pendingInvite } from '@/lib/groups';
@@ -62,6 +63,7 @@ function Routes() {
 
 export default function RootLayout() {
   useEffect(() => watchAppStateForAuthRefresh(), []);
+  useEffect(() => { void loadAppearance(); }, []);
   return (
     <AuthProvider>
       <HealthSyncProvider>

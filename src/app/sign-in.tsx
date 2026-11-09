@@ -1,6 +1,6 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Field, Screen, styles } from '@/components/ui';
 
@@ -22,7 +22,7 @@ const RESEND_SECONDS = 30;
 
 export default function SignIn() {
   const c = useTheme();
-  const dark = useColorScheme() === 'dark';
+  const dark = c.dark;
   const [apple, setApple] = useState(false);
   const [mode, setMode] = useState<'email' | 'phone'>('email');
   const [contact, setContact] = useState('');

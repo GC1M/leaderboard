@@ -11,9 +11,11 @@ import { useHealthExport, useHealthSync } from '@/lib/health/sync';
 import { exportedWater, settleWaterExport } from '@/lib/health/water-export';
 import { NAME_MAX, deleteAccount, deleteFoodHistory, getDisplayName, signOut, updateDisplayName } from '@/lib/profile';
 import { deleteWaterHistory } from '@/lib/water/entries';
+import { useAppearance } from '@/lib/appearance';
 
 export default function Profile() {
   const router = useRouter();
+  const [appearance] = useAppearance();
   const health = useHealthSync();
   const provider = healthProviderName();
   const uid = useAuth().session?.user.id ?? '';
@@ -201,6 +203,7 @@ export default function Profile() {
       </Section>
 
       <Section title="Preferences">
+        <Row label="Appearance" value={appearance === 'system' ? 'System' : appearance === 'light' ? 'Light' : 'Dark'} onPress={() => router.push('/profile/appearance')} />
         <Row label="Units" value="Weight and distance" last onPress={() => router.push('/profile/preferences')} />
       </Section>
       <Section title="Account">
