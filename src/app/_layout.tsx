@@ -2,6 +2,7 @@ import { Newsreader_500Medium, Newsreader_600SemiBold, useFonts } from '@expo-go
 import { Stack, useGlobalSearchParams, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { loadAppearance } from '@/lib/appearance';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { isValidCode, isValidGroupId, normalizeCode, pendingInvite } from '@/lib/groups';
@@ -14,6 +15,8 @@ import { useTheme } from '@/theme';
 
 // Keep the splash up until the stored session is read, so there is no blank frame.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+// Start reading the saved appearance now, while the splash waits on fonts, so a saved Light or Dark doesn't flash the other theme.
+void loadAppearance();
 
 function Routes() {
   const { session, loading } = useAuth();

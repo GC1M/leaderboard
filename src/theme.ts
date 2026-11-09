@@ -1,5 +1,7 @@
 import { type ColorValue, DynamicColorIOS, Platform, useColorScheme } from 'react-native';
 
+import { useAppearance } from '@/lib/appearance';
+
 // "Field notes": paper background, lighter paper cards, deep teal for "you". Light is the default; dark follows the
 // system setting. Each token is [light, dark, high contrast light, high contrast dark]. On iOS the colors resolve
 // natively, so Increase Contrast picks the last two. Every pair was checked for WCAG contrast (text 4.5:1, large
@@ -50,5 +52,6 @@ export const serif = { title: 'Newsreader_600SemiBold', text: 'Newsreader_500Med
 export const rounded = Platform.OS === 'ios' ? 'ui-rounded' : undefined;
 
 export function useTheme(): Theme {
-  return useColorScheme() === 'dark' ? dark : light;
+  const system = useColorScheme(); const [choice] = useAppearance();
+  return (choice === 'system' ? system : choice) === 'dark' ? dark : light;
 }
