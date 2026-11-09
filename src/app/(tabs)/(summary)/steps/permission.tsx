@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform, Text } from 'react-native';
 
+import { HealthSyncStatus } from '@/components/HealthSyncStatus';
 import { Button, ErrorText, Screen, styles } from '@/components/ui';
 import { useTheme } from '@/theme';
 import { healthProviderName } from '@/lib/health-adapter/capabilities';
@@ -86,6 +87,7 @@ export default function HealthPermission() {
         </Text>
       ) : null}
       <ErrorText>{error}</ErrorText>
+      <HealthSyncStatus variant="details" />
       {/* Also shown if the status check failed, so there is always a way to retry. */}
       {!unavailable && <Button label={notAsked ? "Allow Health Access" : "Connect Health Data"} busy={busy} onPress={allow} />}
       {android && connect === 'provider-update-required' && <Button label="Get Health Connect" onPress={() => void openHealthConnectInstall()} />}

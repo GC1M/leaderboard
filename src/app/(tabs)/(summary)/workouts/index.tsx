@@ -32,10 +32,12 @@ export default function Workouts() {
   useFocusEffect(load);
 
   return (
-    <Screen title="Workouts">
+    <Screen title="Workouts" back>
       <Button label="Log Workout" onPress={() => router.push('/workouts/new')} />
-      <Button secondary label="Start from Template" onPress={() => router.push('/workouts/templates')} />
-      <Button secondary label="Import from Another App" onPress={() => router.push('/workouts/import')} />
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flex: 1 }}><Button secondary label="From a Template" onPress={() => router.push('/workouts/templates')} /></View>
+        <View style={{ flex: 1 }}><Button secondary label="Import" onPress={() => router.push('/workouts/import')} /></View>
+      </View>
       {drafts.length > 0 && (
         <Section>
           {drafts.map((d, i) => (

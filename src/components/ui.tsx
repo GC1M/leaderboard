@@ -1,6 +1,7 @@
 import { useRouter, useSegments } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
-import { type ReactElement, type ReactNode, useState } from 'react';
+import { BottomTabBarHeightContext } from 'expo-router/js-tabs';
+import { type ReactElement, type ReactNode, useContext, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -20,10 +21,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { serif, useTheme } from '@/theme';
+import { radius, serif, type Theme, useTheme } from '@/theme';
 
 export function Screen({
   title,
+  subtitle,
   back,
   refreshControl,
   children,
@@ -33,6 +35,8 @@ export function Screen({
   aboveTitle,
 }: {
   title: string;
+  // One quiet line under the title, like today's date.
+  subtitle?: string;
   aboveTitle?: ReactNode;
   back?: boolean;
   onBack?: () => void;
@@ -46,16 +50,18 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const segments: readonly string[] = useSegments();
   const top = insets.top;
+  // The floating tab bar covers the bottom of every tab screen; outside the tabs (sign-in, join) there is none.
+  const tabBar = useContext(BottomTabBarHeightContext) ?? 0;
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ flex: 1, backgroundColor: c.bg, paddingTop: top, paddingBottom: insets.bottom }}
+      style={{ flex: 1, backgroundColor: c.bg, paddingTop: top, paddingBottom: tabBar ? 0 : insets.bottom, experimental_backgroundImage: c.wash }}
     >
       {back && (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={backLabel}
-          onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace(segments.includes('workouts') ? '/workouts' : segments.includes('compete') ? '/compete' : segments.includes('groups') ? '/groups' : segments.includes('profile') ? '/profile' : '/')))}
+          onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace(segments.includes('compete') ? '/compete' : segments.includes('groups') ? '/groups' : segments.includes('profile') ? '/profile' : '/')))}
           style={[styles.back, Platform.OS === 'web' && styles.webWidth]}
         >
           <Icon name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} color={c.accent} size={20} />
@@ -67,7 +73,7 @@ export function Screen({
           inset the content for the native tab bar (React Native defaults to "never"). The content must not
           flexGrow to fill the frame, or that inset makes even short screens scroll. */}
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: Math.max(32, insets.bottom + 24) }, Platform.OS === 'web' && styles.webWidth]}
+        contentContainerStyle={[styles.content, { paddingBottom: Math.max(32, insets.bottom + 24) + tabBar }, Platform.OS === 'web' && styles.webWidth]}
         contentInsetAdjustmentBehavior="automatic"
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         keyboardShouldPersistTaps="handled"
@@ -75,9 +81,10 @@ export function Screen({
       >
         {aboveTitle}
         {/* Capped so one long word like "Leaderboard" still fits a line at the largest text sizes instead of breaking mid-word. */}
-        <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.title, { color: c.ink }]}>
+        <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.title, { color: c.ink }, !!subtitle && { marginBottom: -10 }]}>
           {title}
         </Text>
+        {subtitle ? <Text style={[styles.subtitle, { color: c.inkFaint }]}>{subtitle}</Text> : null}
         {children}
       </ScrollView>
       {Platform.OS === 'ios' && <InputAccessoryView nativeID="numeric-done"><View style={{ backgroundColor: c.surface, alignItems: 'flex-end', paddingHorizontal: 16 }}><Button plain label="Done" onPress={Keyboard.dismiss} /></View></InputAccessoryView>}
@@ -115,8 +122,9 @@ export function Button({
       onPress={onPress}
       style={({ pressed }) => [
         plain ? styles.link : styles.button,
-        !plain && (secondary ? { borderWidth: 2, borderColor: c.border } : { backgroundColor: c.accent }),
-        { opacity: off ? 0.5 : pressed ? 0.7 : 1 },
+        !plain && (secondary ? { borderWidth: 1, borderColor: c.border } : { backgroundColor: c.accent }),
+        { opacity: off ? 0.5 : pressed ? 0.85 : 1 },
+        pressed && !plain && styles.pressed,
       ]}
     >
       {busy ? (
@@ -241,7 +249,7 @@ export function Section({ title, footer, children }: { title?: string; footer?: 
   return (
     <View style={{ gap: 6 }}>
       {title && <Text style={[styles.caption, styles.sectionText, { color: c.inkSoft }]}>{title}</Text>}
-      <View style={[styles.section, { backgroundColor: c.surface }]}>{children}</View>
+      <View style={[styles.section, glass(c)]}>{children}</View>
       {footer && <Text style={[styles.caption, styles.sectionText, { color: c.inkSoft }]}>{footer}</Text>}
     </View>
   );
@@ -254,7 +262,7 @@ export function Card({ icon, label, color, meta, children, footer }: { icon: Sym
   const large = useLargeText();
   return (
     <View style={{ gap: 6 }}>
-      <View style={[styles.card, { backgroundColor: c.surface }]}>
+      <View style={[styles.card, glass(c)]}>
         <View style={[styles.cardHeader, large && styles.rowStacked]}>
           <View style={styles.cardLabel}>
             <Icon name={icon} color={color} size={16} />
@@ -268,6 +276,9 @@ export function Card({ icon, label, color, meta, children, footer }: { icon: Sym
     </View>
   );
 }
+
+// Frosted card: translucent surface, a 1px edge and a brighter top edge that reads as a glass highlight. No shadow.
+export const glass = (c: Theme) => ({ backgroundColor: c.surface, borderWidth: 1, borderColor: c.edge, borderTopColor: c.edgeTop });
 
 // iOS accessibility text sizes (AX1 and up) start around 1.6x; below that the default layouts still fit.
 export function useLargeText() {
@@ -346,15 +357,17 @@ export const styles = StyleSheet.create({
   content: { padding: 16, gap: 16 },
   // Apple's text styles: large title, title 3, body, headline, footnote.
   title: { fontSize: 34, lineHeight: 41, fontFamily: serif.title, letterSpacing: -0.3 },
+  subtitle: { fontSize: 15, lineHeight: 20 },
   heading: { fontSize: 20, lineHeight: 25, fontWeight: '600' },
   body: { fontSize: 17, lineHeight: 22 },
   bodyStrong: { fontSize: 17, lineHeight: 22, fontWeight: '600' },
   caption: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
-  button: { minHeight: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  button: { minHeight: 52, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  pressed: { transform: [{ scale: 0.98 }] },
   link: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
-  input: { minHeight: 48, borderRadius: 10 },
-  section: { borderRadius: 12, overflow: 'hidden' },
-  card: { borderRadius: 12, padding: 16, gap: 12 },
+  input: { minHeight: 48, borderRadius: 12 },
+  section: { borderRadius: radius.card, overflow: 'hidden' },
+  card: { borderRadius: radius.card, padding: 16, gap: 12 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   cardLabel: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   cardLabelText: { fontWeight: '600' },
@@ -363,7 +376,7 @@ export const styles = StyleSheet.create({
   rowBody: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingRight: 16, paddingVertical: 11 },
   rowStacked: { flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' },
   rowEnd: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
-  skeleton: { height: 64, borderRadius: 8, opacity: 0.6 },
+  skeleton: { height: 64, borderRadius: radius.control, opacity: 0.6 },
   code: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: 4, fontVariant: ['tabular-nums'] },
   codeRow: { flexDirection: 'row', gap: 8 },
   codeBox: { flex: 1, maxWidth: 56, aspectRatio: 0.85, alignItems: 'center', justifyContent: 'center' },

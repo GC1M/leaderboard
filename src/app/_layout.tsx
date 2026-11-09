@@ -2,6 +2,7 @@ import { Newsreader_500Medium, Newsreader_600SemiBold, useFonts } from '@expo-go
 import { Stack, useGlobalSearchParams, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { loadAppearance } from '@/lib/appearance';
 
 import { AuthProvider, useAuth } from '@/lib/auth';
@@ -50,6 +51,8 @@ function Routes() {
         <Stack.Protected guard={gate === 'signed-in'}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="privacy" />
+          {/* Half-height sheet from the Log button. Android has no detents, so it is a plain modal there. */}
+          <Stack.Screen name="log" options={{ presentation: Platform.OS === 'ios' ? 'formSheet' : 'modal', sheetAllowedDetents: [0.45], sheetGrabberVisible: true, sheetCornerRadius: 22, contentStyle: { backgroundColor: bg } }} />
         </Stack.Protected>
         <Stack.Protected guard={gate === 'signed-out'}>
           <Stack.Screen name="sign-in" />
