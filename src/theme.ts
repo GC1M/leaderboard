@@ -1,44 +1,53 @@
-import { type ColorValue, Platform, PlatformColor, useColorScheme } from 'react-native';
+import { type ColorValue, DynamicColorIOS, Platform, useColorScheme } from 'react-native';
 
-// Surfaces, text and separators follow Apple's semantic system colors on iOS, so they also adapt to
-// Increase Contrast. The hex values are Apple's defaults, used on Android and web.
-// Brand colors (accent, "you", medals, manual) are ours; contrast figures are in PLAN.md "Tokens".
-const system = (name: string, hex: string): ColorValue => (Platform.OS === 'ios' ? PlatformColor(name) : hex);
+// "Field notes": paper background, lighter paper cards, deep teal for "you". Light is the default; dark follows the
+// system setting. Each token is [light, dark, high contrast light, high contrast dark]. On iOS the colors resolve
+// natively, so Increase Contrast picks the last two. Every pair was checked for WCAG contrast (text 4.5:1, large
+// numerals and meaningful marks 3:1) and for color-vision separation of you / lane / steps.
+const tokens = {
+  bg: ['#EDF0EE', '#12171A', '#EDF0EE', '#000000'],
+  surface: ['#F7F8F6', '#1B2225', '#FFFFFF', '#12171A'],
+  ink: ['#14181A', '#E7ECEA', '#000000', '#FFFFFF'],
+  line: ['#D3D8D5', '#2E3639', '#9AA3A1', '#5C6567'],
+  inkSoft: ['#454C4E', '#A9B2B1', '#2E3436', '#CDD4D3'],
+  // Faintest text: captions, units and periods.
+  inkFaint: ['#5E6967', '#98A1A3', '#454C4E', '#B4BCBD'],
+  // Input outlines and everyone else's lane fill. At least 3:1 on the card.
+  border: ['#86918F', '#6F7A79', '#6B7573', '#8A9493'],
+  accent: ['#1E5F63', '#4FB8BE', '#0F4447', '#7FD8DD'],
+  onAccent: ['#FFFFFF', '#0B1214', '#FFFFFF', '#000000'],
+  youTint: ['#E1E9E7', '#22373A', '#D5E0DF', '#1E3B3D'],
+  danger: ['#B42318', '#FF8A80', '#8F1A10', '#FFA59E'],
+  manual: ['#8A5A00', '#F5C451', '#6B4500', '#FFD66B'],
+  // Empty lane track and skeleton rows.
+  lane: ['#DCE1DE', '#2A3336', '#C3CAC7', '#3A4447'],
+  // Steps metric color: card labels and daily step bars only, never "you".
+  steps: ['#B5520E', '#F0A060', '#8F3E06', '#FFB880'],
+} as const;
+// Rank 1 to 3 numerals only. At least 4.5:1 on the card and the you tint.
+const medals = [
+  ['#8A5F00', '#F2C14E', '#6E4C00', '#FFD66B'],
+  ['#5F6B7A', '#C3CCDA', '#46505C', '#DCE3EE'],
+  ['#9C4F1F', '#E09A6B', '#7A3C14', '#F2B48A'],
+] as const;
 
-const light = {
-  bg: system('systemGroupedBackground', '#F2F2F7'),
-  surface: system('secondarySystemGroupedBackground', '#FFFFFF'),
-  ink: system('label', '#000000'),
-  line: system('separator', '#C6C6C8'),
-  inkSoft: '#4A5568',
-  border: '#7A8496',
-  accent: '#2340D8',
-  onAccent: '#FFFFFF',
-  youTint: '#E3E9FF',
-  danger: '#B42318',
-  manual: '#8A5A00',
-  lane: '#C9D0DC',
-  // Rank 1 to 3 numerals only. At least 3:1 (large text) on bg and youTint.
-  medal: ['#9A6B00', '#5F6B7A', '#9C4F1F'],
-};
-
-const dark: typeof light = {
-  bg: system('systemGroupedBackground', '#000000'),
-  surface: system('secondarySystemGroupedBackground', '#1C1C1E'),
-  ink: system('label', '#FFFFFF'),
-  line: system('separator', '#38383A'),
-  inkSoft: '#A3AEC2',
-  border: '#6B7691',
-  accent: '#8FA3FF',
-  onAccent: '#0B1020',
-  youTint: '#1F2A52',
-  danger: '#FF8A80',
-  manual: '#F5C451',
-  lane: '#2E3957',
-  medal: ['#F2C14E', '#C3CCDA', '#E09A6B'],
-};
+type Tone = readonly [string, string, string, string];
+const resolve = ([light, dark, highContrastLight, highContrastDark]: Tone, scheme: 0 | 1): ColorValue =>
+  Platform.OS === 'ios' ? DynamicColorIOS({ light, dark, highContrastLight, highContrastDark }) : scheme ? dark : light;
+const build = (scheme: 0 | 1) => ({
+  ...(Object.fromEntries(Object.entries(tokens).map(([k, v]) => [k, resolve(v, scheme)])) as Record<keyof typeof tokens, ColorValue>),
+  medal: medals.map((m) => resolve(m, scheme)),
+  dark: scheme === 1,
+});
+const light = build(0);
+const dark = build(1);
 
 export type Theme = typeof light;
+
+// Serif for large titles and the one-line highlight. Loaded in the root layout; falls back to the system font.
+export const serif = { title: 'Newsreader_600SemiBold', text: 'Newsreader_500Medium' };
+// Rounded system numerals on iOS for ranks and big values, like Apple Health.
+export const rounded = Platform.OS === 'ios' ? 'ui-rounded' : undefined;
 
 export function useTheme(): Theme {
   return useColorScheme() === 'dark' ? dark : light;

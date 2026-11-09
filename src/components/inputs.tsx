@@ -94,7 +94,7 @@ export function DateField({ label, value, onChange, mode = 'datetime' }: { label
           if (!raw) return;
           const next = new Date(mode === 'time' ? `${date}T${raw}` : mode === 'date' ? `${raw}T${time || '00:00'}` : raw);
           if (Number.isFinite(next.getTime())) onChange(next);
-        }} style={{ minHeight: 48, minWidth: 0, width: '100%', boxSizing: 'border-box', borderRadius: 10, border: `1px solid ${c.border}`, padding: 12, font: 'inherit', fontSize: 17, color: String(c.ink), background: String(c.surface), colorScheme: c.bg === '#000000' ? 'dark' : 'normal' }} />
+        }} style={{ minHeight: 48, minWidth: 0, width: '100%', boxSizing: 'border-box', borderRadius: 10, border: `1px solid ${String(c.border)}`, padding: 12, font: 'inherit', fontSize: 17, color: String(c.ink), background: String(c.surface), colorScheme: c.dark ? 'dark' : 'normal' }} />
     </View>;
   }
   const pick = async () => {

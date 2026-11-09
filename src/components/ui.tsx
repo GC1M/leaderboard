@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useTheme } from '@/theme';
+import { serif, useTheme } from '@/theme';
 
 export function Screen({
   title,
@@ -55,7 +55,7 @@ export function Screen({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={backLabel}
-          onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace(segments.includes('workouts') ? '/workouts' : segments.includes('groups') ? '/groups' : segments.includes('profile') ? '/profile' : '/')))}
+          onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace(segments.includes('workouts') ? '/workouts' : segments.includes('compete') ? '/compete' : segments.includes('groups') ? '/groups' : segments.includes('profile') ? '/profile' : '/')))}
           style={[styles.back, Platform.OS === 'web' && styles.webWidth]}
         >
           <Icon name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} color={c.accent} size={20} />
@@ -247,6 +247,28 @@ export function Section({ title, footer, children }: { title?: string; footer?: 
   );
 }
 
+// Apple Health style card: a colored icon and label, an optional period or status on the right, then content.
+// The header stacks at accessibility text sizes. `label` is read as a heading.
+export function Card({ icon, label, color, meta, children, footer }: { icon: SymbolViewProps['name']; label: string; color: ColorValue; meta?: string; children: ReactNode; footer?: string }) {
+  const c = useTheme();
+  const large = useLargeText();
+  return (
+    <View style={{ gap: 6 }}>
+      <View style={[styles.card, { backgroundColor: c.surface }]}>
+        <View style={[styles.cardHeader, large && styles.rowStacked]}>
+          <View style={styles.cardLabel}>
+            <Icon name={icon} color={color} size={16} />
+            <Text accessibilityRole="header" style={[styles.caption, styles.cardLabelText, { color }]}>{label}</Text>
+          </View>
+          {meta ? <Text style={[styles.caption, { color: c.inkFaint, flexShrink: 1 }]}>{meta}</Text> : null}
+        </View>
+        {children}
+      </View>
+      {footer && <Text style={[styles.caption, styles.sectionText, { color: c.inkSoft }]}>{footer}</Text>}
+    </View>
+  );
+}
+
 // iOS accessibility text sizes (AX1 and up) start around 1.6x; below that the default layouts still fit.
 export function useLargeText() {
   return useWindowDimensions().fontScale >= 1.5;
@@ -323,7 +345,7 @@ export const styles = StyleSheet.create({
   webWidth: { width: '100%', maxWidth: 640, alignSelf: 'center' },
   content: { padding: 16, gap: 16 },
   // Apple's text styles: large title, title 3, body, headline, footnote.
-  title: { fontSize: 34, lineHeight: 41, fontWeight: '700' },
+  title: { fontSize: 34, lineHeight: 41, fontFamily: serif.title, letterSpacing: -0.3 },
   heading: { fontSize: 20, lineHeight: 25, fontWeight: '600' },
   body: { fontSize: 17, lineHeight: 22 },
   bodyStrong: { fontSize: 17, lineHeight: 22, fontWeight: '600' },
@@ -331,7 +353,11 @@ export const styles = StyleSheet.create({
   button: { minHeight: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   link: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   input: { minHeight: 48, borderRadius: 10 },
-  section: { borderRadius: 10, overflow: 'hidden' },
+  section: { borderRadius: 12, overflow: 'hidden' },
+  card: { borderRadius: 12, padding: 16, gap: 12 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  cardLabel: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  cardLabelText: { fontWeight: '600' },
   sectionText: { paddingHorizontal: 16 },
   row: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 16 },
   rowBody: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingRight: 16, paddingVertical: 11 },

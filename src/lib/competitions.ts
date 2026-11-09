@@ -1,5 +1,6 @@
 import type { Database } from './database.types';
 import { isValidCode, isValidGroupId } from './groups';
+import { dateInZone } from './health/dates';
 import { supabase } from './supabase';
 export type Competition = Database['public']['Tables']['competitions']['Row'];
 export type Participation = Database['public']['Tables']['competition_participants']['Row'];
@@ -64,4 +65,42 @@ export function competitionGap(rows: Pick<CompetitionStanding, 'user_id' | 'disp
   const nearest = Math.min(...ahead.map((r) => r.score!));
   const target = ahead.filter((r) => r.score === nearest);
   return `${amount(nearest - me.score)} behind ${target.length === 1 ? target[0].display_name : `${ordinal(target[0].rank!)} place`}${target.length === 1 ? ` for ${ordinal(target[0].rank!)}` : ''}`;
+}
+const dayKey = (t: number, timezone: string) => dateInZone(new Date(t), timezone);
+// Calendar days of the competition in its timezone. Stepping from noon keeps daylight saving shifts off the boundaries.
+export function competitionDays(c: Pick<Competition, 'starts_at' | 'ends_at' | 'timezone'>): string[] {
+  const days: string[] = []; const end = Date.parse(c.ends_at);
+  for (let t = Date.parse(c.starts_at) + 12 * 3_600_000; t < end; t += 86_400_000) {
+    const key = dayKey(t, c.timezone);
+    if (days[days.length - 1] !== key) days.push(key);
+  }
+  return days;
+}
+export type DailySteps = { day: string; value: number | null; excluded: number; future: boolean };
+// Your own included entries summed per day. Null means no entry that day, which is different from a recorded zero.
+export function dailySteps(days: string[], records: { measured_on: string; value: number; included: boolean }[], today: string): DailySteps[] {
+  return days.map((day) => {
+    const own = records.filter((r) => r.measured_on === day);
+    const counted = own.filter((r) => r.included);
+    return { day, value: counted.length ? counted.reduce((s, r) => s + Number(r.value), 0) : null, excluded: own.filter((r) => !r.included).reduce((s, r) => s + Number(r.value), 0), future: day > today };
+  });
+}
+// The daily pace of the person you are chasing (the runner-up when you lead), from totals already shared. Null when there is no one to compare with.
+export function rivalPace(rows: Pick<CompetitionStanding, 'user_id' | 'display_name' | 'score'>[], uid: string, daysElapsed: number): { name: string; perDay: number } | null {
+  const me = rows.find((r) => r.user_id === uid);
+  const others = rows.filter((r) => r.user_id !== uid && r.score !== null);
+  if (!me || me.score === null || !others.length || daysElapsed < 1) return null;
+  const ahead = others.filter((r) => r.score! > me.score!);
+  const rival = ahead.length ? ahead.reduce((a, b) => (b.score! < a.score! ? b : a)) : others.reduce((a, b) => (b.score! > a.score! ? b : a));
+  return { name: rival.display_name, perDay: Math.round(rival.score! / daysElapsed) };
+}
+export type GroupCompetition = Competition & { groups: { name: string } | null; joined: boolean };
+// Competitions across all your groups (row security limits them to groups you belong to), newest first.
+export async function getMyCompetitions(uid: string): Promise<GroupCompetition[]> {
+  const [rows, mine] = await Promise.all([
+    checked(supabase.from('competitions').select('*, groups(name)').order('starts_at', { ascending: false })),
+    checked(supabase.from('competition_participants').select('competition_id').eq('user_id', uid).eq('status', 'joined')),
+  ]);
+  const joined = new Set((mine ?? []).map((p) => p.competition_id));
+  return (rows ?? []).map((r) => ({ ...r, joined: joined.has(r.id) }));
 }

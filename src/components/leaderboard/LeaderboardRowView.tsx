@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useLargeText } from '@/components/ui';
 import { formatValue, hasNoData, type LeaderboardRow, type Metric } from '@/lib/leaderboard';
-import { useTheme } from '@/theme';
+import { rounded, useTheme } from '@/theme';
 
 type Props = {
   row: LeaderboardRow;
@@ -51,7 +51,7 @@ export function LeaderboardRowView({ row, rankLabel, metric, isYou, leader, sour
         </Text>
       </View>
       <View style={[styles.lane, { backgroundColor: c.lane }]}>
-        <View style={[styles.lane, { width: `${fill * 100}%`, backgroundColor: isYou ? c.accent : c.border }]} />
+        <View style={[styles.lane, { width: `${fill * 100}%`, minWidth: fill > 0 ? 4 : 0, backgroundColor: isYou ? c.accent : c.border }]} />
       </View>
       {children}
     </View>
@@ -61,13 +61,13 @@ export function LeaderboardRowView({ row, rankLabel, metric, isYou, leader, sour
 const styles = StyleSheet.create({
   row: { minHeight: 64, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  rank: { minWidth: 44, fontSize: 28, lineHeight: 32, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  rank: { minWidth: 44, fontSize: 28, lineHeight: 32, fontWeight: '800', fontFamily: rounded, fontVariant: ['tabular-nums'] },
   main: { flex: 1 },
   name: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   source: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
   nameText: { flexShrink: 1, fontSize: 16, lineHeight: 24, fontWeight: '600' },
   tag: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
-  score: { fontSize: 22, lineHeight: 28, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  score: { fontSize: 22, lineHeight: 28, fontWeight: '800', fontFamily: rounded, fontVariant: ['tabular-nums'] },
   none: { fontSize: 16, lineHeight: 24 },
   lane: { height: 4, borderRadius: 999 },
 });
