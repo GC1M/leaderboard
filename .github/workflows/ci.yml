@@ -71,7 +71,8 @@ jobs:
           cache: npm
       - uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          # Zulu downloads from Azul's CDN; the newest Temurin 17 asset on GitHub releases returns 504.
+          distribution: zulu
           java-version: 17 # React Native 0.88 compiles with JDK 17
       - uses: gradle/actions/setup-gradle@v4
       # GitHub's ubuntu image ships the Android SDK; a self-hosted Mac may not.
