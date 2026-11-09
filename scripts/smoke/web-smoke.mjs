@@ -168,7 +168,7 @@ try {
     const groupId = '22345678-1234-1234-1234-123456789abc';
     const id = '32345678-1234-1234-1234-123456789abc';
     const user = { id: uid, aud: 'authenticated', role: 'authenticated', email: 'competition@example.com', user_metadata: {}, app_metadata: {}, created_at: new Date().toISOString() };
-    const competition = { id, group_id: groupId, creator_id: groupId, name: 'Weekend steps', metric: 'steps', starts_at: new Date(Date.now() + 2 * 86400e3).toISOString(), ends_at: new Date(Date.now() + 4 * 86400e3).toISOString(), timezone: 'UTC', include_manual: false, status: 'scheduled', scoring_version: 1 };
+    const competition = { id, group_id: groupId, creator_id: groupId, name: 'Weekend steps', metric: 'steps', starts_at: new Date(Date.now() + 2 * 86400e3).toISOString(), ends_at: new Date(Date.now() + 4 * 86400e3).toISOString(), timezone: 'UTC', include_manual: false, late_joins: false, scoring: 'total', status: 'scheduled', scoring_version: 1 };
     let participation = null;
     await page.route(/\/auth\/v1\//, (route) => {
       const path = new URL(route.request().url()).pathname;
