@@ -15,7 +15,7 @@ export function DailyStepsCard({ days, today, pace }: { days: DailySteps[]; toda
   const total = days.reduce((s, d) => s + (d.value ?? 0), 0);
   const todays = days.find((d) => d.day === today);
   const recorded = days.filter((d) => d.value !== null);
-  const missing = days.filter((d) => !d.future && d.value === null).length;
+  const missing = days.filter((d) => d.day < today && d.value === null).length;
   const best = recorded.reduce<DailySteps | null>((a, d) => (!a || d.value! > a.value! ? d : a), null);
   const max = Math.max(1, ...days.map((d) => Math.max(d.value ?? 0, d.excluded)), pace?.perDay ?? 0);
   const h = (v: number) => Math.max(2, Math.round((v / max) * HEIGHT));
@@ -31,7 +31,7 @@ export function DailyStepsCard({ days, today, pace }: { days: DailySteps[]; toda
     <Card icon={{ ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' }} label="Your steps" color={c.steps} meta="Only you see this">
       <View accessible accessibilityLabel={summary} style={{ gap: 12 }}>
         <View>
-          <Text maxFontSizeMultiplier={1.3} style={[s.big, { color: c.ink }]}>
+          <Text maxFontSizeMultiplier={1.5} style={[s.big, { color: c.ink }]}>
             {total.toLocaleString()}<Text style={[s.unit, { color: c.inkFaint }]}> steps</Text>
           </Text>
           {todays && !todays.future && <Text style={[ui.caption, { color: c.inkFaint }]}>{todays.value === null ? 'No steps recorded today' : `Today ${todays.value.toLocaleString()}`}</Text>}

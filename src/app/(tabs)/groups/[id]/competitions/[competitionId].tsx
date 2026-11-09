@@ -9,13 +9,14 @@ import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { competitionDay, competitionDays, competitionInviteLink, competitionState, dailySteps, getCompetition, getCompetitionStandings, getMyContributions, finalizeCompetition, getParticipation, rivalPace, type CompetitionStanding, joinCompetition, leaveCompetition, type Competition, type Participation } from '@/lib/competitions';
 import { useCompetitionClock } from '@/lib/competition-clock';
+import { dateInZone } from '@/lib/health/dates';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/theme';
 type Contributions = NonNullable<Awaited<ReturnType<typeof getMyContributions>>>;
 const DAY = 86_400_000;
 export default function CompetitionDetail() {
   const { id, competitionId } = useLocalSearchParams<{ id: string; competitionId: string }>(); const uid = useAuth().session?.user.id ?? ''; const c = useTheme(); const now = useCompetitionClock();
-  const [standings, setStandings] = useState<CompetitionStanding[] | null>(null); const [records, setRecords] = useState<Contributions>([]);
+  const [standings, setStandings] = useState<CompetitionStanding[] | null>(null); const [records, setRecords] = useState<Contributions | null>(null);
   const [refreshed, setRefreshed] = useState<Date | null>(null); const [refreshing, setRefreshing] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [row, setRow] = useState<Competition | null>(); const [participation, setParticipation] = useState<Participation | null>(null);
@@ -24,9 +25,9 @@ export default function CompetitionDetail() {
     let live = true; let revision = 0; setRow((r) => (r?.id === competitionId ? r : undefined));
     const refresh = () => {
       const request = ++revision;
-      // Your own entries only feed the private steps card, so a failure there never blocks the standings.
-      void Promise.all([getCompetition(competitionId), getParticipation(competitionId, uid), getCompetitionStandings(competitionId), getMyContributions(competitionId).catch(() => [])]).then(([r, p, scores, mine]) => {
-        if (live && request === revision) { setRow(r?.group_id === id ? r : null); setParticipation(p); setStandings(scores); setRecords(mine ?? []); setRefreshed(new Date()); setError(null); setRefreshing(false); }
+      // Your own entries only feed the private steps card, so a failure there never blocks the standings; the card keeps its last good data or stays hidden.
+      void Promise.all([getCompetition(competitionId), getParticipation(competitionId, uid), getCompetitionStandings(competitionId), getMyContributions(competitionId).catch(() => null)]).then(([r, p, scores, mine]) => {
+        if (live && request === revision) { setRow(r?.group_id === id ? r : null); setParticipation(p); setStandings(scores); setRecords((prev) => mine ?? prev); setRefreshed(new Date()); setError(null); setRefreshing(false); }
       }, () => { if (live && request === revision) { setError('Couldn’t load this competition. Pull down to try again.'); setRefreshing(false); } });
     };
     refresh();
@@ -42,7 +43,7 @@ export default function CompetitionDetail() {
     if (!row) return null;
     const t = now.getTime(); const start = Date.parse(row.starts_at); const end = Date.parse(row.ends_at);
     const upcoming = row.status === 'scheduled' && t < start; const ended = row.status === 'scheduled' && t >= end;
-    const days = competitionDays(row); const today = new Date(Math.min(t, end - 1)).toLocaleDateString('en-CA', { timeZone: row.timezone });
+    const days = competitionDays(row); const today = dateInZone(new Date(Math.min(t, end - 1)), row.timezone);
     const elapsed = days.filter((d) => d <= today).length;
     const status = row.status === 'scheduled' && t >= start && t < end ? `Day ${elapsed} of ${days.length}, ends ${competitionDay(new Date(end - 1).toISOString(), row.timezone)}`
       : upcoming ? `Starts ${competitionDay(row.starts_at, row.timezone)}, ${days.length} ${days.length === 1 ? 'day' : 'days'}` : competitionState(row, now);
@@ -69,7 +70,7 @@ export default function CompetitionDetail() {
         {!upcoming && <GapHighlight rows={standings} metric={row.metric} uid={uid} />}
         <CompetitionStandings rows={standings} metric={row.metric} uid={uid} final={row.status === 'finalized'} now={now} meta={refreshed ? `updated ${refreshed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : undefined} />
         {row.status === 'finalized' && <Text style={[styles.caption, { color: c.inkSoft }]}>Finalized {new Date(row.finalized_at!).toLocaleString()}. Later corrections do not change these scores. Privacy choices still apply.</Text>}
-        {!upcoming && joined && <DailyStepsCard days={dailySteps(days, records, today)} today={today} pace={rivalPace(standings, uid, elapsed)} />}
+        {!upcoming && joined && records && <DailyStepsCard days={dailySteps(days, records, today)} today={today} pace={rivalPace(standings, uid, elapsed)} />}
       </>}
       <Section title="Details">
         <Row label="First day" value={competitionDay(row.starts_at, row.timezone)} />

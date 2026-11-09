@@ -1,5 +1,6 @@
 import type { Database } from './database.types';
 import { isValidCode, isValidGroupId } from './groups';
+import { dateInZone } from './health/dates';
 import { supabase } from './supabase';
 export type Competition = Database['public']['Tables']['competitions']['Row'];
 export type Participation = Database['public']['Tables']['competition_participants']['Row'];
@@ -65,7 +66,7 @@ export function competitionGap(rows: Pick<CompetitionStanding, 'user_id' | 'disp
   const target = ahead.filter((r) => r.score === nearest);
   return `${amount(nearest - me.score)} behind ${target.length === 1 ? target[0].display_name : `${ordinal(target[0].rank!)} place`}${target.length === 1 ? ` for ${ordinal(target[0].rank!)}` : ''}`;
 }
-const dayKey = (t: number, timezone: string) => new Date(t).toLocaleDateString('en-CA', { timeZone: timezone });
+const dayKey = (t: number, timezone: string) => dateInZone(new Date(t), timezone);
 // Calendar days of the competition in its timezone. Stepping from noon keeps daylight saving shifts off the boundaries.
 export function competitionDays(c: Pick<Competition, 'starts_at' | 'ends_at' | 'timezone'>): string[] {
   const days: string[] = []; const end = Date.parse(c.ends_at);
