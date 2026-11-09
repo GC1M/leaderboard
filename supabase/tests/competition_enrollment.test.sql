@@ -14,8 +14,8 @@ select is((select status from competition_participants),'left','history retains 
 select lives_ok($$select join_competition((select id from enroll_comp))$$,'rejoin before start succeeds');
 delete from metric_shares where group_id=(select id from enroll_group) and metric='steps';
 select throws_ok($$select join_competition((select id from enroll_comp))$$,'P0001','enable sharing for this metric in Group Info before joining','joining never bypasses sharing');
-select throws_ok($$select create_competition((select id from enroll_group),'Weight','weight',current_date+2,current_date+3,'UTC')$$,'P0001','only steps competitions are enabled in version 1','unsupported metrics rejected');
-select throws_ok($$select create_competition((select id from enroll_group),'Past','steps',current_date-2,current_date+3,'UTC')$$,'P0001','choose a future start day','past starts rejected');
+select throws_ok($$select create_competition((select id from enroll_group),'Weight','weight_kg',current_date+2,current_date+3,'UTC')$$,'P0001','weight, food and sleep are never ranked; choose steps, workout minutes, workouts, water days or active days','unsupported metrics rejected');
+select throws_ok($$select create_competition((select id from enroll_group),'Past','steps',current_date-91,current_date+3,'UTC')$$,'P0001','the start day can be at most 90 days ago','starts more than 90 days back rejected');
 grant select on enroll_group,enroll_comp to authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000139',true);
 select throws_ok($$select join_competition((select id from enroll_comp))$$,'P0001','competition unavailable','outsider cannot enroll');

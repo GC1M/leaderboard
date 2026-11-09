@@ -32,7 +32,7 @@ export default function Compete() {
     </> : groups.map(([title, match]) => {
       const list = rows.filter((r) => (match ? state(r) === match : state(r) !== 'Active' && state(r) !== 'Upcoming')).sort(order(match));
       return list.length ? <Section key={title} title={title}>
-        {list.map((r, i) => <Row wrap key={r.id} label={r.name} value={[r.groups?.name, when(r, match), r.joined ? 'Joined' : match === 'Upcoming' && 'Not joined'].filter(Boolean).join(', ')} last={i === list.length - 1} onPress={() => router.push(`/compete/${r.group_id}/${r.id}`)} />)}
+        {list.map((r, i) => <Row wrap key={r.id} label={r.name} value={[r.groups?.name, when(r, match), r.joined ? 'Joined' : (match === 'Upcoming' || (match === 'Active' && r.late_joins)) && 'Not joined'].filter(Boolean).join(', ')} last={i === list.length - 1} onPress={() => router.push(`/compete/${r.group_id}/${r.id}`)} />)}
       </Section> : null;
     })}
   </Screen>;

@@ -1,4 +1,4 @@
-import { competitionDay, competitionDays, competitionGap, dailySteps, getMyCompetitions, rivalPace, competitionInviteLink, competitionState, createCompetition, joinCompetition, leaveCompetition } from './competitions';
+import { competitionDay, competitionDays, competitionGap, dailySteps, getMyCompetitions, rivalPace, competitionInviteLink, competitionState, createCompetition, joinCompetition, leaveCompetition, standingValue } from './competitions';
 const mockRpc = jest.fn(); const mockFrom = jest.fn();
 jest.mock('./supabase', () => ({ supabase: { rpc: (...args: unknown[]) => mockRpc(...args), from: (...args: unknown[]) => mockFrom(...args) } }));
 beforeEach(() => { jest.clearAllMocks(); mockRpc.mockResolvedValue({ data: null, error: null }); });
@@ -8,9 +8,9 @@ test('competition invites use the existing group join flow and reject arbitrary 
   expect(() => competitionInviteLink('ABCD2345', 'https://outside.example')).toThrow();
 });
 test('creation sends rules and dates but never enrolls the creator', async () => {
-  await createCompetition({ groupId: 'g1', name: 'Walk', firstDay: '2027-03-14', endDay: '2027-03-15', timezone: 'America/New_York', includeManual: false });
+  await createCompetition({ groupId: 'g1', name: 'Walk', metric: 'active_days', firstDay: '2027-03-14', endDay: '2027-03-15', timezone: 'America/New_York', includeManual: false, lateJoins: true, scoring: 'best_streak' });
   expect(mockRpc).toHaveBeenCalledTimes(1);
-  expect(mockRpc).toHaveBeenCalledWith('create_competition', expect.objectContaining({ p_metric: 'steps', p_timezone: 'America/New_York', p_include_manual: false }));
+  expect(mockRpc).toHaveBeenCalledWith('create_competition', expect.objectContaining({ p_metric: 'active_days', p_timezone: 'America/New_York', p_include_manual: false, p_late_joins: true, p_scoring: 'best_streak' }));
 });
 test('join and leave are distinct server operations; failures are displayed', async () => {
   await joinCompetition('c1'); await leaveCompetition('c1');
@@ -37,7 +37,23 @@ test('competition gap names the next place up, leads, ties, and skips unranked r
   expect(competitionGap([r('a', 10, 1), r('b', 10, 1)], 'a', 'steps')).toBe('Tied for 1st');
   expect(competitionGap([r('a', 5, 3), r('b', 9, 1), r('c', 9, 1)], 'a', 'steps')).toBe('4 steps behind 1st place');
   expect(competitionGap([r('a', 0, 1)], 'a', 'steps')).toBe('You are in 1st');
-  expect(competitionGap([r('a', 600, 2), r('b', 1800, 1)], 'a', 'workout_duration')).toBe('20 min behind b for 1st');
+  expect(competitionGap([r('a', 10, 2), r('b', 30, 1)], 'a', 'workout_minutes')).toBe('20 min behind b for 1st');
+  expect(competitionGap([r('a', 2, 2), r('b', 5, 1)], 'a', 'steps', 'best_streak')).toBe('3 days behind b for 1st');
+  expect(competitionGap([r('a', 1200.5, 2), r('b', 1300, 1)], 'a', 'steps', 'daily_average')).toBe('99.5 steps/day behind b for 1st');
+});
+test('standing values carry each metric and scoring mode, with singulars', () => {
+  const v = (score: number | null, metric: string, scoring?: string) => standingValue({ score, eligibility: score === null ? 'no_data' : 'eligible' }, metric, scoring);
+  expect(v(6500, 'steps')).toBe('6,500 steps');
+  expect(v(75, 'workout_minutes')).toBe('75 min');
+  expect(v(1, 'workout_count')).toBe('1 workout');
+  expect(v(2, 'workout_count')).toBe('2 workouts');
+  expect(v(1, 'water_days_on_target')).toBe('1 day');
+  expect(v(4, 'active_days')).toBe('4 days');
+  expect(v(1300, 'steps', 'daily_average')).toBe('1,300 steps/day');
+  expect(v(0.5, 'active_days', 'daily_average')).toBe('0.5 days/day');
+  expect(v(3, 'water_days_on_target', 'best_streak')).toBe('3 days');
+  expect(v(1, 'steps', 'best_streak')).toBe('1 day');
+  expect(v(null, 'steps')).toBe('No data');
 });
 test('competition days follow the competition timezone across daylight saving', () => {
   expect(competitionDays({ starts_at: '2026-11-01T04:00:00Z', ends_at: '2026-11-03T05:00:00Z', timezone: 'America/New_York' })).toEqual(['2026-11-01', '2026-11-02']);
