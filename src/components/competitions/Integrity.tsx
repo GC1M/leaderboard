@@ -11,10 +11,12 @@ import { useTheme } from '@/theme';
 type Audit = NonNullable<Awaited<ReturnType<typeof getCompetitionAudit>>>;
 type Contributions = NonNullable<Awaited<ReturnType<typeof getMyContributions>>>;
 type Participants = NonNullable<Awaited<ReturnType<typeof getCompetitionParticipants>>>;
+// One confirmation for both finalize buttons (participants and creator on the detail screen, other owners here).
+export const confirmFinalize = (run: () => void) => alert('Finalize these results?', 'This freezes the current server scores. Later uploads, edits and deletions will not change them. Sharing can still be revoked.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Finalize', onPress: run }]);
 export function CompetitionIntegrity({ competition, uid, onChanged }: { competition: Competition; uid: string; onChanged: () => void }) {
   const c = useTheme(); const now = useCompetitionClock();
   const [members, setMembers] = useState<Member[]>([]); const [audit, setAudit] = useState<Audit>([]); const [records, setRecords] = useState<Contributions>([]); const [participants, setParticipants] = useState<Participants>([]);
-  const [reason, setReason] = useState(''); const [showRecords, setShowRecords] = useState(false); const [showAudit, setShowAudit] = useState(false);
+  const [reason, setReason] = useState(''); const [showRecords, setShowRecords] = useState(false); const [showAudit, setShowAudit] = useState(false); const [showTools, setShowTools] = useState(false);
   const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false); const [revision, setRevision] = useState(0); const lock = useRef(false);
   useFocusEffect(useCallback(() => {
     let live = true; let request = 0;
@@ -49,11 +51,12 @@ export function CompetitionIntegrity({ competition, uid, onChanged }: { competit
     </>}
     <Button plain label={showAudit ? 'Hide Activity Log' : 'Activity Log'} onPress={() => setShowAudit((v) => !v)} />
     {showAudit && <Section title="Activity log" footer="Actions recorded since competition auditing was enabled. No raw health measurements are stored in this log.">{audit.length ? audit.map((a, i) => <Row wrap key={a.id} label={`${a.event} · ${a.actor_id ? name(a.actor_id) : 'System or former member'}${a.target_id ? ` → ${name(a.target_id)}` : ''}`} value={`${new Date(a.created_at).toLocaleString()}${a.reason ? ` · ${a.reason}` : ''}`} last={i === audit.length - 1} />) : <Row label="No recorded actions" last />}</Section>}
-    {canModerate && competition.status === 'scheduled' && <>
+    {canModerate && competition.status === 'scheduled' && <Button plain label={showTools ? 'Hide Organizer Tools' : 'Organizer Tools'} onPress={() => setShowTools((v) => !v)} />}
+    {canModerate && competition.status === 'scheduled' && showTools && <>
       <Field label="Moderation reason" helper={now.getTime() < Date.parse(competition.ends_at) ? 'Required for cancellation or removal; shown in the activity log.' : 'Required for removal; shown in the activity log. Ended competitions cannot be cancelled.'} value={reason} onChangeText={setReason} maxLength={500} />
       {now.getTime() < Date.parse(competition.ends_at) && <Button secondary danger label="Cancel Competition" disabled={busy} onPress={() => confirm('cancel')} />}
       {!!active.length && <Section title="Manage participants">{active.map((p, i) => <Row key={p.user_id} label={`Remove ${name(p.user_id)}`} danger disabled={busy} last={i === active.length - 1} onPress={() => confirm('remove', p.user_id)} />)}</Section>}
-      {owner && competition.creator_id !== uid && !active.some((p) => p.user_id === uid) && now.getTime() >= Date.parse(competition.ends_at) + 86_400_000 && <Button label="Finalize Results" busy={busy} onPress={() => alert('Finalize results?', 'This freezes the current server scores.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Finalize', onPress: () => void act(() => finalizeCompetition(competition.id)) }])} />}
     </>}
+    {competition.status === 'scheduled' && owner && competition.creator_id !== uid && !active.some((p) => p.user_id === uid) && now.getTime() >= Date.parse(competition.ends_at) + 86_400_000 && <Button label="Finalize Results" busy={busy} onPress={() => confirmFinalize(() => void act(() => finalizeCompetition(competition.id)))} />}
   </>;
 }

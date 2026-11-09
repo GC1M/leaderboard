@@ -3,11 +3,11 @@ import { NativeTabs } from 'expo-router/native-tabs';
 
 import { useTheme } from '@/theme';
 
-// System tab bar (UITabBar on iOS, Material bar on Android) with SF Symbols and Material icons.
+// System tab bar (UITabBar on iOS, Material bar on Android) with SF Symbols and Material icons. iOS keeps its translucent system bar; Android and web take the theme colors.
 export default function TabsLayout() {
   const { accent, surface, inkSoft, youTint } = useTheme();
   return (
-    <NativeTabs tintColor={accent} {...(Platform.OS === 'web' ? { backgroundColor: surface, indicatorColor: youTint, labelStyle: { default: { color: inkSoft }, selected: { color: accent } } } : {})}>
+    <NativeTabs tintColor={accent} {...(Platform.OS !== 'ios' ? { backgroundColor: surface, indicatorColor: youTint, labelStyle: { default: { color: inkSoft }, selected: { color: accent } } } : {})}>
       <NativeTabs.Trigger name="(summary)">
         <NativeTabs.Trigger.Icon sf={{ default: 'figure.walk', selected: 'figure.walk' }} md="directions_walk" />
         <NativeTabs.Trigger.Label>Summary</NativeTabs.Trigger.Label>

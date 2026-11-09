@@ -78,11 +78,12 @@ export function competitionDays(c: Pick<Competition, 'starts_at' | 'ends_at' | '
 }
 export type DailySteps = { day: string; value: number | null; excluded: number; future: boolean };
 // Your own included entries summed per day. Null means no entry that day, which is different from a recorded zero.
-export function dailySteps(days: string[], records: { measured_on: string; value: number; included: boolean }[], today: string): DailySteps[] {
+// Excluded only counts manual entries this competition leaves out; other reasons (sharing off, wrong timezone) are not rules of the competition.
+export function dailySteps(days: string[], records: { measured_on: string; value: number; included: boolean; reason?: string }[], today: string): DailySteps[] {
   return days.map((day) => {
     const own = records.filter((r) => r.measured_on === day);
     const counted = own.filter((r) => r.included);
-    return { day, value: counted.length ? counted.reduce((s, r) => s + Number(r.value), 0) : null, excluded: own.filter((r) => !r.included).reduce((s, r) => s + Number(r.value), 0), future: day > today };
+    return { day, value: counted.length ? counted.reduce((s, r) => s + Number(r.value), 0) : null, excluded: own.filter((r) => !r.included && r.reason === 'manual_entries_excluded').reduce((s, r) => s + Number(r.value), 0), future: day > today };
   });
 }
 // The daily pace of the person you are chasing (the runner-up when you lead), from totals already shared. Null when there is no one to compare with.

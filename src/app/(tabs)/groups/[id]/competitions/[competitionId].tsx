@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 import { RefreshControl, Share, Text } from 'react-native';
 import { Button, Card, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { DailyStepsCard } from '@/components/competitions/DailySteps';
-import { CompetitionIntegrity } from '@/components/competitions/Integrity';
+import { CompetitionIntegrity, confirmFinalize } from '@/components/competitions/Integrity';
 import { CompetitionStandings, GapHighlight } from '@/components/competitions/Standings';
 import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
@@ -20,9 +20,11 @@ export default function CompetitionDetail() {
   const [refreshed, setRefreshed] = useState<Date | null>(null); const [refreshing, setRefreshing] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [row, setRow] = useState<Competition | null>(); const [participation, setParticipation] = useState<Participation | null>(null);
-  const [error, setError] = useState<string | null>(null); const [tries, setTries] = useState(0); const [busy, setBusy] = useState(false); const lock = useRef(false);
+  const [error, setError] = useState<string | null>(null); const [tries, setTries] = useState(0); const [busy, setBusy] = useState(false); const lock = useRef(false); const seen = useRef(competitionId);
   useFocusEffect(useCallback(() => {
     let live = true; let revision = 0; setRow((r) => (r?.id === competitionId ? r : undefined));
+    // A reused screen must not show the previous competition's private entries.
+    if (seen.current !== competitionId) { seen.current = competitionId; setRecords(null); setParticipation(null); }
     const refresh = () => {
       const request = ++revision;
       // Your own entries only feed the private steps card, so a failure there never blocks the standings; the card keeps its last good data or stays hidden.
@@ -49,10 +51,11 @@ export default function CompetitionDetail() {
       : upcoming ? `Starts ${competitionDay(row.starts_at, row.timezone)}, ${days.length} ${days.length === 1 ? 'day' : 'days'}` : competitionState(row, now);
     const finalizeAt = end + DAY;
     return <>
-      <Text style={[styles.body, { color: c.inkSoft, marginTop: -8 }]}>{status}</Text>
-      {upcoming && !joined && participation?.status !== 'removed' && <Card icon={{ ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' }} label="Steps competition" color={c.steps}
-        footer={`Joining shares your eligible step total, rank, source counts and data freshness with current group members. Your step-sharing switch must stay on, and your profile timezone must be ${row.timezone}. Join before the first day begins; you can leave until the competition ends.`}>
+      <Text style={[styles.bodyStrong, { color: c.accent, marginTop: -8 }]}>{status}</Text>
+      {row.status === 'cancelled' && <Card icon={{ ios: 'xmark.circle', android: 'cancel', web: 'cancel' }} label="Cancelled" color={c.danger}><Text style={[styles.body, { color: c.ink }]}>This competition was cancelled, so there are no standings. The activity log below shows who cancelled it and why.</Text></Card>}
+      {upcoming && !joined && participation?.status !== 'removed' && <Card icon={{ ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' }} label="Steps competition" color={c.steps}>
         <Text style={[styles.body, { color: c.ink }]}>{competitionDay(row.starts_at, row.timezone)} to {competitionDay(new Date(end - 1).toISOString(), row.timezone)}</Text>
+        <Text style={[styles.caption, { color: c.inkSoft }]}>Group members will see your step total, rank, entry sources and data freshness. Keep step sharing on and your profile timezone set to {row.timezone}. Join before the first day; you can leave until it ends.</Text>
         <Button label="Join Competition" busy={busy} onPress={() => void act(() => joinCompetition(competitionId))} />
       </Card>}
       {upcoming && joined && <Card icon={{ ios: 'checkmark.circle', android: 'check_circle', web: 'check_circle' }} label="You're in" color={c.accent}>
@@ -61,16 +64,16 @@ export default function CompetitionDetail() {
       </Card>}
       {upcoming && !joined && <Button secondary label="Share Competition Invite" disabled={busy} onPress={() => void act(invite)} />}
       {ended && <Card icon={{ ios: 'hourglass', android: 'hourglass_empty', web: 'hourglass_empty' }} label="Provisional results" color={c.inkSoft}>
-        <Text style={[styles.body, { color: c.ink }]}>Uploads and corrections still count until someone finalizes the results.</Text>
+        <Text style={[styles.body, { color: c.ink }]}>Scores can still change until someone finalizes them.</Text>
         {(joined || row.creator_id === uid) && (t >= finalizeAt
-          ? <Button label="Finalize Results" busy={busy} onPress={() => alert('Finalize these results?', 'This freezes the current server scores. Later uploads, edits and deletions will not change them. Sharing can still be revoked.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Finalize', onPress: () => void act(() => finalizeCompetition(competitionId)) }])} />
-          : <Text style={[styles.caption, { color: c.inkSoft }]}>You can finalize after {new Date(finalizeAt).toLocaleString()}.</Text>)}
+          ? <Button label="Finalize Results" busy={busy} onPress={() => confirmFinalize(() => void act(() => finalizeCompetition(competitionId)))} />
+          : <Text style={[styles.caption, { color: c.inkSoft }]}>You can finalize after {new Date(finalizeAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}.</Text>)}
       </Card>}
       {row.status !== 'cancelled' && standings !== null && <>
         {!upcoming && <GapHighlight rows={standings} metric={row.metric} uid={uid} />}
         <CompetitionStandings rows={standings} metric={row.metric} uid={uid} final={row.status === 'finalized'} now={now} meta={refreshed ? `updated ${refreshed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : undefined} />
         {row.status === 'finalized' && <Text style={[styles.caption, { color: c.inkSoft }]}>Finalized {new Date(row.finalized_at!).toLocaleString()}. Later corrections do not change these scores. Privacy choices still apply.</Text>}
-        {!upcoming && joined && records && <DailyStepsCard days={dailySteps(days, records, today)} today={today} pace={rivalPace(standings, uid, elapsed)} />}
+        {!upcoming && joined && records && <DailyStepsCard days={dailySteps(days, records, today)} today={today} live={t < end} pace={rivalPace(standings, uid, elapsed)} />}
       </>}
       <Section title="Details">
         <Row label="First day" value={competitionDay(row.starts_at, row.timezone)} />

@@ -1,6 +1,6 @@
-import { competitionDay, competitionDays, competitionGap, dailySteps, rivalPace, competitionInviteLink, competitionState, createCompetition, joinCompetition, leaveCompetition } from './competitions';
-const mockRpc = jest.fn();
-jest.mock('./supabase', () => ({ supabase: { rpc: (...args: unknown[]) => mockRpc(...args) } }));
+import { competitionDay, competitionDays, competitionGap, dailySteps, getMyCompetitions, rivalPace, competitionInviteLink, competitionState, createCompetition, joinCompetition, leaveCompetition } from './competitions';
+const mockRpc = jest.fn(); const mockFrom = jest.fn();
+jest.mock('./supabase', () => ({ supabase: { rpc: (...args: unknown[]) => mockRpc(...args), from: (...args: unknown[]) => mockFrom(...args) } }));
 beforeEach(() => { jest.clearAllMocks(); mockRpc.mockResolvedValue({ data: null, error: null }); });
 test('competition invites use the existing group join flow and reject arbitrary paths', () => {
   const id = '00000000-0000-0000-0000-000000000039';
@@ -46,7 +46,7 @@ test('competition days follow the competition timezone across daylight saving', 
 test('daily steps keep missing days apart from recorded zeroes and excluded entries', () => {
   const rows = dailySteps(['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'], [
     { measured_on: '2026-11-01', value: 4000, included: true }, { measured_on: '2026-11-01', value: 500, included: true },
-    { measured_on: '2026-11-02', value: 0, included: true }, { measured_on: '2026-11-03', value: 900, included: false },
+    { measured_on: '2026-11-02', value: 0, included: true }, { measured_on: '2026-11-03', value: 900, included: false, reason: 'manual_entries_excluded' }, { measured_on: '2026-11-03', value: 300, included: false, reason: 'not_sharing' },
   ], '2026-11-03');
   expect(rows.map((r) => [r.value, r.excluded, r.future])).toEqual([[4500, 0, false], [0, 0, false], [null, 900, false], [null, 0, true]]);
 });
@@ -56,4 +56,31 @@ test('rival pace chases the nearest person ahead, or the runner-up when you lead
   expect(rivalPace(rows, 'a', 3)).toEqual({ name: 'Theo', perDay: 20 });
   expect(rivalPace([rows[2]], 'me', 3)).toBeNull();
   expect(rivalPace(rows, 'c', 3)).toBeNull();
+});
+test('rival pace edges', () => {
+  const r = (user_id: string, score: number | null) => ({ user_id, display_name: user_id, score });
+  expect(rivalPace([r('me', 5), r('a', 9)], 'me', 0)).toBeNull();
+  expect(rivalPace([r('me', 5), r('a', 9)], 'me', 2)).toEqual({ name: 'a', perDay: 5 });
+  expect(rivalPace([r('me', 9), r('a', 9)], 'me', 3)).toEqual({ name: 'a', perDay: 3 });
+  expect(rivalPace([r('me', 10), r('a', 30), r('b', 20)], 'me', 1)).toEqual({ name: 'b', perDay: 20 });
+  expect(rivalPace([r('me', 0), r('a', null)], 'me', 2)).toBeNull();
+});
+test('daily steps count only rule exclusions and keep mixed days apart', () => {
+  const rows = dailySteps(['2026-11-01'], [{ measured_on: '2026-11-01', value: 100, included: true }, { measured_on: '2026-11-01', value: 50, included: false, reason: 'manual_entries_excluded' }, { measured_on: '2026-11-01', value: 70, included: false, reason: 'timezone_mismatch' }], '2026-10-31');
+  expect(rows[0]).toEqual({ day: '2026-11-01', value: 100, excluded: 50, future: true });
+});
+test('competition days: short spring-forward day and empty range', () => {
+  expect(competitionDays({ starts_at: '2027-03-14T05:00:00Z', ends_at: '2027-03-15T04:00:00Z', timezone: 'America/New_York' })).toEqual(['2027-03-14']);
+  expect(competitionDays({ starts_at: '2027-03-14T05:00:00Z', ends_at: '2027-03-14T05:00:00Z', timezone: 'America/New_York' })).toEqual([]);
+});
+test('my competitions mark the ones you joined and surface errors', async () => {
+  type Chain = { select: jest.Mock; eq: jest.Mock; order: jest.Mock; then: (resolve: (v: unknown) => unknown) => unknown };
+  const chain = (result: unknown) => { const q = { then: (resolve: (v: unknown) => unknown) => resolve(result) } as Chain; q.select = jest.fn(() => q); q.eq = jest.fn(() => q); q.order = jest.fn(() => q); return q; };
+  const comps = chain({ data: [{ id: 'c1' }, { id: 'c2' }], error: null }); const parts = chain({ data: [{ competition_id: 'c2' }], error: null });
+  mockFrom.mockImplementation((t: string) => (t === 'competitions' ? comps : parts));
+  expect((await getMyCompetitions('u1')).map((c) => [c.id, c.joined])).toEqual([['c1', false], ['c2', true]]);
+  expect(comps.select).toHaveBeenCalledWith('*, groups(name)');
+  expect(parts.eq).toHaveBeenCalledWith('user_id', 'u1'); expect(parts.eq).toHaveBeenCalledWith('status', 'joined');
+  mockFrom.mockImplementation(() => chain({ data: null, error: { message: 'boom' } }));
+  await expect(getMyCompetitions('u1')).rejects.toThrow('boom');
 });
