@@ -8,8 +8,9 @@ import type { Food } from '@/lib/food/search';
 const mockLog = jest.fn();
 const mockGetFood = jest.fn();
 const mockReplace = jest.fn();
+const mockDismissTo = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: jest.fn(), canGoBack: () => true, replace: (...a: unknown[]) => mockReplace(...a) }),
+  useRouter: () => ({ back: jest.fn(), canGoBack: () => true, replace: (...a: unknown[]) => mockReplace(...a), dismissTo: (...a: unknown[]) => mockDismissTo(...a) }),
   useLocalSearchParams: () => ({ id: 'f1' }),
   useSegments: () => [],
 }));
@@ -83,7 +84,8 @@ test('logging a portion sends the resolved quantity and shows a confirmation', a
   });
   expect(JSON.stringify(c)).toContain('was added to dinner');
   await click(c, 'Log Another Food');
-  expect(mockReplace).toHaveBeenCalledWith('/food');
+  // Pops back to the search screen already under this one instead of stacking a second copy.
+  expect(mockDismissTo).toHaveBeenCalledWith('/food');
 });
 
 test('a failed save keeps the form and can be retried', async () => {

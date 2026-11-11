@@ -96,8 +96,8 @@ export default function FoodDetail() {
         </Text>
         {logged === 'saved' && <Text style={[styles.body, { color: c.danger }]}>Saved on this device but not synced yet. It stays in your diary marked Not synced, and you can retry there.</Text>}
         <Button label="View Diary" onPress={() => router.replace({ pathname: '/food/diary', params: { date: localDateKey(when) } })} />
-        <Button plain label="Log Another Food" onPress={() => router.replace('/food')} />
-        <Button plain label="Done" onPress={() => router.replace('/')} />
+        <Button plain label="Log Another Food" onPress={() => router.dismissTo('/food')} />
+        <Button plain label="Done" onPress={() => router.dismissTo('/')} />
         <Text style={[styles.caption, { color: c.inkSoft }]}>{ESTIMATE_NOTE}</Text>
       </Screen>
     );

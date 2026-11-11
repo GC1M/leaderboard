@@ -48,7 +48,7 @@ export function HealthSyncStatus({variant='full'}:{variant?:'summary'|'details'|
     return <View style={{gap:8}}>
       <Section>
         {health.connected
-          ?<Row icon={heart} label={provider} value={value} last onPress={()=>router.push('/steps/permission')} />
+          ?<Row icon={heart} label={provider} value={value} last onPress={()=>router.push('/steps/permission', { withAnchor: true })} />
           :<Row icon={heart} label={`Connect ${provider}`} action last disabled={busy || !health.ready} onPress={()=>void action(health.connect)} />}
       </Section>
       <ErrorText>{error ?? health.error}</ErrorText>
@@ -86,7 +86,7 @@ export function HealthSyncStatus({variant='full'}:{variant?:'summary'|'details'|
         {m.lastSuccess && <Text style={[styles.caption,{color:t.inkSoft}]}>Last completed import: {new Date(m.lastSuccess).toLocaleString()}</Text>}
       </View>;
     })}
-    <Button label={health.connected?'Review Health Access':`Connect ${provider}`} busy={busy} disabled={!health.ready || health.syncing} onPress={()=>health.connected?router.push('/steps/permission'):action(health.connect)}/>
+    <Button label={health.connected?'Review Health Access':`Connect ${provider}`} busy={busy} disabled={!health.ready || health.syncing} onPress={()=>health.connected?router.push('/steps/permission', { withAnchor: true }):action(health.connect)}/>
     {health.connected && <>
       <Button label={health.syncing?'Importing…':'Refresh Health Data'} secondary disabled={busy || health.syncing} onPress={()=>action(health.sync)}/>
       <Button plain label="Recheck Health History" disabled={busy || health.syncing} onPress={()=>action(health.recheck)}/>

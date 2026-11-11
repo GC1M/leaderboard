@@ -19,7 +19,7 @@ const icons: Record<string, { off: SymbolViewProps['name']; on: SymbolViewProps[
 const BAR = 62;
 const GAP = 12;
 
-export function GlassTabBar({ state, descriptors, navigateToTab }: BottomTabBarProps) {
+export function GlassTabBar({ state, descriptors, emitter, navigateToTab }: BottomTabBarProps) {
   const c = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -44,7 +44,12 @@ export function GlassTabBar({ state, descriptors, navigateToTab }: BottomTabBarP
               accessibilityRole="tab"
               accessibilityState={{ selected: on }}
               accessibilityLabel={label}
-              onPress={() => navigateToTab(route.key)}
+              // Emit tabPress like the stock tab bar: the tab's stack listens for it and pops to its first screen
+              // when you tap the tab you are already on.
+              onPress={() => {
+                const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+                if (!on && !event.defaultPrevented) navigateToTab(route.key);
+              }}
               style={({ pressed }) => [styles.tab, on && { backgroundColor: c.surface }, pressed && ui.pressed]}
             >
               {icon && <Icon name={on ? icon.on : icon.off} color={on ? c.accent : c.inkSoft} size={24} />}

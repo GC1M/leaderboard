@@ -37,7 +37,7 @@ export default function LogSheet() {
   // Close the sheet, then open the screen in the tabs behind it.
   const open = (href: Href) => {
     router.back();
-    router.push(href);
+    router.push(href, { withAnchor: true });
   };
 
   return (

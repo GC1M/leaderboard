@@ -40,7 +40,7 @@ export default function JoinByLink() {
         <Text style={[styles.body, { color: c.inkSoft }]}>
           This link doesn&apos;t hold a valid invite code. Ask whoever invited you to send it again.
         </Text>
-        <Button label="Enter a Code Instead" onPress={() => router.replace('/groups/join')} />
+        <Button label="Enter a Code Instead" onPress={() => router.replace('/groups/join', { withAnchor: true })} />
       </Screen>
     );
   }
@@ -53,7 +53,7 @@ export default function JoinByLink() {
     setError(null);
     try {
       const groupId = await joinGroup(code);
-      router.replace(competition ? `/groups/${groupId}/competitions/${competition}` : `/groups/${groupId}`);
+      router.replace(competition ? `/groups/${groupId}/competitions/${competition}` : `/groups/${groupId}`, { withAnchor: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Try again.');
       setBusy(false);
