@@ -168,7 +168,7 @@ export default function Profile() {
           title="Health Connect"
           footer="Leaderboard reads steps, sleep, weight, workouts, and water that you allow, and saves what you log here only if you turn on saving for it. Deleting imported data doesn't change Health Connect permissions: to change what Leaderboard can read, open Health Connect, then App permissions, then Leaderboard."
         >
-          <Row label="Health Access" icon={{ ios: 'heart.text.square', android: 'favorite', web: 'favorite' }} onPress={() => router.push('/steps/permission')} />
+          <Row label="Health Access" icon={{ ios: 'heart.text.square', android: 'favorite', web: 'favorite' }} onPress={() => router.push('/steps/permission', { withAnchor: true })} />
           <Row label="Delete Imported Health Data" icon={{ ios: 'trash', android: 'delete', web: 'delete' }} danger last disabled={busy || !health.ready} onPress={confirmDeleteImports} />
         </Section>
       )}
@@ -177,11 +177,11 @@ export default function Profile() {
           title="Apple Health"
           footer="Leaderboard reads steps, sleep, weight, workouts, and water that you allow, and saves food or water to Apple Health only if you turn that on in the Food Diary or on the Water screen. Deleting imported data doesn't change Apple's permissions: to change what Leaderboard can read, open the Health app, tap your profile picture, then Apps, then Leaderboard."
         >
-          <Row label="Health Access" icon={{ ios: 'heart.text.square', android: 'favorite', web: 'favorite' }} onPress={() => router.push('/steps/permission')} />
+          <Row label="Health Access" icon={{ ios: 'heart.text.square', android: 'favorite', web: 'favorite' }} onPress={() => router.push('/steps/permission', { withAnchor: true })} />
           <Row
             label="Connect a Watch or Tracker"
             icon={{ ios: 'applewatch', android: 'watch', web: 'watch' }}
-            onPress={() => router.push('/steps/sources')}
+            onPress={() => router.push('/steps/sources', { withAnchor: true })}
           />
           <Row
             label="Delete Imported Health Data"

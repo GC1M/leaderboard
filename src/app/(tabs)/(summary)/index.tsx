@@ -103,8 +103,8 @@ export default function Summary() {
           {cards.length === 0 ? (
             <Section title="Groups" footer="Start a group for your friends, or join with a code someone sent you.">
               <View style={{ padding: 16, gap: 12 }}>
-                <Button label="Create Group" onPress={() => router.push('/groups/new')} />
-                <Button label="Join with a Code" secondary onPress={() => router.push('/groups/join')} />
+                <Button label="Create Group" onPress={() => router.push('/groups/new', { withAnchor: true })} />
+                <Button label="Join with a Code" secondary onPress={() => router.push('/groups/join', { withAnchor: true })} />
               </View>
             </Section>
           ) : (
@@ -119,7 +119,7 @@ export default function Summary() {
                     key={g.id}
                     accessibilityRole="button"
                     accessibilityLabel={`${g.name}. ${noData ? 'No steps data yet today' : `You are ${s!.rankLabel} of ${s!.members}, ${formatValue('steps', value)} steps`}.`}
-                    onPress={() => router.push(`/groups/${g.id}`)}
+                    onPress={() => router.push(`/groups/${g.id}`, { withAnchor: true })}
                     style={({ pressed }) => [styles.race, i < cards.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line }, { opacity: pressed ? 0.7 : 1 }]}
                   >
                     <View style={styles.raceTop}>
