@@ -131,7 +131,7 @@ try {
     await page.goto(`${base}/weight`);
     await page.getByText('No weight recorded yet.', { exact: true }).waitFor();
     if (await page.getByRole('radiogroup', { name: 'Time range', exact: true }).count()) throw new Error('An empty weight history still shows ranges');
-    for (const name of ['Summary', 'Compete', 'Groups', 'Profile']) await page.getByRole('tab', { name, exact: true }).waitFor();
+    for (const name of ['Summary', 'Compete', 'Social', 'Profile']) await page.getByRole('tab', { name, exact: true }).waitFor();
     await page.getByRole('button', { name: 'Add Weight', exact: true }).click();
     await page.getByRole('textbox', { name: 'Weight (kg)', exact: true }).fill('75.');
     if (await page.getByRole('button', { name: 'Save Weight', exact: true }).isDisabled()) throw new Error('Decimal typing left save disabled');
@@ -154,7 +154,7 @@ try {
     if (await page.getByRole('radiogroup', { name: 'Activity', exact: true }).count()) throw new Error('The separate activity selector remains visible');
     if (await page.getByRole('textbox', { name: 'Duration seconds', exact: true }).count()) throw new Error('Duration still shows seconds');
     await page.getByRole('textbox', { name: 'Duration minutes', exact: true }).fill('30');
-    await page.getByRole('tab', { name: 'Groups', exact: true }).click();
+    await page.getByRole('tab', { name: 'Social', exact: true }).click();
     await page.getByRole('tab', { name: 'Summary', exact: true }).click();
     if (await page.getByRole('textbox', { name: 'Duration minutes', exact: true }).inputValue() !== '30') throw new Error('Switching tabs lost the workout draft');
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -201,7 +201,7 @@ try {
     await page.getByText('Health entries only', { exact: true }).waitFor();
     await page.getByText('0 steps', { exact: true }).waitFor();
     await page.getByText('No data', { exact: true }).waitFor();
-    for (const name of ['Summary', 'Compete', 'Groups', 'Profile']) await page.getByRole('tab', { name, exact: true }).waitFor();
+    for (const name of ['Summary', 'Compete', 'Social', 'Profile']) await page.getByRole('tab', { name, exact: true }).waitFor();
     await page.getByRole('button', { name: 'Join Competition', exact: true }).click();
     await page.getByRole('button', { name: 'Leave Competition', exact: true }).waitFor();
     if (optIns !== 1) throw new Error(`Expected one explicit opt-in, got ${optIns}`);

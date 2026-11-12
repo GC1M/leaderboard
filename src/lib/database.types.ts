@@ -345,44 +345,6 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"messages": {
-                  Row: {
-                    "body": string,"competition_id": string | null,"created_at": string,"group_id": string | null,"id": string,"recipient_id": string | null,"sender_id": string
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "body": string,"competition_id"?: string | null,"created_at"?: string,"group_id"?: string | null,"id"?: string,"recipient_id"?: string | null,"sender_id"?: string
-                  }
-                  Update: {
-                    "body"?: string,"competition_id"?: string | null,"created_at"?: string,"group_id"?: string | null,"id"?: string,"recipient_id"?: string | null,"sender_id"?: string
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "messages_competition_id_fkey"
-      columns: ["competition_id"]
-isOneToOne: false
-      referencedRelation: "competitions"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "messages_group_id_fkey"
-      columns: ["group_id"]
-isOneToOne: false
-      referencedRelation: "groups"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "messages_recipient_id_fkey"
-      columns: ["recipient_id"]
-isOneToOne: false
-      referencedRelation: "profiles"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "messages_sender_id_fkey"
-      columns: ["sender_id"]
-isOneToOne: false
-      referencedRelation: "profiles"
-      referencedColumns: ["id"]
-    }
-                  ]
                 },"goals": {
                   Row: {
                     "end_date": string | null,"id": string,"metric": string,"start_date": string,"start_value": number,"target_value": number,"user_id": string
@@ -464,6 +426,44 @@ isOneToOne: false
                     {
       foreignKeyName: "health_exports_user_id_fkey"
       columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"messages": {
+                  Row: {
+                    "body": string,"competition_id": string | null,"created_at": string,"group_id": string | null,"id": string,"recipient_id": string | null,"sender_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "body": string,"competition_id"?: string | null,"created_at"?: string,"group_id"?: string | null,"id"?: string,"recipient_id"?: string | null,"sender_id"?: string
+                  }
+                  Update: {
+                    "body"?: string,"competition_id"?: string | null,"created_at"?: string,"group_id"?: string | null,"id"?: string,"recipient_id"?: string | null,"sender_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "messages_competition_id_fkey"
+      columns: ["competition_id"]
+isOneToOne: false
+      referencedRelation: "competitions"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "messages_group_id_fkey"
+      columns: ["group_id"]
+isOneToOne: false
+      referencedRelation: "groups"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "messages_recipient_id_fkey"
+      columns: ["recipient_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "messages_sender_id_fkey"
+      columns: ["sender_id"]
 isOneToOne: false
       referencedRelation: "profiles"
       referencedColumns: ["id"]
@@ -744,6 +744,12 @@ isOneToOne: false
 "apply_health_workouts":
 { Args: { "p_device": string,"p_owner": string,"p_remove": (string)[],"p_workouts": Json }; Returns: undefined
                            },
+"are_friends":
+{ Args: { "p_user_id": string }; Returns: boolean
+                           },
+"can_use_thread":
+{ Args: { "p_competition_id": string,"p_group_id": string,"p_other_id": string }; Returns: boolean
+                           },
 "competition_invite":
 { Args: { "p_code": string,"p_id": string }; Returns: Json
                            },
@@ -841,17 +847,11 @@ isOneToOne: false
               "total_duration_s": number,"user_id": string,"week_start": string,"workout_count": number
             }[]
                            },
-"import_workouts":
-{ Args: { "p_app": string,"p_workouts": Json }; Returns: number
-                           },
-"are_friends":
-{ Args: { "p_user_id": string }; Returns: boolean
-                           },
-"can_use_thread":
-{ Args: { "p_competition_id": string; "p_group_id": string; "p_other_id": string }; Returns: boolean
-                           },
 "has_friendship":
 { Args: { "p_user_id": string }; Returns: boolean
+                           },
+"import_workouts":
+{ Args: { "p_app": string,"p_workouts": Json }; Returns: number
                            },
 "in_competition":
 { Args: { "p_competition_id": string }; Returns: boolean
