@@ -4,8 +4,11 @@ import { RefreshControl, Text, View } from 'react-native';
 
 import { Button, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
 import { useTheme } from '@/theme';
+import { alert } from '@/lib/alert';
 import { listMyGroups, type MyGroup } from '@/lib/groups';
+import { acceptFriendRequest, listFriends, removeFriend, type Friend } from '@/lib/social';
 
+// Groups and friends together. The route stays /groups so existing links and deep links keep working.
 export default function Groups() {
   const c = useTheme();
   const router = useRouter();
@@ -17,15 +20,18 @@ export default function Groups() {
     </View>
   ) : null;
   const [groups, setGroups] = useState<MyGroup[] | null>(null);
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setGroups(await listMyGroups());
+      const [g, f] = await Promise.all([listMyGroups(), listFriends()]);
+      setGroups(g);
+      setFriends(f);
       setError(null);
     } catch {
-      setError("Couldn't load your groups. Check your connection and try again.");
+      setError("Couldn't load your groups and friends. Check your connection and try again.");
     }
   }, []);
 
@@ -42,6 +48,37 @@ export default function Groups() {
     setRefreshing(false);
   };
 
+  const respond = (f: Friend) => {
+    const act = (fn: () => Promise<void>) => () => void fn().then(load, (e: Error) => setError(e.message));
+    if (f.status === 'incoming') {
+      alert(`${f.name} wants to be friends`, 'Friends can message each other.', [
+        { text: 'Decline', style: 'destructive', onPress: act(() => removeFriend(f.userId)) },
+        { text: 'Accept', onPress: act(() => acceptFriendRequest(f.userId)) },
+      ]);
+    } else {
+      alert(`Cancel your request to ${f.name}?`, undefined, [
+        { text: 'Keep', style: 'cancel' },
+        { text: 'Cancel Request', style: 'destructive', onPress: act(() => removeFriend(f.userId)) },
+      ]);
+    }
+  };
+  // Requests waiting on you first, then friends, then requests you sent.
+  const order = { incoming: 0, friend: 1, outgoing: 2 };
+  const people = [...friends].sort((a, b) => order[a.status] - order[b.status]);
+  const friendsSection = (
+    <Section title="Friends">
+      {people.map((f) => (
+        <Row
+          key={f.userId}
+          label={f.name}
+          value={f.status === 'incoming' ? 'Wants to be friends' : f.status === 'outgoing' ? 'Requested' : 'Message'}
+          onPress={() => (f.status === 'friend' ? router.push(`/groups/chat?friend=${f.userId}`) : respond(f))}
+        />
+      ))}
+      <Row label="Add Friends" icon={{ ios: 'person.badge.plus', android: 'person_add', web: 'person_add' }} action last onPress={() => router.push('/groups/add-friend')} />
+    </Section>
+  );
+
   const actions = (
     <Section>
       <Row label="Create Group" icon={{ ios: 'plus.circle', android: 'add_circle', web: 'add_circle' }} action onPress={() => router.push('/groups/new')} />
@@ -51,7 +88,7 @@ export default function Groups() {
 
   if (!groups) {
     return (
-      <Screen title="Groups">
+      <Screen title="Social">
         {unavailable}
         {error ? (
           <>
@@ -66,7 +103,7 @@ export default function Groups() {
   }
 
   return (
-    <Screen title="Groups" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
+    <Screen title="Social" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
       {unavailable}
       <ErrorText>{error}</ErrorText>
       {groups.length === 0 ? (
@@ -75,7 +112,7 @@ export default function Groups() {
           <Text style={[styles.body, { color: c.inkSoft }]}>Start one for your friends, or join with a code someone sent you.</Text>
         </View>
       ) : (
-        <Section>
+        <Section title="Groups">
           {groups.map((g, i) => (
             <Row
               key={g.id}
@@ -88,6 +125,7 @@ export default function Groups() {
         </Section>
       )}
       {actions}
+      {friendsSection}
     </Screen>
   );
 }

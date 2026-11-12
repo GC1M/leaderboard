@@ -1,4 +1,4 @@
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { RefreshControl, Share, Text } from 'react-native';
 import { Button, Card, ErrorText, Row, Screen, Section, Skeleton, styles } from '@/components/ui';
@@ -15,7 +15,7 @@ import { useTheme } from '@/theme';
 type Contributions = NonNullable<Awaited<ReturnType<typeof getMyContributions>>>;
 const DAY = 86_400_000;
 export default function CompetitionDetail() {
-  const { id, competitionId } = useLocalSearchParams<{ id: string; competitionId: string }>(); const uid = useAuth().session?.user.id ?? ''; const c = useTheme(); const now = useCompetitionClock();
+  const { id, competitionId } = useLocalSearchParams<{ id: string; competitionId: string }>(); const uid = useAuth().session?.user.id ?? ''; const c = useTheme(); const router = useRouter(); const now = useCompetitionClock();
   const [standings, setStandings] = useState<CompetitionStanding[] | null>(null); const [records, setRecords] = useState<Contributions | null>(null);
   const [refreshed, setRefreshed] = useState<Date | null>(null); const [refreshing, setRefreshing] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -63,6 +63,8 @@ export default function CompetitionDetail() {
         <Text style={[styles.caption, { color: c.inkSoft }]}>Group members will see your score, rank, entry sources and data freshness. Keep {sharing} sharing on{metricNeedsTimezone(row.metric) ? ` and your profile timezone set to ${row.timezone}` : ''}. {row.late_joins ? 'You can join until the last day' : 'Join before the first day'}; you can leave until it ends.{!upcoming ? ' Days already gone are scored from what you have imported.' : ''}</Text>
         <Button label="Join Competition" busy={busy} onPress={() => void act(() => joinCompetition(competitionId))} />
       </Card>}
+      {/* Chat is for joined participants; the Compete tab opens it in Social, so anchor that stack. */}
+      {joined && <Button secondary label="Competition Chat" onPress={() => router.push(`/groups/chat?competition=${competitionId}`, { withAnchor: true })} />}
       {upcoming && joined && <Card icon={{ ios: 'checkmark.circle', android: 'check_circle', web: 'check_circle' }} label="You're in" color={c.accent}>
         <Text style={[styles.body, { color: c.ink }]}>Starts {competitionDay(row.starts_at, row.timezone)}. Your {metricUnit(row.metric)} count from the first day.</Text>
         <Button secondary label="Share Competition Invite" disabled={busy} onPress={() => void act(invite)} />

@@ -319,6 +319,70 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"friendships": {
+                  Row: {
+                    "addressee_id": string,"created_at": string,"requester_id": string,"status": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "addressee_id": string,"created_at"?: string,"requester_id": string,"status"?: string
+                  }
+                  Update: {
+                    "addressee_id"?: string,"created_at"?: string,"requester_id"?: string,"status"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "friendships_addressee_id_fkey"
+      columns: ["addressee_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "friendships_requester_id_fkey"
+      columns: ["requester_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"messages": {
+                  Row: {
+                    "body": string,"competition_id": string | null,"created_at": string,"group_id": string | null,"id": string,"recipient_id": string | null,"sender_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "body": string,"competition_id"?: string | null,"created_at"?: string,"group_id"?: string | null,"id"?: string,"recipient_id"?: string | null,"sender_id"?: string
+                  }
+                  Update: {
+                    "body"?: string,"competition_id"?: string | null,"created_at"?: string,"group_id"?: string | null,"id"?: string,"recipient_id"?: string | null,"sender_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "messages_competition_id_fkey"
+      columns: ["competition_id"]
+isOneToOne: false
+      referencedRelation: "competitions"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "messages_group_id_fkey"
+      columns: ["group_id"]
+isOneToOne: false
+      referencedRelation: "groups"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "messages_recipient_id_fkey"
+      columns: ["recipient_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "messages_sender_id_fkey"
+      columns: ["sender_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"goals": {
                   Row: {
                     "end_date": string | null,"id": string,"metric": string,"start_date": string,"start_value": number,"target_value": number,"user_id": string
@@ -779,6 +843,18 @@ isOneToOne: false
                            },
 "import_workouts":
 { Args: { "p_app": string,"p_workouts": Json }; Returns: number
+                           },
+"are_friends":
+{ Args: { "p_user_id": string }; Returns: boolean
+                           },
+"can_use_thread":
+{ Args: { "p_competition_id": string; "p_group_id": string; "p_other_id": string }; Returns: boolean
+                           },
+"has_friendship":
+{ Args: { "p_user_id": string }; Returns: boolean
+                           },
+"in_competition":
+{ Args: { "p_competition_id": string }; Returns: boolean
                            },
 "is_group_member":
 { Args: { "p_group_id": string }; Returns: boolean
