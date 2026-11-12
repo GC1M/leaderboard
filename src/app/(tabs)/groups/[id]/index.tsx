@@ -167,6 +167,7 @@ export default function GroupDetail() {
     <View style={[{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }, Platform.OS === 'web' && ui.webWidth]}>
       <View style={styles.header}>
         <Button plain label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+        <Button plain label="Chat" onPress={() => router.push(`/groups/chat?group=${id}`)} />
         <Button plain label="Competitions" onPress={() => router.push(`/groups/${id}/competitions`)} />
         <Button plain label="Group Info" onPress={() => router.push(`/groups/${id}/info`)} />
       </View>

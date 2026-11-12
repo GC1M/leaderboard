@@ -32,7 +32,7 @@ export function friendlyError(e: unknown): string {
   return 'Something went wrong. Check your connection and try again.';
 }
 
-async function friendly<T>(p: PromiseLike<{ data: T | null; error: unknown }>): Promise<T> {
+export async function friendly<T>(p: PromiseLike<{ data: T | null; error: unknown }>): Promise<T> {
   const { data, error } = await p;
   if (error) throw new Error(friendlyError(error));
   return data as T;
@@ -127,7 +127,7 @@ export async function deleteMemberManualSteps(groupId: string, userId: string): 
 
 export type SharedMetric = 'steps' | 'sleep' | 'weight' | 'workouts' | 'food' | 'water';
 
-async function myId(): Promise<string> {
+export async function myId(): Promise<string> {
   const { data: auth } = await supabase.auth.getSession();
   const uid = auth.session?.user.id;
   if (!uid) throw new Error(friendlyError({ message: 'not authenticated' }));

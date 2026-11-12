@@ -11,7 +11,8 @@ export default function TabsLayout() {
     <Tabs tabBar={(props) => <GlassTabBar {...props} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: bg }, tabBarHideOnKeyboard: true }}>
       <Tabs.Screen name="(summary)" options={{ title: 'Summary' }} />
       <Tabs.Screen name="compete" options={{ title: 'Compete' }} />
-      <Tabs.Screen name="groups" options={{ title: 'Groups' }} />
+      {/* "Social": the tab now holds friends and chats as well as groups. The route keeps its name so links still work. */}
+      <Tabs.Screen name="groups" options={{ title: 'Social' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
   );
