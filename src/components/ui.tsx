@@ -57,18 +57,23 @@ export function Screen({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1, backgroundColor: c.bg, paddingTop: top, paddingBottom: tabBar ? 0 : insets.bottom, experimental_backgroundImage: c.wash }}
     >
-      {back && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={backLabel}
-          onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace(segments.includes('compete') ? '/compete' : segments.includes('groups') ? '/groups' : segments.includes('profile') ? '/profile' : '/')))}
-          style={[styles.back, Platform.OS === 'web' && styles.webWidth]}
-        >
-          <Icon name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} color={c.accent} size={20} />
-          <Text style={[styles.body, { color: c.accent }]}>{backLabel}</Text>
-        </Pressable>
+      {/* One header row: Back on the left, the screen's action (Edit, History) on the right. */}
+      {(back || headerActions) && (
+        <View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, Platform.OS === 'web' && styles.webWidth]}>
+          {back ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={backLabel}
+              onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace(segments.includes('compete') ? '/compete' : segments.includes('groups') ? '/groups' : segments.includes('profile') ? '/profile' : '/')))}
+              style={styles.back}
+            >
+              <Icon name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} color={c.accent} size={20} />
+              <Text style={[styles.body, { color: c.accent }]}>{backLabel}</Text>
+            </Pressable>
+          ) : <View />}
+          {headerActions && <View style={{ paddingHorizontal: 16 }}>{headerActions}</View>}
+        </View>
       )}
-      {headerActions && <View style={{ paddingHorizontal: 16 }}>{headerActions}</View>}
       {/* Number pads have no return key, so dragging the list dismisses the keyboard. "automatic" lets iOS
           inset the content for the native tab bar (React Native defaults to "never"). The content must not
           flexGrow to fill the frame, or that inset makes even short screens scroll. */}
