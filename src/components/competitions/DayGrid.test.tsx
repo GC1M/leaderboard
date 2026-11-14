@@ -17,7 +17,7 @@ const rows = [
 test('the grid shows short amounts, crowns day winners, says you, and speaks a summary', async () => {
   const text = await render(<DayGrid rows={rows} days={days} elapsed={3} uid="me" metric="steps" unit="Steps" />);
   expect(text).toContain('"12K"'); expect(text).toContain('"1.2K"');
-  expect(text).toContain('👑');
+  expect(text).toContain('crown.fill');
   expect(text).toContain('"Today"');
   expect(text).toContain('Steps each day, 3 of 4 days. Maya: won 1 day, 1 without data. You: won 1 day, 0 without data.');
 });
@@ -25,7 +25,7 @@ test('the grid shows short amounts, crowns day winners, says you, and speaks a s
 test('on/off metrics show checks and days on target', async () => {
   const water = [{ ...rows[0], cells: [1, 0, 1, null] }, { ...rows[1], cells: [1, 1, null, null] }];
   const text = await render(<DayGrid rows={water} days={days} elapsed={3} uid="me" metric="water_days_on_target" unit="Water days" />);
-  expect(text).toContain('✓'); expect(text).not.toContain('👑');
+  expect(text).toContain('"checkmark"'); expect(text).not.toContain('crown.fill');
   expect(text).toContain('Maya: 2 of 3 days. You: 2 of 3 days.');
 });
 
@@ -37,6 +37,7 @@ test('one racer or no elapsed day draws nothing', async () => {
 test('highlights name you as You and pair a battle with vs', async () => {
   const text = await render(<Highlights uid="me" names={{ me: 'Sam', maya: 'Maya' }} items={[{ key: 'battle', title: 'Closest battle', who: ['maya', 'me'], detail: '200 steps apart' }, { key: 'biggest', title: 'Biggest day', who: ['me'], detail: '1,400 steps on Nov 12' }]} />);
   expect(text).toContain('Closest battle: Maya vs You. 200 steps apart.');
-  expect(text).toContain('⚔️'); expect(text).toContain('🚀');
+  expect(text).toContain('figure.fencing'); expect(text).toContain('bolt.fill');
+  expect(await render(<Highlights uid="me" names={{ me: 'Sam', maya: 'Maya' }} items={[{ key: 'streak', title: 'Longest streak', who: ['maya', 'me'], detail: '4 days in a row with steps' }]} />)).toContain('Longest streak: Maya and You.');
   expect(await render(<Highlights uid="me" names={{}} items={[]} />)).not.toContain('Highlights');
 });
