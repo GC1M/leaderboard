@@ -29,3 +29,14 @@ test('standings lead with your place and flag stale rows', async () => {
   await act(async () => root.render(<CompetitionStandings uid="b" metric="steps" rows={[]} />)); expect(JSON.stringify(root.container)).toContain('No one has joined yet');
   await act(async () => root.unmount());
 });
+test('each trailing row says its gap to the leader, and your race says what passing takes a day', async () => {
+  const root = createRoot();
+  const rows = [{ ...row, score: 6100 }, { ...row, user_id: 'b', display_name: 'Bob', score: 5900, rank: 2 }, { ...row, user_id: 'c', display_name: 'Cy', score: 3000, rank: 3 }];
+  await act(async () => root.render(<><GapHighlight uid="b" metric="steps" rows={rows} daysLeft={2} /><CompetitionStandings uid="a" metric="steps" rows={rows} /></>));
+  const text = JSON.stringify(root.container);
+  expect(text).toContain('200 steps behind you'); expect(text).toContain('3,100 steps behind you');
+  expect(text).toContain('To pass Alice, beat them by about 101 steps a day.');
+  await act(async () => root.render(<GapHighlight uid="b" metric="steps" scoring="daily_average" rows={rows} daysLeft={2} />));
+  expect(JSON.stringify(root.container)).not.toContain('To pass');
+  await act(async () => root.unmount());
+});
