@@ -37,6 +37,7 @@ jest.mock('@/lib/competitions', () => ({
   getCompetition: (...a: unknown[]) => mockCompetitions.getCompetition(...a),
   getParticipation: (...a: unknown[]) => mockCompetitions.getParticipation(...a),
   getCompetitionStandings: () => Promise.resolve([]),
+  getCompetitionDailyValues: () => Promise.resolve([]),
   getMyContributions: () => Promise.resolve(null),
 }));
 jest.mock('@/components/competitions/Integrity', () => ({ CompetitionIntegrity: () => null, confirmFinalize: jest.fn() }));

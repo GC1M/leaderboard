@@ -3,10 +3,12 @@ import { useCallback, useRef, useState } from 'react';
 import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, ErrorText, Skeleton, styles as ui, useLargeText } from '@/components/ui';
+import { Button, ErrorText, Icon, Row, Section, Skeleton, styles as ui, useLargeText } from '@/components/ui';
 import { LeaderboardRowView } from '@/components/leaderboard/LeaderboardRowView';
 import { MemberSummaries } from '@/components/leaderboard/MemberSummaries';
 import { useAuth } from '@/lib/auth';
+import { competitionState, getCompetitions, type Competition } from '@/lib/competitions';
+import { useCompetitionClock } from '@/lib/competition-clock';
 import { flushLocalLogs } from '@/lib/flush-logs';
 import { buildMemberSummaries, type MemberSummary } from '@/lib/group-summaries';
 import { getGroupFood, getGroupShares, getGroupWater, getGroupSleep, getGroupWeights, getGroupWorkouts, isNotMember, isValidGroupId, listMembers } from '@/lib/groups';
@@ -53,9 +55,13 @@ export default function GroupDetail() {
   const [unit] = useWeightUnit();
   const [waterUnit] = useWaterUnit();
   const [visible, setVisible] = useState<string[] | null>(null);
+  const [competitions, setCompetitions] = useState<Competition[] | null>(null);
+  const now = useCompetitionClock();
   const list = useRef<FlatList<LeaderboardRow>>(null);
   const focused = useRef(false);
   const me = session?.user.id;
+  // Screens under this one are addressed relative to it, so the group opened from Summary stays in Summary's stack.
+  const open = (path: string) => router.push(`./${path}`, { relativeToDirectory: true });
 
   const load = useCallback(
     () =>
@@ -72,6 +78,8 @@ export default function GroupDetail() {
           // Source captions are extra; a failure here shouldn't hide the board.
           return Promise.all([
             getManualDays(id, period).then(setManual, () => setManual({})),
+            // The competitions section is extra too: on failure it stays hidden rather than blocking the board.
+            getCompetitions(id).then((r) => setCompetitions(r ?? []), () => setCompetitions(null)),
             // Same for the sleep, weight, workout, food and water summaries, except that losing access must leave the screen.
             Promise.all([listMembers(id), getGroupShares(id), getGroupSleep(id), getGroupWeights(id), getGroupWorkouts(id), getGroupFood(id), getGroupWater(id)]).then(
               ([m, sh, sl, w, wo, fo, wa]) => setSummaries(buildMemberSummaries(m, sh, sl, w, wo, fo, wa)),
@@ -128,12 +136,22 @@ export default function GroupDetail() {
     [],
   );
 
+  // Running and upcoming competitions on the page; finished ones live behind All Competitions.
+  const live = (competitions ?? []).filter((r) => ['Active', 'Upcoming'].includes(competitionState(r, now)));
+  const contests = competitions && (
+    <Section title="Competitions">
+      {live.map((r) => <Row key={r.id} label={r.name} value={competitionState(r, now)} onPress={() => open(`competitions/${r.id}`)} />)}
+      <Row label={live.length ? 'All Competitions' : 'Competitions'} value={live.length ? undefined : 'None running'} icon={{ ios: 'trophy', android: 'emoji_events', web: 'emoji_events' }} last onPress={() => open('competitions')} />
+    </Section>
+  );
+
   // Scrolls with the list, so at large text sizes it doesn't squeeze the rows into a strip.
   const head = (
     <View style={styles.head}>
       <Text accessibilityRole="header" numberOfLines={large ? undefined : 2} maxFontSizeMultiplier={1.5} style={[ui.title, { color: c.ink }]}>
         {group?.name ?? ' '}
       </Text>
+      {contests}
       <View style={[styles.toggle, { backgroundColor: c.surface, borderColor: c.border }]} accessibilityRole="tablist">
         {PERIODS.map((p) => {
           const on = period === p.key;
@@ -165,11 +183,21 @@ export default function GroupDetail() {
 
   return (
     <View style={[{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }, Platform.OS === 'web' && ui.webWidth]}>
-      <View style={styles.header}>
-        <Button plain label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
-        <Button plain label="Chat" onPress={() => router.push(`/groups/chat?group=${id}`)} />
-        <Button plain label="Competitions" onPress={() => router.push(`/groups/${id}/competitions`)} />
-        <Button plain label="Group Info" onPress={() => router.push(`/groups/${id}/info`)} />
+      {/* The same back control as every other screen, with Chat and Info as icons on the right. */}
+      <View style={[styles.header, Platform.OS === 'web' && ui.webWidth]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={ui.back}>
+          <Icon name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} color={c.accent} size={20} />
+          <Text style={[ui.body, { color: c.accent }]}>Back</Text>
+        </Pressable>
+        <View style={styles.headerIcons}>
+          {/* Chats live in Social, so from Summary this one changes tab; the anchor keeps a Social list underneath. */}
+          <Pressable accessibilityRole="button" accessibilityLabel="Chat" onPress={() => router.push(`/groups/chat?group=${id}`, { withAnchor: true })} style={styles.headerIcon}>
+            <Icon name={{ ios: 'bubble.left.and.bubble.right', android: 'chat', web: 'chat' }} color={c.accent} size={22} />
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Group Info" onPress={() => open('info')} style={styles.headerIcon}>
+            <Icon name={{ ios: 'info.circle', android: 'info', web: 'info' }} color={c.accent} size={22} />
+          </Pressable>
+        </View>
       </View>
       {!rows && <View style={{ paddingHorizontal: 16 }}>{head}</View>}
       {error && !rows ? (
@@ -238,7 +266,9 @@ export default function GroupDetail() {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 8 },
+  headerIcons: { flexDirection: 'row' },
+  headerIcon: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   head: { paddingBottom: 12, gap: 12 },
   toggle: { flexDirection: 'row', flexWrap: 'wrap', maxWidth: '100%', borderWidth: 1, borderRadius: 999, padding: 2, alignSelf: 'flex-start' },
   tab: { minHeight: 44, minWidth: 96, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 999 },

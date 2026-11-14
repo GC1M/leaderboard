@@ -65,7 +65,8 @@ export default function LogSheet() {
         </View>
         <Row label="Weigh in" icon={{ ios: 'scalemass.fill', android: 'monitor_weight', web: 'monitor_weight' }} onPress={() => open('/weight')} />
         <Row label="Workout" icon={{ ios: 'dumbbell.fill', android: 'fitness_center', web: 'fitness_center' }} onPress={() => open('/workouts/new')} />
-        <Row label="Meal" icon={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }} last onPress={() => open('/food')} />
+        {/* The diary, like the Summary tile: one food screen, with Add Food on it. */}
+        <Row label="Meal" icon={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }} last onPress={() => open('/food/diary')} />
       </Section>
       <ErrorText>{error}</ErrorText>
     </View>

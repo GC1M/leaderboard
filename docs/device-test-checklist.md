@@ -95,7 +95,7 @@ Record each result as pass, fail (with what you saw) or skipped, then tick the m
 ## 7. Account switching and deletion (#27, #37, #50, last)
 
 - [ ] Sign out of A and sign in as B on the iPhone: none of A's Health data, workouts, food, drafts or routes appear, and no sync runs for A.
-- [ ] Back on A, Profile, Delete Imported Health Data: imported records go, manual ones stay, and nothing re-imports until Apple Health is reconnected.
+- [ ] Back on A, Profile, Your Data, Delete Imported Health Data: imported records go, manual ones stay, and nothing re-imports until Apple Health is reconnected.
 - [ ] Delete Food History with Health export on: Delete and Remove from Health leaves no food samples from this app in Health; Keep in Health leaves them. Offline, it asks for a connection and removes nothing.
 - [ ] Delete Account with Remove from Health: Health samples go first, then the account. Afterwards another account on the device shows none of A's data, and Health keeps A's samples only if Keep was chosen.
 

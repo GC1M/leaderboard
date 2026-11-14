@@ -750,6 +750,16 @@ isOneToOne: false
 "can_use_thread":
 { Args: { "p_competition_id": string,"p_group_id": string,"p_other_id": string }; Returns: boolean
                            },
+"competition_daily_values":
+{ Args: { "p_id": string }; Returns: {
+              "day": string,"user_id": string,"value": number
+            }[]
+                           },
+"competition_day_values":
+{ Args: { "p_id": string }; Returns: {
+              "day": string,"excluded": number,"fresh": string,"health": number,"manuals": number,"uid": string,"val": number
+            }[]
+                           },
 "competition_invite":
 { Args: { "p_code": string,"p_id": string }; Returns: Json
                            },
