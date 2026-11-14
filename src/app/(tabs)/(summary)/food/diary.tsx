@@ -67,6 +67,7 @@ export default function Diary() {
     <Screen
       title="Food Diary"
       back
+      headerActions={<Button plain label="History" onPress={() => router.push('/food/history')} />}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
@@ -121,9 +122,8 @@ export default function Diary() {
           ))}
         </>
       )}
-      <Button label="Log Food" onPress={() => router.push('/food')} />
+      <Button label="Add Food" onPress={() => router.push('/food')} />
       <Button plain label="Recipes and Meals" onPress={() => router.push('/food/recipes')} />
-      <Button plain label="History" onPress={() => router.push('/food/history')} />
       <Text style={[styles.caption, { color: c.inkSoft }]}>{ESTIMATE_NOTE}</Text>
       {entries?.some((e) => e.provider === 'usda_fdc') && <Text style={[styles.caption, { color: c.inkSoft }]}>{FDC_ATTRIBUTION}</Text>}
     </Screen>

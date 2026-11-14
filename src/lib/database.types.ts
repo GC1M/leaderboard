@@ -758,6 +758,11 @@ isOneToOne: false
               "eligibility": string,"excluded_entries": number,"health_entries": number,"manual_entries": number,"score": number,"updated_at": string,"user_id": string
             }[]
                            },
+"competition_daily_values":
+{ Args: { "p_id": string }; Returns: {
+              "day": string,"user_id": string,"value": number
+            }[]
+                           },
 "competition_share_metric":
 { Args: { "p_metric": string }; Returns: string
                            },

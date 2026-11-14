@@ -1,5 +1,4 @@
 import { act } from 'react';
-import { StyleSheet } from 'react-native';
 import { createRoot } from 'test-renderer';
 
 import GroupDetail from '@/app/(tabs)/groups/[id]';
@@ -65,13 +64,17 @@ describe('group leaderboard', () => {
     return { c, scroll, title };
   };
 
-  test('the title block scrolls with the list and the header wraps', async () => {
+  test('the title block scrolls with the list and the header keeps Back, Chat and Group Info above it', async () => {
     const { c, scroll, title } = await setup();
     expect(scroll.queryAll((n: any) => n === title)).toHaveLength(1);
     expect(texts(scroll, 'This Week')).toHaveLength(1);
     expect(texts(scroll, ' member')).toHaveLength(1);
-    const header = c.queryAll((n: any) => n.type === 'View' && StyleSheet.flatten(n.props.style)?.flexWrap === 'wrap');
-    expect(header.some((h: any) => texts(h, 'Group Info').length)).toBe(true);
+    // Icon buttons carry their names for VoiceOver, and sit in the fixed header rather than scrolling away.
+    for (const label of ['Back', 'Chat', 'Group Info']) {
+      const button = c.queryAll((n: any) => n.props.accessibilityLabel === label && n.props.onClick)[0];
+      expect(button).toBeTruthy();
+      expect(scroll.queryAll((n: any) => n === button)).toHaveLength(0);
+    }
     expect(title.props.numberOfLines).toBe(2);
   });
 

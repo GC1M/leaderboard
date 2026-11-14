@@ -114,6 +114,18 @@ export function rivalPace(rows: Pick<CompetitionStanding, 'user_id' | 'display_n
   const rival = ahead.length ? ahead.reduce((a, b) => (b.score! < a.score! ? b : a)) : others.reduce((a, b) => (b.score! > a.score! ? b : a));
   return { name: rival.display_name, perDay: Math.round(rival.score! / daysElapsed) };
 }
+// Every eligible participant's counted value per day (days with nothing counted are absent), for the race chart.
+export const getCompetitionDailyValues = (id: string) => checked(supabase.rpc('competition_daily_values', { p_id: id }));
+export type RaceLine = { user_id: string; display_name: string; rank: number; score: number; totals: number[] };
+// Cumulative totals per elapsed day for each ranked member, in standing order. Only `total` scoring adds up day by day,
+// so callers show the chart for that mode alone. Missing days carry the previous total forward.
+export function raceSeries(days: string[], values: { user_id: string; day: string; value: number }[], standings: Pick<CompetitionStanding, 'user_id' | 'display_name' | 'rank' | 'score'>[]): RaceLine[] {
+  return standings.filter((s): s is typeof s & { rank: number; score: number } => s.rank !== null && s.score !== null).sort((a, b) => a.rank - b.rank).map((s) => {
+    let sum = 0;
+    const totals = days.map((day) => { sum += values.filter((v) => v.user_id === s.user_id && v.day === day).reduce((t, v) => t + Number(v.value), 0); return sum; });
+    return { user_id: s.user_id, display_name: s.display_name, rank: s.rank, score: s.score, totals };
+  });
+}
 export type GroupCompetition = Competition & { groups: { name: string } | null; joined: boolean };
 // Competitions across all your groups (row security limits them to groups you belong to), newest first.
 export async function getMyCompetitions(uid: string): Promise<GroupCompetition[]> {

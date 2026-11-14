@@ -26,9 +26,10 @@ export default function Compete() {
   const order = (match: string | null) => (a: GroupCompetition, b: GroupCompetition) => match === 'Upcoming' ? Date.parse(a.starts_at) - Date.parse(b.starts_at) : match ? Date.parse(a.ends_at) - Date.parse(b.ends_at) : Date.parse(b.ends_at) - Date.parse(a.ends_at);
   return <Screen title="Compete" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setTries((v) => v + 1); }} />}>
     <ErrorText>{error}</ErrorText>{error && <Button plain label="Try Again" onPress={() => setTries((v) => v + 1)} />}
+    <Button label="New Competition" onPress={() => router.push('/compete/new')} />
     {rows === null ? !error && <Skeleton label="Loading competitions" /> : !rows.length ? <>
-      <Text style={[styles.body, { color: c.inkSoft }]}>No competitions in your groups yet. Create one from a group.</Text>
-      <Button secondary label="Go to Groups" onPress={() => router.navigate('/groups')} />
+      <Text style={[styles.body, { color: c.inkSoft }]}>No competitions in your groups yet. Create one for a group, or join a group first.</Text>
+      <Button secondary label="Go to Social" onPress={() => router.navigate('/groups')} />
     </> : groups.map(([title, match]) => {
       const list = rows.filter((r) => (match ? state(r) === match : state(r) !== 'Active' && state(r) !== 'Upcoming')).sort(order(match));
       return list.length ? <Section key={title} title={title}>

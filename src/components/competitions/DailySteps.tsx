@@ -10,7 +10,8 @@ const short = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString(un
 // entries this competition excludes an outline at their height, and days still to come stay empty.
 // The reference line is the pace of the person you are chasing, from totals the group already shares.
 // live is false once the competition has ended, so the last day is no longer called today.
-export function DailyStepsCard({ days, today, live, pace, noun = 'steps' }: { days: DailySteps[]; today: string; live: boolean; pace: { name: string; perDay: number } | null; noun?: string }) {
+// `label` names the card when the unit reads badly after "Your" (water is counted in mL).
+export function DailyStepsCard({ days, today, live, pace, noun = 'steps', label = `Your ${noun}` }: { days: DailySteps[]; today: string; live: boolean; pace: { name: string; perDay: number } | null; noun?: string; label?: string }) {
   const c = useTheme();
   const total = days.reduce((s, d) => s + (d.value ?? 0), 0);
   const todays = live ? days.find((d) => d.day === today) : undefined;
@@ -21,7 +22,7 @@ export function DailyStepsCard({ days, today, live, pace, noun = 'steps' }: { da
   const max = Math.max(1, ...days.map((d) => Math.max(d.value ?? 0, d.excluded)), pace?.perDay ?? 0);
   const h = (v: number) => Math.max(2, Math.round((v / max) * HEIGHT));
   const summary = [
-    `Your ${noun}, ${days.filter((d) => !d.future).length} of ${days.length} days.`,
+    `${label}, ${days.filter((d) => !d.future).length} of ${days.length} days.`,
     `Total ${total.toLocaleString()}.`,
     todays && !todays.future ? (todays.value === null ? `No ${noun} recorded today.` : `Today ${todays.value.toLocaleString()}.`) : '',
     best ? `Best day ${short(best.day)}, ${best.value!.toLocaleString()}.` : '',
@@ -31,7 +32,7 @@ export function DailyStepsCard({ days, today, live, pace, noun = 'steps' }: { da
     recorded.length ? `Your average ${Math.round(total / recorded.length).toLocaleString()} a day.` : '',
   ].filter(Boolean).join(' ');
   return (
-    <Card icon={{ ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' }} label={`Your ${noun}`} color={c.steps} meta="Only you see this">
+    <Card icon={{ ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' }} label={label} color={c.steps} meta="Only you see this">
       <View accessible accessibilityRole="image" accessibilityLabel={summary} style={{ gap: 12 }}>
         <View>
           <Text maxFontSizeMultiplier={1.5} style={[s.big, { color: c.ink }]}>

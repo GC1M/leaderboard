@@ -106,6 +106,7 @@ export default function Water() {
     <Screen
       title="Water"
       back
+      headerActions={<Button plain label="History" onPress={() => router.push('/water/history')} />}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await health.sync(); await load(); setRefreshing(false); }} />}
     >
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
@@ -202,7 +203,6 @@ export default function Water() {
           {m.lastSuccess && <Text style={[styles.caption, { color: c.inkSoft }]}>{`Last completed import: ${new Date(m.lastSuccess).toLocaleString()}`}</Text>}
         </View>
       )}
-      <Button plain label="History" onPress={() => router.push('/water/history')} />
       <Text style={[styles.caption, { color: c.inkSoft }]}>Only you can see your water. Group sharing of daily totals is controlled in Group Info.</Text>
     </Screen>
   );
