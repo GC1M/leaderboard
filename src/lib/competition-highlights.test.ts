@@ -32,7 +32,7 @@ test('amount highlights: biggest day, days won, streak, most improved, steadiest
   const grid = dayGrid(days, steps, standings);
   const h = Object.fromEntries(competitionHighlights(grid, days, true, 'steps', 'total', standings).map((x) => [x.key, x]));
   expect(h.biggest.who).toEqual(['me']); expect(h.biggest.detail).toMatch(/^1,400 steps on /);
-  expect(h.wins).toMatchObject({ who: ['maya', 'me'], detail: '3 of 6 days' });
+  expect(h.wins).toMatchObject({ who: ['me'], detail: '3 of 5 days' }); // today (Maya's) is not finished
   expect(h.streak).toMatchObject({ who: ['maya', 'me'], detail: '6 days in a row with steps' });
   // Finished days only (today is live): Sam went from 550 a day (days 1-2) to 1,300 (days 3-5).
   expect(h.improved).toMatchObject({ who: ['me'], detail: '+750 steps a day lately' });

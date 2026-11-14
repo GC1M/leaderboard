@@ -155,9 +155,10 @@ export function competitionHighlights(rows: DayGridRow[], days: string[], live: 
   if (!counts) {
     const big = rows.flatMap((r) => r.cells.map((v, i) => ({ r, v: v ?? 0, i }))).reduce((a, b) => (b.v > a.v ? b : a));
     if (big.v > 0) out.push({ key: 'biggest', title: 'Biggest day', who: [big.r.user_id], detail: `${big.v.toLocaleString()} ${unit} on ${short(days[big.i])}` });
-    const wins = dayWinners(rows, days.length).flat().reduce<Record<string, number>>((m, id) => ({ ...m, [id]: (m[id] ?? 0) + 1 }), {});
+    // Finished days only: today's leader can still change.
+    const wins = dayWinners(rows, done).flat().reduce<Record<string, number>>((m, id) => ({ ...m, [id]: (m[id] ?? 0) + 1 }), {});
     const most = Math.max(0, ...Object.values(wins));
-    if (most > 1) out.push({ key: 'wins', title: 'Most days won', who: Object.keys(wins).filter((id) => wins[id] === most), detail: `${most} of ${days.length} days` });
+    if (most > 1) out.push({ key: 'wins', title: 'Most days won', who: Object.keys(wins).filter((id) => wins[id] === most), detail: `${most} of ${done} days` });
   }
   const runs = rows.map((r) => longestRun(r.cells)); const run = Math.max(...runs);
   if (run >= 2) out.push({ key: 'streak', title: 'Longest streak', who: rows.filter((_, i) => runs[i] === run).map((r) => r.user_id), detail: `${run} days in a row ${metric === 'water_days_on_target' ? 'on target' : counts ? 'active' : `with ${unit}`}` });

@@ -1,4 +1,5 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { ScrollView, type ScrollViewInstance, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { Card, styles as ui } from '@/components/ui';
 import { dayCountMetric, dayWinners, type DayGridRow } from '@/lib/competitions';
 import { rounded, useTheme } from '@/theme';
@@ -13,6 +14,8 @@ const compact = (v: number) => (v >= 10_000 ? `${Math.round(v / 1000)}K` : v >= 
 // scroll sideways, starting at the end so today is in view.
 export function DayGrid({ rows, days, elapsed, uid, metric, unit }: { rows: DayGridRow[]; days: string[]; elapsed: number; uid: string; metric: string; unit: string }) {
   const c = useTheme();
+  const dark = useColorScheme() === 'dark';
+  const scroll = useRef<ScrollViewInstance>(null);
   if (rows.length < 2 || !elapsed) return null;
   const counts = dayCountMetric(metric);
   const past = rows.map((r) => r.cells.slice(0, elapsed));
@@ -21,7 +24,10 @@ export function DayGrid({ rows, days, elapsed, uid, metric, unit }: { rows: DayG
     const v = rows.map((r) => r.cells[i]).filter((x): x is number => x !== null && x > 0);
     return { lo: Math.min(...v), hi: Math.max(...v) };
   });
-  const shade = (v: number, i: number) => (counts ? (v ? 0.85 : 0) : v <= 0 ? 0 : range[i].hi === range[i].lo ? 0.9 : 0.18 + ((v - range[i].lo) / (range[i].hi - range[i].lo)) * 0.72);
+  // Fill tops out at 0.75 so dark ink stays readable on the light-mode orange (about 4.7:1 at the top); in dark mode the
+  // fill is light, so the value switches to the dark background color past 0.55.
+  const shade = (v: number, i: number) => (counts ? (v ? 0.75 : 0) : v <= 0 ? 0 : range[i].hi === range[i].lo ? 0.75 : 0.15 + ((v - range[i].lo) / (range[i].hi - range[i].lo)) * 0.6);
+  const onFill = (o: number) => (dark && o > 0.55 ? c.bg : c.ink);
   const name = (r: DayGridRow) => (r.user_id === uid ? 'You' : r.display_name);
   const won = (id: string) => winners.filter((w) => w.includes(id)).length;
   const summary = [
@@ -42,7 +48,7 @@ export function DayGrid({ rows, days, elapsed, uid, metric, unit }: { rows: DayG
             </View>
           ))}
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} ref={(s) => s?.scrollToEnd({ animated: false })}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} ref={scroll} onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
           <View style={{ gap: GAP }}>
             <View style={[styles.row, styles.head]}>
               {days.map((d, i) => (
@@ -58,7 +64,7 @@ export function DayGrid({ rows, days, elapsed, uid, metric, unit }: { rows: DayG
                   return (
                     <View key={i} style={[styles.cell, !o && { backgroundColor: c.lane }]}>
                       {o > 0 && <View style={[StyleSheet.absoluteFill, styles.fill, { backgroundColor: c.steps, opacity: o }]} />}
-                      <Text style={[styles.value, { color: o > 0.55 ? c.bg : c.ink }]}>{counts ? (v ? '✓' : '') : compact(v)}</Text>
+                      <Text style={[styles.value, { color: onFill(o) }]}>{counts ? (v ? '✓' : '') : compact(v)}</Text>
                       {winners[i]?.includes(r.user_id) && <Text style={styles.crown}>👑</Text>}
                     </View>
                   );
