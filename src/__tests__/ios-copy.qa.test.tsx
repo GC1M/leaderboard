@@ -68,9 +68,11 @@ test('HealthSyncStatus on iOS is headed Apple Health', async () => {
   expect(text).not.toContain('Health Connect');
 });
 
-test('Profile on iOS never mentions Health Connect, and delete-imports copy names the Health app', async () => {
+test('Profile and Your Data on iOS never mention Health Connect, and delete-imports copy names the Health app', async () => {
   const Profile = load('@/app/(tabs)/profile/index').default;
-  const { r, text } = await render(<Profile />);
+  expect((await render(<Profile />)).text).not.toContain('Health Connect');
+  const YourData = load('@/app/(tabs)/profile/data').default;
+  const { r, text } = await render(<YourData />);
   expect(text).not.toContain('Health Connect');
   const row = (r.container as any).queryAll((n: any) => n.props.onClick && JSON.stringify(n).includes('Delete Imported'))[0];
   expect(row).toBeTruthy();

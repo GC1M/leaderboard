@@ -1,4 +1,4 @@
-import { competitionDay, competitionDays, competitionGap, dailySteps, getMyCompetitions, rivalPace, competitionInviteLink, competitionState, createCompetition, joinCompetition, leaveCompetition, standingValue } from './competitions';
+import { competitionDay, competitionDays, competitionGap, dailySteps, getMyCompetitions, raceSeries, rivalPace, competitionInviteLink, competitionState, createCompetition, joinCompetition, leaveCompetition, standingValue } from './competitions';
 const mockRpc = jest.fn(); const mockFrom = jest.fn();
 jest.mock('./supabase', () => ({ supabase: { rpc: (...args: unknown[]) => mockRpc(...args), from: (...args: unknown[]) => mockFrom(...args) } }));
 beforeEach(() => { jest.clearAllMocks(); mockRpc.mockResolvedValue({ data: null, error: null }); });
@@ -65,6 +65,14 @@ test('daily steps keep missing days apart from recorded zeroes and excluded entr
     { measured_on: '2026-11-02', value: 0, included: true }, { measured_on: '2026-11-03', value: 900, included: false, reason: 'manual_entries_excluded' }, { measured_on: '2026-11-03', value: 300, included: false, reason: 'not_sharing' },
   ], '2026-11-03');
   expect(rows.map((r) => [r.value, r.excluded, r.future])).toEqual([[4500, 0, false], [0, 0, false], [null, 900, false], [null, 0, true]]);
+});
+test('race series add each day up in standing order, carry gaps forward and leave unranked members out', () => {
+  const lines = raceSeries(['2026-11-01', '2026-11-02', '2026-11-03'], [
+    { user_id: 'b', day: '2026-11-01', value: 5 }, { user_id: 'b', day: '2026-11-03', value: 1 },
+    { user_id: 'a', day: '2026-11-01', value: 1 }, { user_id: 'a', day: '2026-11-02', value: 2 }, { user_id: 'a', day: '2026-11-03', value: 3 },
+    { user_id: 'c', day: '2026-11-01', value: 9 },
+  ], [{ user_id: 'b', display_name: 'Theo', rank: 2, score: 6 }, { user_id: 'a', display_name: 'Maya', rank: 1, score: 6 }, { user_id: 'c', display_name: 'Ana', rank: null, score: null }]);
+  expect(lines.map((l) => [l.display_name, l.totals])).toEqual([['Maya', [1, 3, 6]], ['Theo', [5, 5, 6]]]);
 });
 test('rival pace chases the nearest person ahead, or the runner-up when you lead', () => {
   const rows = [{ user_id: 'a', display_name: 'Maya', score: 90 }, { user_id: 'b', display_name: 'Theo', score: 60 }, { user_id: 'me', display_name: 'Sam', score: 50 }, { user_id: 'c', display_name: 'Ana', score: null }];

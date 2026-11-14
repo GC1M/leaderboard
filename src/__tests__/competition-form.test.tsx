@@ -2,9 +2,12 @@ import { act } from 'react';
 import { createRoot } from 'test-renderer';
 import NewCompetition from '@/app/(tabs)/groups/[id]/competitions/new';
 const mockCreate = jest.fn(); const mockReplace = jest.fn();
-jest.mock('expo-router', () => ({ useRouter: () => ({ replace: mockReplace, back: jest.fn(), canGoBack: () => true }), useLocalSearchParams: () => ({ id: 'g1' }), useSegments: () => [] }));
+let mockParams: { id?: string } = { id: 'g1' };
+jest.mock('expo-router', () => ({ useRouter: () => ({ replace: mockReplace, back: jest.fn(), canGoBack: () => true }), useLocalSearchParams: () => mockParams, useSegments: () => [] }));
 jest.mock('@/lib/competitions', () => ({ ...jest.requireActual('@/lib/competitions'), createCompetition: (...args: unknown[]) => mockCreate(...args) }));
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
+const mockGroups = jest.fn();
+jest.mock('@/lib/groups', () => ({ listMyGroups: () => mockGroups() }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 let root: ReturnType<typeof createRoot>;
@@ -13,7 +16,7 @@ async function render() { root = createRoot(); await act(async () => root.render
 const find = (c: any, label: string, prop: string) => c.queryAll((n: any) => n.props[prop] && n.props.accessibilityLabel === label)[0];
 const click = async (c: any, label: string) => act(async () => find(c, label, 'onClick').props.onClick());
 const flip = async (c: any, label: string, value: boolean) => act(async () => c.queryAll((n: any) => n.type === 'RCTSwitch' && n.props.accessibilityLabel === label)[0].props.onChange({ nativeEvent: { value } }));
-beforeEach(() => { jest.clearAllMocks(); mockCreate.mockResolvedValue('c1'); });
+beforeEach(() => { jest.clearAllMocks(); mockParams = { id: 'g1' }; mockCreate.mockResolvedValue('c1'); mockGroups.mockResolvedValue([{ id: 'g1', name: 'Family' }, { id: 'g2', name: 'Work' }]); });
 test('metric chips, late joins, scoring and manual entries reach the server; the default is a steps total', async () => {
   const c = await render();
   expect(find(c, 'Steps', 'onClick').props.accessibilityState.selected).toBe(true);
@@ -28,7 +31,26 @@ test('metric chips, late joins, scoring and manual entries reach the server; the
   await click(c, 'Create competition');
   expect(mockCreate).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'active_days', scoring: 'best_streak', lateJoins: true, includeManual: true }));
   expect(mockCreate.mock.calls[1][0].endDay > mockCreate.mock.calls[1][0].firstDay).toBe(true);
-  expect(mockReplace).toHaveBeenCalledWith('/groups/g1/competitions/c1');
+  // Relative to the form's own directory: the group's stack, whether it was opened from Social or Summary.
+  expect(mockReplace).toHaveBeenCalledWith('../c1', { relativeToDirectory: true });
+});
+test('from the Compete tab the form asks for a group, then opens the competition in Compete', async () => {
+  mockParams = {};
+  const c = await render();
+  expect(mockGroups).toHaveBeenCalled();
+  await act(async () => find(c, 'Name', 'onChangeText').props.onChangeText('Any group'));
+  await click(c, 'Create competition');
+  expect(mockCreate).not.toHaveBeenCalled(); expect(JSON.stringify(c)).toContain('Choose a group.');
+  await click(c, 'Work');
+  await click(c, 'Create competition');
+  expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ groupId: 'g2', name: 'Any group' }));
+  expect(mockReplace).toHaveBeenCalledWith('/compete/g2/c1');
+});
+test('with no groups the form says so instead of offering a create button that can only fail', async () => {
+  mockParams = {}; mockGroups.mockResolvedValue([]);
+  const c = await render();
+  expect(JSON.stringify(c)).toContain('Create or join one in Social first');
+  expect(find(c, 'Create competition', 'onClick').props.accessibilityState.disabled).toBe(true);
 });
 test('a name is required and server errors are shown', async () => {
   const c = await render();

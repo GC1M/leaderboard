@@ -198,6 +198,8 @@ try {
     await page.getByRole('button', { name: 'Join Group', exact: true }).click();
     await page.getByRole('button', { name: 'Join Competition', exact: true }).waitFor();
     if (optIns) throw new Error('Group consent also enrolled in competition');
+    // The sources row sits behind the collapsed details.
+    await page.getByText('Details and rules', { exact: true }).click();
     await page.getByText('Health entries only', { exact: true }).waitFor();
     await page.getByText('0 steps', { exact: true }).waitFor();
     await page.getByText('No data', { exact: true }).waitFor();

@@ -44,11 +44,11 @@ test('Save Name dismisses the keyboard and confirms the save', async () => {
   act(() => r.unmount()); // the 2s "Saved" timer must not outlive the test
 });
 
-test('Delete Food History lets the user keep or remove the Health copies', async () => {
+test('Delete Food History, on the Your Data screen, lets the user keep or remove the Health copies', async () => {
   mockEntries = [{ kind: 'food', recordId: 'e1', op: 'save', status: 'success', version: 5 }, { kind: 'workout', recordId: 'w1', op: 'save', status: 'success', version: 5 }];
   mockDeleteFood.mockResolvedValue(undefined);
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Profile = require('@/app/(tabs)/profile/index').default;
+  const Profile = require('@/app/(tabs)/profile/data').default;
   const r = createRoot();
   await act(async () => r.render(<Profile />));
   const row = (r.container as any).queryAll((n: any) => n.props.onClick && JSON.stringify(n).includes('Delete Food History'))[0];

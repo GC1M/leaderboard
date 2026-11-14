@@ -3,20 +3,21 @@ import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { HealthSyncStatus } from '@/components/HealthSyncStatus';
+import { Sparkline } from '@/components/Sparkline';
 import { WeekChart } from '@/components/steps/WeekChart';
 import { Button, ErrorText, Icon, Row, Screen, Section, Skeleton, glass, styles as ui, useLargeText } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { flushLocalLogs } from '@/lib/flush-logs';
 import { getDailyTotals } from '@/lib/food/diary';
 import { listMyGroups, type MyGroup } from '@/lib/groups';
-import { lastNDates, localDateKey, readingDateLabel } from '@/lib/health/dates';
+import { lastNDates, localDateKey, readingDateLabel, startOfLocalDay } from '@/lib/health/dates';
 import { dateFromKey, formatSleep, formatWeight } from '@/lib/health/format';
 import type { StepRow } from '@/lib/health/rules';
 import { useHealthSync } from '@/lib/health/sync';
 import { formatValue, getLeaderboard, myStanding, type Standing } from '@/lib/leaderboard';
 import { getMyRecentSteps } from '@/lib/metrics';
 import { getMyRecentSleep } from '@/lib/sleep';
-import { getMyLatestWeight } from '@/lib/weight';
+import { getMyLatestWeight, getMyWeightHistory } from '@/lib/weight';
 import { useWeightUnit } from '@/lib/weight-unit';
 import { historyStart, totalsParts, weeklyTotals, type WeekTotals } from '@/lib/workout-history';
 import { useDistanceUnit } from '@/lib/distance-unit';
@@ -32,6 +33,9 @@ type Sleep = { date: string; value: number };
 type Weight = { kg: number; measuredAt: string };
 // Today's food: null when nothing is logged (not 0 kcal); kcal is null when no logged food had calories.
 type Food = { kcal: number | null; atLeast: boolean };
+// The last seven days of each tile's metric, oldest first, for its sparkline. Days without a value are null.
+type Week = (number | null)[];
+const week = (dates: string[], rows: { date: string; value: number | null }[]): Week => dates.map((d) => rows.find((r) => r.date === d)?.value ?? null);
 
 export default function Summary() {
   const c = useTheme();
@@ -46,6 +50,7 @@ export default function Summary() {
   const [food, setFood] = useState<Latest<Food>>();
   // Today's water in mL: null when nothing is logged (not 0 mL).
   const [water, setWater] = useState<Latest<number>>();
+  const [sparks, setSparks] = useState<{ sleep: Week; weight: Week; food: Week; water: Week } | null>(null);
   const [waterUnit] = useWaterUnit();
   const [unit] = useWeightUnit();
   const [cards, setCards] = useState<Card[] | null>(null);
@@ -63,11 +68,22 @@ export default function Summary() {
       const boards = await Promise.allSettled(groups.map((g) => getLeaderboard(g.id, 'steps', 'day')));
       // Sleep, weight and workouts fail on their own: an error shows on that card, not on the whole summary.
       const todayKey = localDateKey(new Date());
-      const [sl, wt, wo, fd, wa] = await Promise.allSettled([getMyRecentSleep(me, 30), getMyLatestWeight(me), listWorkoutsSince(historyStart(1)), getDailyTotals(todayKey, todayKey), getWaterTotals(todayKey, todayKey)]);
+      // Food and water come back for the last seven days: today's tile value, and the week for its sparkline.
+      const seven = lastNDates(7);
+      const [sl, wt, wo, fd, wa, wh] = await Promise.allSettled([getMyRecentSleep(me, 30), getMyLatestWeight(me), listWorkoutsSince(historyStart(1)), getDailyTotals(seven[0], todayKey), getWaterTotals(seven[0], todayKey), getMyWeightHistory(me, startOfLocalDay(new Date(), 6))]);
+      const todayFood = fd.status === 'fulfilled' ? fd.value.find((d) => d.date === todayKey) : undefined;
+      const todayWater = wa.status === 'fulfilled' ? wa.value.find((d) => d.date === todayKey) : undefined;
       setSleep(sl.status === 'fulfilled' ? (sl.value[sl.value.length - 1] ?? null) : 'error');
       setWeight(wt.status === 'fulfilled' ? wt.value : 'error');
-      setFood(fd.status === 'fulfilled' ? (fd.value[0] ? { kcal: fd.value[0].energy_kcal, atLeast: fd.value[0].kcalIncomplete } : null) : 'error');
-      setWater(wa.status === 'fulfilled' ? (wa.value[0]?.totalMl ?? null) : 'error');
+      setFood(fd.status === 'fulfilled' ? (todayFood ? { kcal: todayFood.energy_kcal, atLeast: todayFood.kcalIncomplete } : null) : 'error');
+      setWater(wa.status === 'fulfilled' ? (todayWater?.totalMl ?? null) : 'error');
+      setSparks({
+        sleep: week(seven, sl.status === 'fulfilled' ? sl.value : []),
+        // One dot per day, at the day's last reading.
+        weight: week(seven, wh.status === 'fulfilled' ? wh.value.map((r) => ({ date: localDateKey(new Date(r.measuredAt)), value: r.kg })).reverse() : []),
+        food: week(seven, fd.status === 'fulfilled' ? fd.value.map((d) => ({ date: d.date, value: d.energy_kcal })) : []),
+        water: week(seven, wa.status === 'fulfilled' ? wa.value.map((d) => ({ date: d.date, value: d.totalMl })) : []),
+      });
       setWorkouts(wo.status === 'fulfilled' ? weeklyTotals(wo.value, 1)[0] : 'error');
       setSteps(s);
       setCards(groups.map((g, i) => ({ ...g, standing: boards[i].status === 'fulfilled' ? myStanding(boards[i].value, me) : null })));
@@ -119,7 +135,7 @@ export default function Summary() {
                     key={g.id}
                     accessibilityRole="button"
                     accessibilityLabel={`${g.name}. ${noData ? 'No steps data yet today' : `You are ${s!.rankLabel} of ${s!.members}, ${formatValue('steps', value)} steps`}.`}
-                    onPress={() => router.push(`/groups/${g.id}`, { withAnchor: true })}
+                    onPress={() => router.push(`/group/${g.id}`)}
                     style={({ pressed }) => [styles.race, i < cards.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line }, { opacity: pressed ? 0.7 : 1 }]}
                   >
                     <View style={styles.raceTop}>
@@ -163,6 +179,7 @@ export default function Summary() {
               value={typeof sleep === 'object' && sleep ? formatSleep(sleep.value) : null}
               when={typeof sleep === 'object' && sleep ? readingDateLabel(dateFromKey(sleep.date)) : null}
               state={sleep === 'error' ? 'error' : sleep ? 'ok' : 'empty'}
+              spark={sparks?.sleep}
               onPress={() => router.push('/sleep')}
             />
             <Tile
@@ -170,6 +187,8 @@ export default function Summary() {
               value={typeof weight === 'object' && weight ? formatWeight(weight.kg, unit) : null}
               when={typeof weight === 'object' && weight ? readingDateLabel(new Date(weight.measuredAt)) : null}
               state={weight === 'error' ? 'error' : weight ? 'ok' : 'empty'}
+              spark={sparks?.weight}
+              dots
               onPress={() => router.push('/weight')}
             />
             <Tile
@@ -178,6 +197,7 @@ export default function Summary() {
               when="Today"
               empty="Nothing logged"
               state={food === 'error' ? 'error' : typeof food === 'object' && food ? 'ok' : 'empty'}
+              spark={sparks?.food}
               onPress={() => router.push('/food/diary')}
             />
             <Tile
@@ -186,6 +206,7 @@ export default function Summary() {
               when="Today"
               empty="Nothing logged"
               state={water === 'error' ? 'error' : typeof water === 'number' ? 'ok' : 'empty'}
+              spark={sparks?.water}
               onPress={() => router.push('/water')}
             />
           </View>
@@ -206,13 +227,16 @@ export default function Summary() {
 }
 
 // Half-width glass tile with the latest value. `when` says which day the value is from, so an old reading never
-// reads as today's. Tiles stack to one column at accessibility text sizes.
-function Tile({ title, value, when, state, empty = 'No data', onPress }: {
+// reads as today's. The week's sparkline hints at the chart behind the tile. Tiles stack to one column at
+// accessibility text sizes.
+function Tile({ title, value, when, state, empty = 'No data', spark, dots, onPress }: {
   title: string;
   value: string | null;
   when: string | null;
   state: 'ok' | 'empty' | 'error';
   empty?: string;
+  spark?: Week;
+  dots?: boolean;
   onPress: () => void;
 }) {
   const c = useTheme();
@@ -228,6 +252,7 @@ function Tile({ title, value, when, state, empty = 'No data', onPress }: {
       <Text style={[styles.label, { color: c.inkSoft }]}>{title}</Text>
       <Text maxFontSizeMultiplier={1.5} numberOfLines={1} adjustsFontSizeToFit style={[state === 'ok' ? styles.tileValue : styles.tileEmpty, { color: state === 'ok' ? c.ink : state === 'error' ? c.danger : c.inkFaint }]}>{text}</Text>
       {when ? <Text style={[ui.caption, { color: c.inkFaint }]}>{when}</Text> : null}
+      {spark && <Sparkline values={spark} dots={dots} />}
     </Pressable>
   );
 }
