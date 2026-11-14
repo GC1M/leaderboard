@@ -126,6 +126,67 @@ export function raceSeries(days: string[], values: { user_id: string; day: strin
     return { user_id: s.user_id, display_name: s.display_name, rank: s.rank, score: s.score, totals };
   });
 }
+// Metrics whose day value is 1 or 0 (on target or not) rather than an amount.
+export const dayCountMetric = (metric: string) => metric === 'water_days_on_target' || metric === 'active_days';
+export type DayGridRow = { user_id: string; display_name: string; rank: number; cells: (number | null)[] };
+// Each ranked member's value on each given day, in standing order; null where nothing was counted that day.
+export function dayGrid(days: string[], values: { user_id: string; day: string; value: number }[], standings: Pick<CompetitionStanding, 'user_id' | 'display_name' | 'rank' | 'score'>[]): DayGridRow[] {
+  const at = new Map(values.map((v) => [`${v.user_id} ${v.day}`, Number(v.value)]));
+  return standings.filter((s): s is typeof s & { rank: number } => s.rank !== null && s.score !== null).sort((a, b) => a.rank - b.rank)
+    .map((s) => ({ user_id: s.user_id, display_name: s.display_name, rank: s.rank, cells: days.map((d) => at.get(`${s.user_id} ${d}`) ?? null) }));
+}
+// Who had the biggest value each day (ties share it); nobody wins a day where the best is zero or missing.
+export const dayWinners = (rows: DayGridRow[], dayCount: number) => Array.from({ length: dayCount }, (_, i) => {
+  const best = Math.max(0, ...rows.map((r) => r.cells[i] ?? 0));
+  return best > 0 ? rows.filter((r) => r.cells[i] === best).map((r) => r.user_id) : [];
+});
+const longestRun = (cells: (number | null)[]) => cells.reduce<[number, number]>(([run, best], v) => { const n = (v ?? 0) > 0 ? run + 1 : 0; return [n, Math.max(best, n)]; }, [0, 0])[1];
+const mean = (cells: (number | null)[]) => { const v = cells.filter((x): x is number => x !== null); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
+// `who` holds user ids, so the card can say "You".
+export type Highlight = { key: string; title: string; who: string[]; detail: string };
+// Fun facts from the day-by-day values. `rows` cover the days so far (today last when `live`); a day still in progress
+// is left out of comparisons it would unfairly drag down. Each highlight appears only when it says something.
+export function competitionHighlights(rows: DayGridRow[], days: string[], live: boolean, metric: string, scoring: string, standings: Pick<CompetitionStanding, 'user_id' | 'display_name' | 'rank' | 'score'>[]): Highlight[] {
+  if (rows.length < 2 || !days.length) return [];
+  const unit = metricUnit(metric); const counts = dayCountMetric(metric);
+  const done = live ? days.length - 1 : days.length;
+  const short = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const out: Highlight[] = [];
+  if (!counts) {
+    const big = rows.flatMap((r) => r.cells.map((v, i) => ({ r, v: v ?? 0, i }))).reduce((a, b) => (b.v > a.v ? b : a));
+    if (big.v > 0) out.push({ key: 'biggest', title: 'Biggest day', who: [big.r.user_id], detail: `${big.v.toLocaleString()} ${unit} on ${short(days[big.i])}` });
+    const wins = dayWinners(rows, days.length).flat().reduce<Record<string, number>>((m, id) => ({ ...m, [id]: (m[id] ?? 0) + 1 }), {});
+    const most = Math.max(0, ...Object.values(wins));
+    if (most > 1) out.push({ key: 'wins', title: 'Most days won', who: Object.keys(wins).filter((id) => wins[id] === most), detail: `${most} of ${days.length} days` });
+  }
+  const runs = rows.map((r) => longestRun(r.cells)); const run = Math.max(...runs);
+  if (run >= 2) out.push({ key: 'streak', title: 'Longest streak', who: rows.filter((_, i) => runs[i] === run).map((r) => r.user_id), detail: `${run} days in a row ${metric === 'water_days_on_target' ? 'on target' : counts ? 'active' : `with ${unit}`}` });
+  if (counts && done >= 2) {
+    const perfect = rows.filter((r) => r.cells.slice(0, done).every((v) => v === 1));
+    if (perfect.length) out.push({ key: 'perfect', title: 'Perfect so far', who: perfect.map((r) => r.user_id), detail: `Every finished day ${metric === 'water_days_on_target' ? 'on target' : 'active'}` });
+  }
+  if (!counts && done >= 4) {
+    // Most improved: second half of the finished days against the first half.
+    const half = Math.floor(done / 2);
+    const gains = rows.map((r) => { const a = mean(r.cells.slice(0, half)); const b = mean(r.cells.slice(half, done)); return a === null || b === null ? null : b - a; });
+    const gain = Math.max(0, ...gains.map((g) => g ?? 0));
+    if (gain > 0) out.push({ key: 'improved', title: 'Most improved', who: [rows[gains.indexOf(gain)].user_id], detail: `+${Math.round(gain).toLocaleString()} ${unit} a day lately` });
+  }
+  if (!counts && done >= 3) {
+    // Steadiest: smallest swing around their own average, among people with at least three finished days counted.
+    const spread = rows.map((r) => { const v = r.cells.slice(0, done).filter((x): x is number => x !== null); const m = mean(v); return v.length < 3 || !m ? null : Math.sqrt(v.reduce((s, x) => s + (x - m) ** 2, 0) / v.length) / m; });
+    const ok = spread.filter((s): s is number => s !== null);
+    if (ok.length >= 2) out.push({ key: 'steady', title: 'Steadiest', who: [rows[spread.indexOf(Math.min(...ok))].user_id], detail: `Most even ${unit} day to day` });
+  }
+  // Closest battle: the two neighbouring ranks nearest each other, once there are at least three people to compare.
+  const ranked = standings.filter((s): s is typeof s & { rank: number; score: number } => s.rank !== null && s.score !== null).sort((a, b) => a.rank - b.rank);
+  if (ranked.length >= 3) {
+    const pairs = ranked.slice(1).map((s, i) => ({ a: ranked[i], b: s, gap: ranked[i].score - s.score }));
+    const close = pairs.reduce((x, y) => (y.gap < x.gap ? y : x));
+    out.push({ key: 'battle', title: 'Closest battle', who: [close.a.user_id, close.b.user_id], detail: close.gap === 0 ? 'Dead even' : `${standingValue({ score: close.gap, eligibility: 'eligible' }, metric, scoring)} apart` });
+  }
+  return out;
+}
 export type GroupCompetition = Competition & { groups: { name: string } | null; joined: boolean };
 // Competitions across all your groups (row security limits them to groups you belong to), newest first.
 export async function getMyCompetitions(uid: string): Promise<GroupCompetition[]> {

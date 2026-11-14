@@ -5,10 +5,12 @@ import { Button, Card, ErrorText, Row, Screen, Section, Skeleton, styles } from 
 import { DailyStepsCard } from '@/components/competitions/DailySteps';
 import { CompetitionIntegrity, confirmFinalize } from '@/components/competitions/Integrity';
 import { RaceChart } from '@/components/competitions/RaceChart';
+import { DayGrid } from '@/components/competitions/DayGrid';
+import { Highlights } from '@/components/competitions/Highlights';
 import { CompetitionStandings, GapHighlight } from '@/components/competitions/Standings';
 import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
-import { competitionDay, competitionDays, competitionInviteLink, competitionState, dailySteps, getCompetition, getCompetitionDailyValues, getCompetitionStandings, getMyContributions, finalizeCompetition, getParticipation, metricLabel, metricNeedsTimezone, metricUnit, raceSeries, rivalPace, SCORING, type CompetitionStanding, joinCompetition, leaveCompetition, type Competition, type Participation } from '@/lib/competitions';
+import { competitionDay, competitionDays, competitionHighlights, dayGrid, competitionInviteLink, competitionState, dailySteps, getCompetition, getCompetitionDailyValues, getCompetitionStandings, getMyContributions, finalizeCompetition, getParticipation, metricLabel, metricNeedsTimezone, metricUnit, raceSeries, rivalPace, SCORING, type CompetitionStanding, joinCompetition, leaveCompetition, type Competition, type Participation } from '@/lib/competitions';
 import { useCompetitionClock } from '@/lib/competition-clock';
 import { dateInZone } from '@/lib/health/dates';
 import { supabase } from '@/lib/supabase';
@@ -81,11 +83,20 @@ export default function CompetitionDetail() {
           : <Text style={[styles.caption, { color: c.inkSoft }]}>You can finalize after {new Date(finalizeAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}.</Text>)}
       </Card>}
       {row.status !== 'cancelled' && standings !== null && <>
-        {!upcoming && <GapHighlight rows={standings} metric={row.metric} scoring={row.scoring} uid={uid} />}
+        {!upcoming && <GapHighlight rows={standings} metric={row.metric} scoring={row.scoring} uid={uid} daysLeft={t < end ? days.filter((d) => d >= today).length : 0} />}
         <CompetitionStandings rows={standings} metric={row.metric} scoring={row.scoring} uid={uid} final={row.status === 'finalized'} now={now} meta={refreshed ? `updated ${refreshed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : undefined} />
         {row.status === 'finalized' && <Text style={[styles.caption, { color: c.inkSoft }]}>Finalized {new Date(row.finalized_at!).toLocaleString()}. Later corrections do not change these scores. Privacy choices still apply.</Text>}
         {/* The race adds days up, so it only describes a total; frozen results no longer move, so it stops at finalization. */}
-        {!upcoming && row.status === 'scheduled' && row.scoring === 'total' && race && <RaceChart lines={raceSeries(days.filter((d) => d <= today), race, standings)} uid={uid} unit={metricLabel(row.metric)} dayCount={days.length} />}
+        {!upcoming && row.status === 'scheduled' && row.scoring === 'total' && joined && race && <RaceChart lines={raceSeries(days.filter((d) => d <= today), race, standings)} uid={uid} unit={metricLabel(row.metric)} dayCount={days.length} />}
+        {/* Day-by-day values only reach people who joined, and stop at finalization like the race. */}
+        {!upcoming && row.status === 'scheduled' && joined && race && (() => {
+          const grid = dayGrid(days, race, standings);
+          const sofar = days.filter((d) => d <= today);
+          return <>
+            <DayGrid rows={grid} days={days} elapsed={sofar.length} uid={uid} metric={row.metric} unit={metricLabel(row.metric)} />
+            <Highlights items={competitionHighlights(grid.map((g) => ({ ...g, cells: g.cells.slice(0, sofar.length) })), sofar, t < end, row.metric, row.scoring, standings)} names={Object.fromEntries(standings.map((s) => [s.user_id, s.display_name]))} uid={uid} />
+          </>;
+        })()}
         {!upcoming && joined && records && noun && <DailyStepsCard noun={noun} label={label} days={dailySteps(days, records, today)} today={today} live={t < end} pace={row.scoring === 'total' && row.metric !== 'water_days_on_target' ? rivalPace(standings, uid, elapsed) : null} />}
       </>}
       {/* Chat is for joined participants; the Compete tab opens it in Social, so anchor that stack. */}
